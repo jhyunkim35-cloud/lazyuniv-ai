@@ -2428,7 +2428,8 @@
 <div id="splitViewer" style="display:none; position:fixed; inset:0; z-index:10000; background:var(--bg); flex-direction:column; overflow:hidden;">
   <div id="splitTopBar" style="height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 1rem; background:var(--surface2); border-bottom:1px solid var(--border); flex-shrink:0;">
     <span style="font-size:0.9rem; font-weight:600; color:var(--text);">📖 슬라이드 + 학습 노트</span>
-    <div style="display:flex; gap:0.5rem;">
+    <div style="display:flex; gap:0.5rem; align-items:center;">
+      <button id="splitDebugBtn" class="action-btn" title="디버그 리포트 복사" style="display:none; font-size:0.85rem; padding:0.25rem 0.5rem;" onclick="copyDebugReport()">📋</button>
       <button id="splitTwoColBtn" class="action-btn">2단</button>
       <button id="splitPdfBtn" class="action-btn">⬇ PDF</button>
       <button id="splitSaveBtn" class="action-btn">💾 저장</button>
@@ -2532,6 +2533,7 @@ let abortController = null;      // cancel support
 let currentNoteId  = null;       // id of the note currently loaded
 let _accordionOpenLabels = new Set(); // persists accordion open state across tab switches
 let draggedNoteId  = null;       // id of the note being dragged
+let _lastGenerationError = '';   // last pipeline error message for debug report
 
 /* Sleep that rejects immediately when the user clicks cancel.
    Plain setTimeout ignores AbortSignal, so a 429 retry wait of up to
@@ -4282,6 +4284,7 @@ analyzeBtn.addEventListener('click', async () => {
       showToast('분석이 취소되었습니다.');
     } else {
       console.error(err);
+      _lastGenerationError = `[${new Date().toISOString()}] ${err.name}: ${err.message}`;
       showToast(`❌ 오류: ${err.message}`);
     }
     setProgress(null);
