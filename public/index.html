@@ -5315,22 +5315,42 @@ async function agent1_patchNotes(apiKey, notesText, critiqueText, targetBodyEl =
   setAgentNode(1, 'loading', 'Haiku 패치 중…');
 
   const targetEl = targetBodyEl || document.getElementById('finalNotesBody');
-  const dot      = makeAgentDot(1);
 
-  const systemPrompt = '당신은 학습 노트 교정 전문가입니다. 주어진 지시에만 따르고, 나머지는 원문 그대로 유지하세요. 모든 출력은 한국어로 작성하세요.';
+  const systemPrompt = 'You are a precise text patch assistant. Return ONLY valid JSON, no markdown fences, no explanation.';
   const userPrompt =
-`아래 학습 노트에서 [CRITICAL] 태그가 붙은 수정 사항만 적용하세요.
-그 외 내용은 절대 변경하지 마세요. 수정된 전체 노트를 반환하세요.
+`You are given a note and a critique. Return ONLY the fixes as a JSON array.
+Each fix: {"old": "exact text to find", "new": "replacement text"}
+Return NOTHING else, no markdown fences, just the JSON array.
 
-[원본 노트]
+[NOTE]
 ${notesText}
 
-[수정 지시]
+[CRITIQUE]
 ${critiqueText}`;
 
-  agentLog(1, 'Haiku — 핵심 수정 사항만 적용 중…');
-  const patched = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, null, 'claude-haiku-4-5-20251001');
+  agentLog(1, 'Haiku — JSON 패치 목록 생성 중…');
+  targetEl.innerHTML = '<div class="loading-row"><div class="spinner"></div><span>Haiku 패치 적용 중…</span></div>';
 
+  const raw = await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-haiku-4-5-20251001');
+
+  let patched = notesText;
+  try {
+    const fixes = JSON.parse(raw);
+    let fixCount = 0;
+    fixes.forEach(f => {
+      if (f.old && f.new !== undefined && patched.includes(f.old)) {
+        patched = patched.replaceAll(f.old, f.new);
+        fixCount++;
+      }
+    });
+    agentLog(1, `Haiku 패치 적용 — ${fixes.length}개 항목 중 ${fixCount}개 매칭`);
+  } catch (_) {
+    // JSON parse failed — treat raw response as full replacement note
+    agentLog(1, 'JSON 파싱 실패 — 전체 응답을 노트로 사용 (폴백)');
+    patched = raw;
+  }
+
+  targetEl.innerHTML = renderMarkdown(patched);
   storedNotesText = patched;
 
   if (!targetBodyEl) {
@@ -5342,7 +5362,7 @@ ${critiqueText}`;
     document.getElementById('dotNotes').className = 'status-dot done';
   }
 
-  agentLog(1, `Haiku 패치 완료 — ${patched.length.toLocaleString()}자`);
+  agentLog(1, `Haiku 패치 완료 — 최종 노트 ${patched.length.toLocaleString()}자`);
   setAgentNode(1, 'done', '완료');
   return patched;
 }
