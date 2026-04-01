@@ -5315,7 +5315,8 @@ ${critiqueText}`;
 
   let patched = notesText;
   try {
-    const fixes = JSON.parse(raw);
+    const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+    const fixes = JSON.parse(cleaned);
     let fixCount = 0;
     fixes.forEach(f => {
       if (f.old && f.new !== undefined && patched.includes(f.old)) {
@@ -5325,9 +5326,8 @@ ${critiqueText}`;
     });
     agentLog(1, `Haiku 패치 적용 — ${fixes.length}개 항목 중 ${fixCount}개 매칭`);
   } catch (_) {
-    // JSON parse failed — treat raw response as full replacement note
-    agentLog(1, 'JSON 파싱 실패 — 전체 응답을 노트로 사용 (폴백)');
-    patched = raw;
+    // JSON parse failed — keep original note unchanged
+    agentLog(1, 'JSON 파싱 실패 — 원본 노트 유지 (폴백)');
   }
 
   targetEl.innerHTML = renderMarkdown(patched);
