@@ -16,7 +16,7 @@ function checkRateLimit(ip) {
 }
 
 const ALLOWED_ORIGINS = [
-  'https://lecturenote-ai.vercel.app',  // production
+  'https://lazyuniv-ai.vercel.app',  // production
   'http://localhost:3000',               // local dev
 ];
 
