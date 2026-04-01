@@ -4203,6 +4203,9 @@ analyzeBtn.addEventListener('click', async () => {
 
   // disable download buttons until notes are ready
   [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+  const _dbgBtnReset = document.getElementById('splitDebugBtn');
+  if (_dbgBtnReset) _dbgBtnReset.style.display = 'none';
+  _lastGenerationError = '';
 
   resultsEl.classList.add('visible');
   document.getElementById('agentSection').classList.add('visible');
@@ -4304,6 +4307,52 @@ document.getElementById('cancelBtn').addEventListener('click', () => {
     stopElapsedTimer();
   }
 });
+
+/* ═══════════════════════════════════════════════
+   Debug report
+═══════════════════════════════════════════════ */
+async function copyDebugReport() {
+  const sep = '\n' + '='.repeat(60) + '\n';
+
+  const notesMd = storedNotesText
+    || document.getElementById('splitNotes')?.innerText
+    || document.getElementById('finalNotesBody')?.innerText
+    || '(없음)';
+
+  const critiqueEl = document.getElementById('tab-critique');
+  const pipelineLog = [
+    ..._debugLog,
+    ...(critiqueEl ? ['--- 비평 피드백 ---', critiqueEl.innerText.trim()] : []),
+  ].join('\n') || '(없음)';
+
+  const slideText = storedPptText || '(없음)';
+
+  const errors = _lastGenerationError || '(없음)';
+
+  const report = [
+    `디버그 리포트 — ${new Date().toLocaleString('ko-KR')}`,
+    sep,
+    '## Generated Note',
+    notesMd,
+    sep,
+    '## Pipeline Log',
+    pipelineLog,
+    sep,
+    '## Slide Text Input',
+    slideText,
+    sep,
+    '## Errors',
+    errors,
+  ].join('\n');
+
+  try {
+    await navigator.clipboard.writeText(report);
+  } catch (_) {
+    const ta = Object.assign(document.createElement('textarea'), { value: report, style: 'position:fixed;opacity:0' });
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+  }
+  showToast('✅ 디버그 리포트가 복사되었습니다!');
+}
 
 /* ═══════════════════════════════════════════════
    Download button handlers
@@ -5226,6 +5275,8 @@ ${recText}`;
   /* enable download buttons — single mode only */
   if (!targetBodyEl) {
     [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    const dbgBtn = document.getElementById('splitDebugBtn');
+    if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
     document.getElementById('collapseBtn').classList.add('visible');
     document.getElementById('dotNotes').className = 'status-dot done';
@@ -6078,6 +6129,8 @@ async function openSavedNote(id) {
 
   // Enable action buttons (they start disabled until a pipeline runs)
   [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+  const _dbgBtnRestore = document.getElementById('splitDebugBtn');
+  if (_dbgBtnRestore) _dbgBtnRestore.style.display = '';
   document.getElementById('notesActions')?.classList.add('visible');
   document.getElementById('collapseBtn')?.classList.add('visible');
 
