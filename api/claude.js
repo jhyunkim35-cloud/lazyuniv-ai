@@ -1,3 +1,4 @@
+const fetch = globalThis.fetch || require('node-fetch');
 const rateLimit = new Map();
 const RATE_LIMIT = 10; // requests per minute
 const RATE_WINDOW = 60 * 1000;
