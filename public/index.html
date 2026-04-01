@@ -405,8 +405,6 @@
     #splitSlides .slide-label { text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; }
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
-    .split-notes-twocol { column-count:2; column-gap:2rem; column-rule:1px solid var(--border); }
-    .split-notes-twocol h1, .split-notes-twocol h2 { column-span:all; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
     .split-tab:hover { color:var(--text); }
     .split-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
@@ -2431,7 +2429,6 @@
     <span style="font-size:0.9rem; font-weight:600; color:var(--text);">📖 슬라이드 + 학습 노트</span>
     <div style="display:flex; gap:0.5rem; align-items:center;">
       <button id="splitDebugBtn" class="action-btn" title="디버그 리포트 복사" style="display:none; font-size:0.85rem; padding:0.25rem 0.5rem;" onclick="copyDebugReport()">📋</button>
-      <button id="splitTwoColBtn" class="action-btn">2단</button>
       <button id="splitPdfBtn" class="action-btn">⬇ PDF</button>
       <button id="splitSaveBtn" class="action-btn">💾 저장</button>
       <button id="splitCloseBtn" class="action-btn">✕ 닫기</button>
@@ -4451,23 +4448,6 @@ document.getElementById('splitCloseBtn').addEventListener('click', () => {
   switchView('home');
 });
 
-document.getElementById('splitTwoColBtn').addEventListener('click', () => {
-  const btn        = document.getElementById('splitTwoColBtn');
-  const slidesEl   = document.getElementById('splitSlides');
-  const rightEl    = document.getElementById('splitRight');
-  const isCurrentlyTwo = slidesEl.style.display !== 'none';
-  if (isCurrentlyTwo) {
-    // Switch to 1단: hide slides, notes full width
-    slidesEl.style.display = 'none';
-    rightEl.style.width    = '100%';
-    btn.textContent        = '2단';
-  } else {
-    // Switch to 2단: show slides, restore split
-    slidesEl.style.display = '';
-    rightEl.style.width    = '50%';
-    btn.textContent        = '1단';
-  }
-});
 
 function switchSplitTab(tab) {
   document.querySelectorAll('#splitTabs .split-tab').forEach(btn => {
@@ -5028,7 +5008,7 @@ function getFormatDisplayName() {
 }
 
 function getAgent1SystemPrompt() {
-  return `당신은 대학 강의 학습 가이드 작성 전문가입니다. PPT 슬라이드 구조를 뼈대로 삼고, 강의 녹취록의 교수님 설명을 녹여 시험 대비에 최적화된 학습 가이드를 작성합니다. 모든 출력은 한국어로 작성하세요. 반드시 PPT의 모든 슬라이드를 빠짐없이 다룰 것. 슬라이드를 건너뛰거나 여러 슬라이드를 하나로 병합하지 말 것. PPT의 모든 슬라이드를 빠짐없이 다루되, 각 개념은 시험에 필요한 수준으로 서술하세요.`;
+  return `당신은 대학 강의 학습 가이드 작성 전문가입니다. PPT 슬라이드 구조를 뼈대로 삼고, 강의 녹취록의 교수님 설명을 녹여 시험 대비에 최적화된 학습 가이드를 작성합니다. 모든 출력은 한국어로 작성하세요. 반드시 PPT의 모든 슬라이드를 빠짐없이 다룰 것. 슬라이드를 건너뛰거나 여러 슬라이드를 하나로 병합하지 말 것. PPT의 모든 슬라이드를 빠짐없이 다루되, 각 개념은 시험에 필요한 수준으로 서술하세요. When a slide contains a structural diagram, flowchart, graph, or visual model that cannot be adequately represented in text or markdown table, add a line: '📊 **[슬라이드 p.X 이미지 참조]**' to indicate users should refer to the slide image. Do NOT attempt to recreate complex diagrams in text.`;
 }
 
 function getNoteFormatBlocks() {
