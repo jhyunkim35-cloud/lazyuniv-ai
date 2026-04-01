@@ -4936,66 +4936,75 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
       const iterTargetEl = targetBodyEl || document.getElementById('finalNotesBody');
       iterTargetEl.querySelectorAll('figure[data-slide-inserted]').forEach(f => f.remove());
 
-      /* ── Agent 1: write / revise notes ── */
-      debugLog('PIPE', `Iter ${iter} — Agent1 start, hasTxt=${!!storedFilteredText}, critique=${!!critiqueText}`);
-      const isRevision = iter > 1;
-      const fmtName = getFormatDisplayName();
-      if (!targetBodyEl) {
-        document.getElementById('notesCardTitle').textContent =
-          isRevision ? `📚 통합 학습 노트 (${iter}차 수정 중…)` : `📚 통합 학습 노트 (작성 중… ${fmtName})`;
-      }
-      analyzeBtn.textContent = isRevision
-        ? `⏳ Agent 1: ${iter}차 노트 수정 중…`
-        : `⏳ Agent 1: 노트 작성 중… (${fmtName})`;
-      setProgress(20 + (iter - 1) * 25, `Agent 1: ${iter}차 노트 ${isRevision ? '수정' : '작성'} 중… ${fmtName}`);
-      notesText = await agent1_writeNotes(apiKey, storedPptText, storedFilteredText, critiqueText, targetBodyEl);
-      debugLog('PIPE', `Iter ${iter} — Agent1 done, notes=${notesText.length}chars`);
-      if (!targetBodyEl) {
-        document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
-      }
+      if (iter === 1) {
+        /* ── Iter 1: Sonnet writes full note ── */
+        debugLog('PIPE', `Iter ${iter} — Agent1 start, hasTxt=${!!storedFilteredText}, critique=${!!critiqueText}`);
+        const fmtName = getFormatDisplayName();
+        if (!targetBodyEl) {
+          document.getElementById('notesCardTitle').textContent = `📚 통합 학습 노트 (작성 중… ${fmtName})`;
+        }
+        analyzeBtn.textContent = `⏳ Agent 1: 노트 작성 중… (${fmtName})`;
+        setProgress(20, `Agent 1: 노트 작성 중… ${fmtName}`);
+        notesText = await agent1_writeNotes(apiKey, storedPptText, storedFilteredText, '', targetBodyEl);
+        debugLog('PIPE', `Iter ${iter} — Agent1 done, notes=${notesText.length}chars`);
+        if (!targetBodyEl) document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
 
-      /* ── Agent 2: critique ── */
-      analyzeBtn.textContent = `⏳ Agent 2: ${iter}차 검토 중…`;
-      setProgress(30 + (iter - 1) * 25, `Agent 2: ${iter}차 검토 중…`);
-      critiqueText = await agent2_critiqueNotes(apiKey, notesText, storedPptText, storedFilteredText, iter);
-      const isDone = critiqueText.includes(DONE_SIGNAL);
-      debugLog('PIPE', `Iter ${iter} — Agent2 done, isDone=${isDone}, critique=${critiqueText.length}chars`);
+        /* ── Iter 1: Sonnet critiques ── */
+        analyzeBtn.textContent = `⏳ Agent 2: ${iter}차 검토 중…`;
+        setProgress(45, `Agent 2: ${iter}차 검토 중…`);
+        critiqueText = await agent2_critiqueNotes(apiKey, notesText, storedPptText, storedFilteredText, iter);
+        const isDone = critiqueText.includes(DONE_SIGNAL);
+        debugLog('PIPE', `Iter ${iter} — Agent2 done, isDone=${isDone}, critique=${critiqueText.length}chars`);
 
-      const iterDuration = Date.now() - iterStart;
-      iterTimings.push(iterDuration);
-      updateIterCounter('done', iter);
+        const iterDuration = Date.now() - iterStart;
+        iterTimings.push(iterDuration);
+        updateIterCounter('done', iter);
+        addIterChip(iter, isDone);
 
-      /* ── Stop condition ── */
-      addIterChip(iter, isDone);
+        if (isDone) {
+          updateETA(iterTimings, 0);
+          const finalBar = document.getElementById('agentFinalBar');
+          finalBar.innerHTML =
+            `✅ ${iter}차 검토 완료 — 학습 노트가 원본과 일치합니다 (총 ${Math.round(iterTimings.reduce((a,b)=>a+b,0)/1000)}초 소요)`;
+          finalBar.classList.add('visible');
+          agentLog(0, `━━━ 완료 (${iter}차에 검토 통과) ━━━`);
+          break;
+        }
 
-      if (isDone) {
-        updateETA(iterTimings, 0);
+        /* prepare iter 2 */
+        agentLog(0, `수정 사항 발견 → ${iter + 1}차 Haiku 패치 진행`);
+        updateETA(iterTimings, 1);
+        await new Promise(r => setTimeout(r, 300));
+        for (let n = 1; n <= 2; n++) {
+          document.getElementById('anode'   + n).className   = 'agent-node';
+          document.getElementById('astatus' + n).textContent = `${iter + 1}차 준비`;
+        }
+        document.getElementById('aconn1').classList.remove('active');
+
+      } else {
+        /* ── Iter 2+: Haiku applies critical fixes only, skip re-critique ── */
+        debugLog('PIPE', `Iter ${iter} — Haiku patch start, critique=${critiqueText.length}chars`);
+        if (!targetBodyEl) {
+          document.getElementById('notesCardTitle').textContent = `📚 통합 학습 노트 (${iter}차 Haiku 패치 중…)`;
+        }
+        analyzeBtn.textContent = `⏳ Haiku: ${iter}차 핵심 수정 중…`;
+        setProgress(65, `Haiku: ${iter}차 핵심 수정 중…`);
+        notesText = await agent1_patchNotes(apiKey, notesText, critiqueText, targetBodyEl);
+        debugLog('PIPE', `Iter ${iter} — Haiku patch done, notes=${notesText.length}chars`);
+        if (!targetBodyEl) document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
+
+        const iterDuration = Date.now() - iterStart;
+        iterTimings.push(iterDuration);
+        updateIterCounter('done', iter);
+        addIterChip(iter, false);
+
         const finalBar = document.getElementById('agentFinalBar');
         finalBar.innerHTML =
-          `✅ ${iter}차 검토 완료 — 학습 노트가 원본과 일치합니다 (총 ${Math.round(iterTimings.reduce((a,b)=>a+b,0)/1000)}초 소요)`;
+          `✅ Haiku 패치 완료 — 최종 노트가 위에 표시됩니다 (총 ${Math.round(iterTimings.reduce((a,b)=>a+b,0)/1000)}초 소요)`;
         finalBar.classList.add('visible');
-        agentLog(0, `━━━ 완료 (${iter}차에 검토 통과) ━━━`);
+        agentLog(0, `━━━ Haiku 패치 완료 — 종료 ━━━`);
         break;
       }
-
-      if (iter === MAX_ITERATIONS) {
-        const finalBar = document.getElementById('agentFinalBar');
-        finalBar.innerHTML =
-          `⚠️ 최대 ${MAX_ITERATIONS}회 반복 완료 — 최종 노트가 위에 표시됩니다`;
-        finalBar.classList.add('visible');
-        agentLog(0, `━━━ 최대 반복 도달 — 종료 ━━━`);
-        break;
-      }
-
-      /* prepare next iteration */
-      agentLog(0, `수정 사항 발견 → ${iter + 1}차 수정 진행`);
-      updateETA(iterTimings, MAX_ITERATIONS - iter);
-      await new Promise(r => setTimeout(r, 300));
-      for (let n = 1; n <= 2; n++) {
-        document.getElementById('anode'   + n).className   = 'agent-node';
-        document.getElementById('astatus' + n).textContent = `${iter + 1}차 준비`;
-      }
-      document.getElementById('aconn1').classList.remove('active');
     }
 
     /* ── Transcript highlighting ── */
@@ -5297,6 +5306,45 @@ ${recText}`;
   agentLog(1, `노트 ${critiqueText ? '수정' : '작성'} 완료 — ${notesText.length.toLocaleString()}자`);
   setAgentNode(1, 'done', '완료');
   return notesText;
+}
+
+/* ═══════════════════════════════════════════════
+   Agent 1b — Haiku Patch (Iter 2: apply critical fixes only)
+═══════════════════════════════════════════════ */
+async function agent1_patchNotes(apiKey, notesText, critiqueText, targetBodyEl = null) {
+  setAgentNode(1, 'loading', 'Haiku 패치 중…');
+
+  const targetEl = targetBodyEl || document.getElementById('finalNotesBody');
+  const dot      = makeAgentDot(1);
+
+  const systemPrompt = '당신은 학습 노트 교정 전문가입니다. 주어진 지시에만 따르고, 나머지는 원문 그대로 유지하세요. 모든 출력은 한국어로 작성하세요.';
+  const userPrompt =
+`아래 학습 노트에서 [CRITICAL] 태그가 붙은 수정 사항만 적용하세요.
+그 외 내용은 절대 변경하지 마세요. 수정된 전체 노트를 반환하세요.
+
+[원본 노트]
+${notesText}
+
+[수정 지시]
+${critiqueText}`;
+
+  agentLog(1, 'Haiku — 핵심 수정 사항만 적용 중…');
+  const patched = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, null, 'claude-haiku-4-5-20251001');
+
+  storedNotesText = patched;
+
+  if (!targetBodyEl) {
+    [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    const dbgBtn = document.getElementById('splitDebugBtn');
+    if (dbgBtn) dbgBtn.style.display = '';
+    document.getElementById('notesActions').classList.add('visible');
+    document.getElementById('collapseBtn').classList.add('visible');
+    document.getElementById('dotNotes').className = 'status-dot done';
+  }
+
+  agentLog(1, `Haiku 패치 완료 — ${patched.length.toLocaleString()}자`);
+  setAgentNode(1, 'done', '완료');
+  return patched;
 }
 
 /* ═══════════════════════════════════════════════
