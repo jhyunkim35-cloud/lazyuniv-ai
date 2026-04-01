@@ -411,7 +411,7 @@
     .split-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
 
     /* ── Accordion tab ─────────────────────────── */
-    #splitAccordion { flex:1; min-height:0; overflow-y:auto; padding:1.5rem; display:none; }
+    #splitAccordion { flex:1; min-height:0; overflow-y:auto; padding:1.5rem; }
     details.accordion-h1 { margin:0.5rem 0; border-left:3px solid var(--primary); padding-left:0.8rem; }
     details.accordion-h2 { margin:0.3rem 0 0.3rem 0.5rem; border-left:2px solid var(--secondary); padding-left:0.8rem; }
     .accordion-h1 > summary { font-size:1.05rem; color:#b4a0ff; font-weight:700; cursor:pointer; padding:0.4rem 0; }
@@ -2530,6 +2530,7 @@ let imageDescriptions  = {};       // slideNumber → description (Mode 2 only)
 let isRunning      = false;      // double-click guard
 let abortController = null;      // cancel support
 let currentNoteId  = null;       // id of the note currently loaded
+let _accordionOpenLabels = new Set(); // persists accordion open state across tab switches
 let draggedNoteId  = null;       // id of the note being dragged
 
 /* Sleep that rejects immediately when the user clicks cancel.
@@ -3042,17 +3043,27 @@ function extractSlideContent(slideXml, notesXml) {
     const trEls = tbls[0].getElementsByTagName('a:tr').length
       ? tbls[0].getElementsByTagName('a:tr')
       : tbls[0].getElementsByTagName('tr');
-    const rows = Array.from(trEls).map(tr => {
+    const rows = [];
+    Array.from(trEls).forEach((tr, rowIdx) => {
       const tcEls = tr.getElementsByTagName('a:tc').length
         ? tr.getElementsByTagName('a:tc')
         : tr.getElementsByTagName('tc');
       const cells = Array.from(tcEls).map(tc => {
-        const atEls = tc.getElementsByTagName('a:t').length
-          ? tc.getElementsByTagName('a:t')
-          : tc.getElementsByTagName('t');
-        return Array.from(atEls).map(n => n.textContent.trim()).filter(Boolean).join(' ') || ' ';
+        const apEls = tc.getElementsByTagName('a:p').length
+          ? tc.getElementsByTagName('a:p')
+          : tc.getElementsByTagName('p');
+        const cellText = Array.from(apEls).map(ap => {
+          const atEls = ap.getElementsByTagName('a:t').length
+            ? ap.getElementsByTagName('a:t')
+            : ap.getElementsByTagName('t');
+          return Array.from(atEls).map(n => n.textContent.trim()).filter(Boolean).join('');
+        }).filter(Boolean).join(' / ').replace(/<[^>]*>/g, '') || ' ';
+        return cellText;
       });
-      return '| ' + cells.join(' | ') + ' |';
+      rows.push('| ' + cells.join(' | ') + ' |');
+      if (rowIdx === 0) {
+        rows.push('| ' + cells.map(() => '---').join(' | ') + ' |');
+      }
     });
     if (rows.length) tables.push(rows.join('\n'));
   }
@@ -4416,10 +4427,23 @@ function switchSplitTab(tab) {
     }
   }
 
+  if (tab !== 'accordion') {
+    // Save open state before leaving accordion tab
+    _accordionOpenLabels = new Set(
+      Array.from(accordionEl.querySelectorAll('details[open] > summary'))
+        .map(s => s.textContent.trim())
+    );
+  }
+
   if (tab === 'accordion' && !accordionEl.innerHTML.trim()) {
     accordionEl.innerHTML = notesEl.innerHTML.trim()
       ? buildAccordionView(notesEl)
       : '<span class="placeholder-msg">노트가 없습니다.</span>';
+    if (_accordionOpenLabels.size) {
+      accordionEl.querySelectorAll('details > summary').forEach(s => {
+        if (_accordionOpenLabels.has(s.textContent.trim())) s.parentElement.open = true;
+      });
+    }
   }
 
 
@@ -4468,14 +4492,15 @@ function buildAccordionView(sourceEl) {
     } else {
       const frag = node.outerHTML;
       if (h2Label !== null) {
-        // Level 3: content belongs inside the current Level 2 block
+        // Content belongs inside the current Level 2 block
         h2Content += frag;
-      } else if (h1Label === null) {
+      } else if (h1Label !== null) {
+        // Content between h1 and first h2 goes directly into the h1 body
+        h1Body += `<div class="accordion-content">${frag}</div>`;
+      } else {
         // Pre-h1 content (e.g. summary paragraph before first #)
         outerHtml += frag;
       }
-      // Content between # and first ## is intentionally skipped —
-      // all body content should live inside a Level 2 block
     }
   }
   closeH1();
