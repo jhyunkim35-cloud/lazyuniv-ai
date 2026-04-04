@@ -5011,7 +5011,7 @@ function getFormatDisplayName() {
 }
 
 function getAgent1SystemPrompt() {
-  return `당신은 대학 강의 학습 가이드 작성 전문가입니다. PPT 슬라이드 구조를 뼈대로 삼고, 강의 녹취록의 교수님 설명을 녹여 시험 대비에 최적화된 학습 가이드를 작성합니다. 모든 출력은 한국어로 작성하세요. 반드시 PPT의 모든 슬라이드를 빠짐없이 다룰 것. 슬라이드를 건너뛰거나 여러 슬라이드를 하나로 병합하지 말 것. PPT의 모든 슬라이드를 빠짐없이 다루되, 각 개념은 시험에 필요한 수준으로 서술하세요. When a slide contains a structural diagram, flowchart, graph, or visual model that cannot be adequately represented in text or markdown table, add a line: '📊 **[슬라이드 p.X 이미지 참조]**' to indicate users should refer to the slide image. Do NOT attempt to recreate complex diagrams in text.`;
+  return `당신은 대학 강의 학습 가이드 작성 전문가입니다. PPT 슬라이드 구조를 뼈대로 삼고, 강의 녹취록의 교수님 설명을 녹여 시험 대비에 최적화된 학습 가이드를 작성합니다. 모든 출력은 한국어로 작성하세요. 반드시 PPT의 모든 슬라이드를 빠짐없이 다룰 것. 슬라이드를 건너뛰거나 여러 슬라이드를 하나로 병합하지 말 것. PPT의 모든 슬라이드를 빠짐없이 다루되, 각 개념은 시험에 필요한 수준으로 서술하세요. Tables from slides MUST be recreated as markdown tables. For structural diagrams, flowcharts, graphs, or visual models that cannot be represented as text or tables, add: '📊 **[슬라이드 p.X 이미지 참조]**'. Do NOT recreate complex visual diagrams in text, but always recreate tabular data as markdown tables.`;
 }
 
 function getNoteFormatBlocks() {
