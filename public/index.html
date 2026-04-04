@@ -558,6 +558,9 @@
     .md-table td { background: var(--surface2); }
     .md-table tr:hover td { background: rgba(124, 77, 255, 0.06); }
 
+    .md-content table, #splitAccordion .md-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+    .md-content th, .md-content td, #splitAccordion .md-content th, #splitAccordion .md-content td { min-width: 60px; white-space: nowrap; }
+
     @media print {
       .md-table,
       .md-table th,
@@ -5314,10 +5317,10 @@ ${critiqueText}`;
   const raw = await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-haiku-4-5-20251001');
 
   let patched = notesText;
+  let fixCount = 0;
   try {
     const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
     const fixes = JSON.parse(cleaned);
-    let fixCount = 0;
     fixes.forEach(f => {
       if (f.old && f.new !== undefined && patched.includes(f.old)) {
         patched = patched.replaceAll(f.old, f.new);
@@ -5328,6 +5331,28 @@ ${critiqueText}`;
   } catch (_) {
     // JSON parse failed — keep original note unchanged
     agentLog(1, 'JSON 파싱 실패 — 원본 노트 유지 (폴백)');
+  }
+
+  if (fixCount === 0 && critiqueText.includes('[CRITICAL]')) {
+    console.log('JSON patch matched 0 fixes — falling back to full Haiku rewrite');
+    agentLog(1, 'JSON 패치 0개 매칭 — Haiku 전체 재작성으로 폴백');
+    const rewriteSystem = '당신은 전문 학습 노트 작성가입니다. 모든 답변은 한국어로 작성하세요.';
+    const rewritePrompt =
+`Apply ONLY the [CRITICAL] fixes from the critique below to the note, then return the full corrected note.
+
+[NOTE]
+${notesText}
+
+[CRITIQUE]
+${critiqueText}`;
+    patched = await callClaudeStream(
+      apiKey, rewritePrompt, targetEl, document.getElementById('dotNotes'),
+      rewriteSystem, 8192, null, 'claude-haiku-4-5-20251001'
+    );
+    storedNotesText = patched;
+    setAgentNode(1, 'done', '완료');
+    agentLog(1, `Haiku 전체 재작성 완료 — 최종 노트 ${patched.length.toLocaleString()}자`);
+    return patched;
   }
 
   targetEl.innerHTML = renderMarkdown(patched);
