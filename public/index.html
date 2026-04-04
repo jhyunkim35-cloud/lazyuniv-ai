@@ -2049,6 +2049,13 @@
     .note-card.drag-over-bottom { border-bottom:2px solid var(--primary); }
     .note-card-drag-handle { opacity:0; transition:opacity 0.15s; cursor:grab; font-size:1.1rem; color:var(--text-muted); padding:0 0.1rem; user-select:none; flex-shrink:0; margin-top:0.1rem; }
     .note-card:hover .note-card-drag-handle { opacity:1; }
+    .note-card-checkbox { position:absolute; top:0.55rem; left:0.55rem; width:17px; height:17px; cursor:pointer; z-index:2; accent-color:var(--primary); display:none; }
+    .bulk-select-mode .note-card-checkbox { display:block; }
+    .bulk-select-mode .note-card-drag-handle { visibility:hidden; }
+    .note-card.bulk-selected { border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-dim); }
+    #bulkDeleteBar { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%); background:var(--surface2); border:1px solid var(--border-bright); border-radius:12px; padding:0.65rem 1.1rem; display:none; align-items:center; gap:0.9rem; z-index:400; box-shadow:0 4px 24px rgba(0,0,0,0.35); white-space:nowrap; font-size:0.88rem; }
+    #bulkDeleteBar.visible { display:flex; }
+    #bulkSelectToggleBtn.active { border-color:var(--primary); color:var(--primary); background:var(--primary-dim); }
 
     /* ── Settings Panel ──────────────────────────── */
     #settingsPanel { position:fixed; top:52px; right:1rem; width:320px; max-height:calc(100vh - 60px); background:var(--surface); border:1px solid var(--border); border-radius:10px; z-index:10001; overflow-y:auto; padding:1rem; flex-direction:column; gap:0.8rem; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:none; }
@@ -2178,7 +2185,10 @@
     <div>
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
         <h2 style="font-size:1.1rem; font-weight:700; color:var(--text);">모든 노트</h2>
-        <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
+        <div style="display:flex;gap:0.4rem;">
+          <button id="bulkSelectToggleBtn" class="action-btn" onclick="toggleBulkSelectMode()">선택</button>
+          <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
+        </div>
       </div>
       <div id="allNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
       <div id="emptyHomeMsg" style="display:none; text-align:center; padding:3rem; color:var(--text-muted);">
@@ -3441,6 +3451,7 @@ function renderMarkdown(raw) {
   closeAll();
   let html = `<div class="md-content">${output.join('')}</div>`;
   html = html.replace(/<strong>⭐\s*([^<]*)<\/strong>/g, '<strong class="highlight-important">⭐ $1</strong>');
+  html = html.replace(/&lt;br&gt;/gi, '<br>').replace(/&lt;br\/&gt;/gi, '<br>');
   return html;
 }
 
@@ -4352,7 +4363,7 @@ async function copyDebugReport() {
     const ta = Object.assign(document.createElement('textarea'), { value: report, style: 'position:fixed;opacity:0' });
     document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
   }
-  showToast('✅ 디버그 리포트가 복사되었습니다!');
+  showToast('복사 완료!');
 }
 
 /* ═══════════════════════════════════════════════
@@ -5011,7 +5022,7 @@ function getFormatDisplayName() {
 }
 
 function getAgent1SystemPrompt() {
-  return `당신은 대학 강의 학습 가이드 작성 전문가입니다. PPT 슬라이드 구조를 뼈대로 삼고, 강의 녹취록의 교수님 설명을 녹여 시험 대비에 최적화된 학습 가이드를 작성합니다. 모든 출력은 한국어로 작성하세요. 반드시 PPT의 모든 슬라이드를 빠짐없이 다룰 것. 슬라이드를 건너뛰거나 여러 슬라이드를 하나로 병합하지 말 것. PPT의 모든 슬라이드를 빠짐없이 다루되, 각 개념은 시험에 필요한 수준으로 서술하세요. Tables from slides MUST be recreated as markdown tables. For structural diagrams, flowcharts, graphs, or visual models that cannot be represented as text or tables, add: '📊 **[슬라이드 p.X 이미지 참조]**'. Do NOT recreate complex visual diagrams in text, but always recreate tabular data as markdown tables.`;
+  return `당신은 대학 강의 학습 가이드 작성 전문가입니다. PPT 슬라이드 구조를 뼈대로 삼고, 강의 녹취록의 교수님 설명을 녹여 시험 대비에 최적화된 학습 가이드를 작성합니다. 모든 출력은 한국어로 작성하세요. 반드시 PPT의 모든 슬라이드를 빠짐없이 다룰 것. 슬라이드를 건너뛰거나 여러 슬라이드를 하나로 병합하지 말 것. PPT의 모든 슬라이드를 빠짐없이 다루되, 각 개념은 시험에 필요한 수준으로 서술하세요. Tables from slides MUST be recreated as markdown tables. For structural diagrams, flowcharts, graphs, or visual models that cannot be represented as text or tables, add: '📊 **[슬라이드 p.X 이미지 참조]**'. Do NOT recreate complex visual diagrams in text, but always recreate tabular data as markdown tables. You MUST cover ALL slides from the first to the last. NEVER stop early or skip slides. If content is long, compress each section but cover every slide. NEVER use <br> or any HTML tags inside markdown tables. If a cell needs multiple items, separate them with semicolons or commas instead.`;
 }
 
 function getNoteFormatBlocks() {
@@ -5261,17 +5272,55 @@ ${critiqueText}`;
     notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-20250514');
 
   } else {
-    /* ── First write: single Sonnet call with full transcript ── */
-    agentLog(1, `PPT + 녹취록 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`);
+    /* ── First write: single or chunked Sonnet call with full transcript ── */
+    const slideMatches = [...pptText.matchAll(/\[(?:슬라이드|페이지) (\d+)\]([\s\S]*?)(?=\[(?:슬라이드|페이지) \d+\]|$)/g)];
+    const totalSlides = slideMatches.length;
 
-    const userPrompt = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.
+    if (totalSlides > 18) {
+      /* ── Chunked mode: split slides into 2 chunks ── */
+      const splitAt = Math.ceil(totalSlides / 2);
+      const chunk1Slides = slideMatches.slice(0, splitAt);
+      const chunk2Slides = slideMatches.slice(splitAt);
+
+      const slide1Start = parseInt(chunk1Slides[0][1], 10);
+      const slide1End   = parseInt(chunk1Slides[chunk1Slides.length - 1][1], 10);
+      const slide2Start = parseInt(chunk2Slides[0][1], 10);
+      const slide2End   = parseInt(chunk2Slides[chunk2Slides.length - 1][1], 10);
+
+      const pptChunk1 = chunk1Slides.map(m => m[0]).join('');
+      const pptChunk2 = chunk2Slides.map(m => m[0]).join('');
+
+      debugLog('PIPE', `Chunk 1/2 — slides ${slide1Start}-${slide1End}, Chunk 2/2 — slides ${slide2Start}-${slide2End}`);
+      agentLog(1, `슬라이드 ${totalSlides}개 감지 — 2청크 분할: 청크1 (${slide1Start}-${slide1End}), 청크2 (${slide2Start}-${slide2End})`);
+
+      const cachePrefix1 = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk1}`;
+      const userPrompt1  = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. Write notes for slides ${slide1Start}-${slide1End} only. More slides follow in a separate call.\n\n[강의 녹취록]\n${recText}`;
+
+      agentLog(1, `청크 1/2 스트리밍 중 (슬라이드 ${slide1Start}-${slide1End})…`);
+      const chunk1Text = await callClaudeStream(apiKey, userPrompt1, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix1, 'claude-sonnet-4-20250514');
+
+      const cachePrefix2 = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk2}`;
+      const userPrompt2  = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. Write notes for slides ${slide2Start}-${slide2End} only. Continue from previous notes. Match the same format.\n\n[강의 녹취록]\n${recText}`;
+
+      agentLog(1, `청크 2/2 스트리밍 중 (슬라이드 ${slide2Start}-${slide2End})…`);
+      const chunk2Text = await callClaudeStream(apiKey, userPrompt2, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix2, 'claude-sonnet-4-20250514');
+
+      notesText = chunk1Text + '\n\n' + chunk2Text;
+      targetEl.innerHTML = renderMarkdown(notesText);
+
+    } else {
+      /* ── Single-pass mode ── */
+      agentLog(1, `PPT + 녹취록 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`);
+
+      const userPrompt = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.
 
 [강의 녹취록]
 ${recText}`;
 
-    agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
-    debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-20250514');
+      agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
+      debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
+      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-20250514');
+    }
   }
 
   storedNotesText = notesText;
@@ -5345,9 +5394,10 @@ ${notesText}
 
 [CRITIQUE]
 ${critiqueText}`;
+    const fallbackDot = targetBodyEl ? makeAgentDot(1) : document.getElementById('dotNotes');
     patched = await callClaudeStream(
-      apiKey, rewritePrompt, targetEl, document.getElementById('dotNotes'),
-      rewriteSystem, 8192, null, 'claude-haiku-4-5-20251001'
+      apiKey, rewritePrompt, targetEl, fallbackDot,
+      rewriteSystem, 16000, null, 'claude-haiku-4-5-20251001'
     );
     storedNotesText = patched;
     setAgentNode(1, 'done', '완료');
@@ -6569,6 +6619,14 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   notes.slice(0, 4).forEach(note => recentGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
 
   allGrid.innerHTML = '';
+  if (_bulkSelectMode) {
+    allGrid.classList.add('bulk-select-mode');
+    // Cards are rebuilt — stale selections are gone; reset count
+    _selectedNoteIds.clear();
+    const allChk = document.getElementById('bulkSelectAllChk');
+    if (allChk) { allChk.checked = false; allChk.indeterminate = false; }
+    _updateBulkBar();
+  }
   if (!displayNotes.length) {
     emptyMsg.style.display = '';
     const icon = document.getElementById('emptyHomeIcon');
@@ -6618,6 +6676,7 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
   const preview = (note.notesText || '')
     .replace(/^#+\s+.*/gm, '').replace(/\*\*/g, '').replace(/\n+/g, ' ').trim().slice(0, 100);
   card.innerHTML = `
+    <input type="checkbox" class="note-card-checkbox">
     <span class="note-card-drag-handle">⠿</span>
     <div class="note-card-content">
       <div class="note-card-folder">${folderName ? colorDot + '📁 ' + escHtml(folderName) : '📄 미분류'}</div>
@@ -6633,7 +6692,23 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
       <button title="폴더 이동">📁</button>
       <button title="삭제">🗑</button>
     </div>`;
-  card.addEventListener('click', () => openSavedNote(note.id));
+  const checkbox = card.querySelector('.note-card-checkbox');
+  checkbox.addEventListener('click', e => {
+    e.stopPropagation();
+    if (checkbox.checked) { _selectedNoteIds.add(note.id); card.classList.add('bulk-selected'); }
+    else                  { _selectedNoteIds.delete(note.id); card.classList.remove('bulk-selected'); }
+    _updateBulkBar();
+  });
+  card.addEventListener('click', () => {
+    if (_bulkSelectMode) {
+      checkbox.checked = !checkbox.checked;
+      if (checkbox.checked) { _selectedNoteIds.add(note.id); card.classList.add('bulk-selected'); }
+      else                  { _selectedNoteIds.delete(note.id); card.classList.remove('bulk-selected'); }
+      _updateBulkBar();
+      return;
+    }
+    openSavedNote(note.id);
+  });
   const [renameBtn, moveBtn, deleteBtn] = card.querySelectorAll('.note-card-actions button');
   renameBtn.addEventListener('click', e => { e.stopPropagation(); renameSavedNote(note.id); });
   moveBtn.addEventListener('click',   e => { e.stopPropagation(); moveSavedNote(note.id); });
@@ -6818,6 +6893,70 @@ window.addEventListener('beforeunload', e => {
 });
 
 /* ═══════════════════════════════════════════════
+   Bulk Delete
+═══════════════════════════════════════════════ */
+let _bulkSelectMode = false;
+const _selectedNoteIds = new Set();
+
+function toggleBulkSelectMode() {
+  _bulkSelectMode = !_bulkSelectMode;
+  _selectedNoteIds.clear();
+  const grid = document.getElementById('allNotesGrid');
+  const btn  = document.getElementById('bulkSelectToggleBtn');
+  const bar  = document.getElementById('bulkDeleteBar');
+  if (grid)  grid.classList.toggle('bulk-select-mode', _bulkSelectMode);
+  if (btn)   btn.classList.toggle('active', _bulkSelectMode);
+  if (bar)   bar.classList.toggle('visible', _bulkSelectMode);
+  // reset checkboxes
+  grid && grid.querySelectorAll('.note-card-checkbox').forEach(cb => { cb.checked = false; });
+  grid && grid.querySelectorAll('.note-card').forEach(c => c.classList.remove('bulk-selected'));
+  const allChk = document.getElementById('bulkSelectAllChk');
+  if (allChk) allChk.checked = false;
+  _updateBulkBar();
+}
+
+function _updateBulkBar() {
+  const count = document.getElementById('bulkSelectCount');
+  const allChk = document.getElementById('bulkSelectAllChk');
+  if (count) count.textContent = `${_selectedNoteIds.size}개 선택됨`;
+  if (allChk) {
+    const grid = document.getElementById('allNotesGrid');
+    const total = grid ? grid.querySelectorAll('.note-card[data-note-id]').length : 0;
+    allChk.checked = total > 0 && _selectedNoteIds.size === total;
+    allChk.indeterminate = _selectedNoteIds.size > 0 && _selectedNoteIds.size < total;
+  }
+}
+
+function toggleBulkSelectAll(checked) {
+  const grid = document.getElementById('allNotesGrid');
+  if (!grid) return;
+  grid.querySelectorAll('.note-card[data-note-id]').forEach(card => {
+    const id = card.dataset.noteId;
+    const cb = card.querySelector('.note-card-checkbox');
+    if (checked) { _selectedNoteIds.add(id); card.classList.add('bulk-selected'); if (cb) cb.checked = true; }
+    else          { _selectedNoteIds.delete(id); card.classList.remove('bulk-selected'); if (cb) cb.checked = false; }
+  });
+  _updateBulkBar();
+}
+
+async function bulkDeleteSelected() {
+  if (!_selectedNoteIds.size) return;
+  if (!confirm(`${_selectedNoteIds.size}개의 노트를 삭제하시겠습니까?`)) return;
+  for (const id of _selectedNoteIds) {
+    await deleteNote(id);
+    if (currentNoteId === id) currentNoteId = null;
+  }
+  showToast(`🗑 ${_selectedNoteIds.size}개 노트 삭제 완료`);
+  _selectedNoteIds.clear();
+  _bulkSelectMode = false;
+  const bar = document.getElementById('bulkDeleteBar');
+  const btn = document.getElementById('bulkSelectToggleBtn');
+  if (bar) bar.classList.remove('visible');
+  if (btn) btn.classList.remove('active');
+  renderHomeView();
+}
+
+/* ═══════════════════════════════════════════════
    Init — load saved notes on page load
 ═══════════════════════════════════════════════ */
 (async function init() {
@@ -6836,6 +6975,15 @@ window.addEventListener('beforeunload', e => {
   }
 })();
 </script>
+<div id="bulkDeleteBar">
+  <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
+    <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">
+    전체 선택
+  </label>
+  <span id="bulkSelectCount" style="color:var(--text);font-weight:600;">0개 선택됨</span>
+  <button class="action-btn" onclick="bulkDeleteSelected()" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.1);">🗑 선택 삭제</button>
+  <button class="action-btn" onclick="toggleBulkSelectMode()">취소</button>
+</div>
 <div id="debugPanel" style="display:none; position:fixed; bottom:60px; right:20px; width:500px; max-height:50vh; background:var(--surface); border:1px solid var(--border-bright); border-radius:var(--radius); z-index:9999; overflow:hidden; flex-direction:column;">
   <div style="display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0.8rem; background:var(--surface2); border-bottom:1px solid var(--border);">
     <span style="font-size:0.82rem; font-weight:600; color:var(--text-muted);">🔧 Debug Log</span>
