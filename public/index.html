@@ -5300,7 +5300,7 @@ ${critiqueText}`;
       const chunk1Text = await callClaudeStream(apiKey, userPrompt1, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix1, 'claude-sonnet-4-20250514');
 
       const cachePrefix2 = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk2}`;
-      const userPrompt2  = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. Write notes for slides ${slide2Start}-${slide2End} only. Continue from previous notes. Match the same format.\n\n[강의 녹취록]\n${recText}`;
+      const userPrompt2  = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. Write notes for slides ${slide2Start}-${slide2End} only. Continue from previous notes. Match the same format. Do NOT write a **요약** paragraph or any introduction — start directly with the first # heading for these slides.\n\n[강의 녹취록]\n${recText}`;
 
       agentLog(1, `청크 2/2 스트리밍 중 (슬라이드 ${slide2Start}-${slide2End})…`);
       const chunk2Text = await callClaudeStream(apiKey, userPrompt2, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix2, 'claude-sonnet-4-20250514');
