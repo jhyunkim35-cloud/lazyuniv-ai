@@ -2599,6 +2599,8 @@ async function saveNoteFS(note) {
       toSave.slideImageUrls = await uploadSlideImages(id, toSave.slideImages);
     }
     delete toSave.slideImages;
+    delete toSave.extractedImages;
+    delete toSave.filteredText;
 
     // Progressive size reduction until under 900KB
     const stripOrder = ['pipelineLog', 'highlightedTranscript', 'pptText', 'recText'];
