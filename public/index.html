@@ -2544,8 +2544,7 @@ function updateAuthUI() {
     if (newNoteView.style.display !== 'block') {
       homeView.style.display = '';
     }
-    renderHomeView();
-    migrateLocalToFirestore();
+    syncNotesOnLogin().then(() => renderHomeView());
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     const sidebarUserName = document.getElementById('sidebarUserName');
     if (sidebarAvatar) sidebarAvatar.src = currentUser.photoURL || '';
@@ -2621,53 +2620,10 @@ async function saveNoteFS(note) {
   return record;
 }
 async function getNoteFS(id) {
-  // Try IndexedDB first (has base64 slideImages for speed)
-  const local = await getNote(id);
-  if (local) return local;
-  // Fallback to Firestore
-  const ref = userNotesRef();
-  if (!ref) return null;
-  const doc = await ref.doc(id).get();
-  if (!doc.exists) return null;
-  const note = doc.data();
-  // Convert slideImageUrls back to slideImages for viewer compatibility
-  if (note.slideImageUrls && !note.slideImages) {
-    note.slideImages = note.slideImageUrls;
-  }
-  if (!note.notesHtml && note.notesText) {
-    note.notesHtml = renderMarkdown(note.notesText);
-  }
-  return note;
+  return getNote(id);
 }
 async function getAllNotesFS() {
-  const ref = userNotesRef();
-  if (!ref) return getAllNotes();
-
-  // Get from BOTH sources and merge
-  const [localNotes, fsSnap] = await Promise.all([
-    getAllNotes(),
-    ref.orderBy('updatedAt', 'desc').get()
-  ]);
-  const fsNotes = fsSnap.docs.map(d => d.data());
-
-  // Merge: Firestore notes take priority, but add local-only notes too
-  const fsMap = Object.fromEntries(fsNotes.map(n => [n.id, n]));
-  const localMap = Object.fromEntries(localNotes.map(n => [n.id, n]));
-
-  // Start with Firestore notes, enrich with local slideImages
-  const merged = fsNotes.map(n => {
-    const local = localMap[n.id];
-    return local ? Object.assign({}, n, { slideImages: local.slideImages, notesHtml: local.notesHtml }) : n;
-  });
-
-  // Add local-only notes (not yet in Firestore)
-  for (const ln of localNotes) {
-    if (!fsMap[ln.id]) merged.push(ln);
-  }
-
-  // Sort by updatedAt desc
-  merged.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
-  return merged;
+  return getAllNotes();
 }
 async function deleteNoteFS(id) {
   await deleteNote(id);
@@ -2747,6 +2703,73 @@ async function migrateLocalToFirestore() {
   }
   // Always set flag so we don't retry
   localStorage.setItem('fs_migrated_' + currentUser.uid, 'true');
+}
+
+async function syncNotesOnLogin() {
+  if (!currentUser) return;
+  const synced = sessionStorage.getItem('synced_' + currentUser.uid);
+  if (synced) return;
+  try {
+    const ref = userNotesRef();
+    const fRef = userFoldersRef();
+    if (!ref || !fRef) return;
+
+    const [localNotes, localFolders, fsNotesSnap, fsFoldersSnap] = await Promise.all([
+      getAllNotes(), getAllFolders(),
+      ref.get(), fRef.get()
+    ]);
+
+    const fsNotes = fsNotesSnap.docs.map(d => d.data());
+    const fsFolders = fsFoldersSnap.docs.map(d => d.data());
+    const fsNoteMap = Object.fromEntries(fsNotes.map(n => [n.id, n]));
+    const localNoteMap = Object.fromEntries(localNotes.map(n => [n.id, n]));
+    const fsFolderMap = Object.fromEntries(fsFolders.map(f => [f.id, f]));
+    const localFolderMap = Object.fromEntries(localFolders.map(f => [f.id, f]));
+
+    // 1. Firestore에 있는데 로컬에 없으면 → 로컬에 저장
+    for (const fsNote of fsNotes) {
+      if (!localNoteMap[fsNote.id]) {
+        if (!fsNote.notesHtml && fsNote.notesText) fsNote.notesHtml = renderMarkdown(fsNote.notesText);
+        if (fsNote.slideImageUrls && !fsNote.slideImages) fsNote.slideImages = fsNote.slideImageUrls;
+        await saveNote(fsNote);
+      }
+    }
+    for (const fsFolder of fsFolders) {
+      if (!localFolderMap[fsFolder.id]) await saveFolder(fsFolder);
+    }
+
+    // 2. 로컬에 있는데 Firestore에 없으면 → Firestore에 업로드
+    for (const ln of localNotes) {
+      if (!fsNoteMap[ln.id]) {
+        try { await saveNoteFS(ln); } catch (e) { console.warn('Sync upload skip:', ln.id, e.message); }
+      }
+    }
+    for (const lf of localFolders) {
+      if (!fsFolderMap[lf.id]) {
+        try { await saveFolderFS(lf); } catch (e) { console.warn('Folder sync skip:', e.message); }
+      }
+    }
+
+    // 3. 둘 다 있으면 → updatedAt 비교, 최신 걸로 통일
+    for (const fsNote of fsNotes) {
+      const local = localNoteMap[fsNote.id];
+      if (!local) continue;
+      const fsTime = fsNote.updatedAt || '';
+      const localTime = local.updatedAt || '';
+      if (fsTime > localTime) {
+        // Firestore가 최신 → 로컬 갱신 (slideImages 유지)
+        const merged = Object.assign({}, fsNote, { slideImages: local.slideImages, notesHtml: local.notesHtml });
+        await saveNote(merged);
+      } else if (localTime > fsTime) {
+        // 로컬이 최신 → Firestore 갱신
+        try { await saveNoteFS(local); } catch (e) { console.warn('Sync push skip:', e.message); }
+      }
+    }
+
+    sessionStorage.setItem('synced_' + currentUser.uid, 'true');
+  } catch (e) {
+    console.error('Sync error:', e);
+  }
 }
 
 async function uploadSlideImages(noteId, slideImages) {
