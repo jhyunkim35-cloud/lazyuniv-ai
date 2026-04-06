@@ -5276,36 +5276,46 @@ ${critiqueText}`;
     const slideMatches = [...pptText.matchAll(/\[(?:슬라이드|페이지) (\d+)\]([\s\S]*?)(?=\[(?:슬라이드|페이지) \d+\]|$)/g)];
     const totalSlides = slideMatches.length;
 
-    if (totalSlides > 18) {
-      /* ── Chunked mode: split slides into 2 chunks ── */
-      const splitAt = Math.ceil(totalSlides / 2);
-      const chunk1Slides = slideMatches.slice(0, splitAt);
-      const chunk2Slides = slideMatches.slice(splitAt);
+    if (totalSlides > 12) {
+      /* ── Chunked mode: dynamic chunking ── */
+      const SLIDES_PER_CHUNK = 12;
+      const numChunks = Math.ceil(totalSlides / SLIDES_PER_CHUNK);
 
-      const slide1Start = parseInt(chunk1Slides[0][1], 10);
-      const slide1End   = parseInt(chunk1Slides[chunk1Slides.length - 1][1], 10);
-      const slide2Start = parseInt(chunk2Slides[0][1], 10);
-      const slide2End   = parseInt(chunk2Slides[chunk2Slides.length - 1][1], 10);
+      const chunks = [];
+      for (let c = 0; c < numChunks; c++) {
+        const start = c * SLIDES_PER_CHUNK;
+        const end = Math.min(start + SLIDES_PER_CHUNK, totalSlides);
+        chunks.push(slideMatches.slice(start, end));
+      }
 
-      const pptChunk1 = chunk1Slides.map(m => m[0]).join('');
-      const pptChunk2 = chunk2Slides.map(m => m[0]).join('');
+      let combinedNotes = '';
+      for (let c = 0; c < chunks.length; c++) {
+        const chunkSlides = chunks[c];
+        const slideStart = parseInt(chunkSlides[0][1], 10);
+        const slideEnd = parseInt(chunkSlides[chunkSlides.length - 1][1], 10);
+        const pptChunk = chunkSlides.map(m => m[0]).join('');
 
-      debugLog('PIPE', `Chunk 1/2 — slides ${slide1Start}-${slide1End}, Chunk 2/2 — slides ${slide2Start}-${slide2End}`);
-      agentLog(1, `슬라이드 ${totalSlides}개 감지 — 2청크 분할: 청크1 (${slide1Start}-${slide1End}), 청크2 (${slide2Start}-${slide2End})`);
+        debugLog('PIPE', `Chunk ${c+1}/${numChunks} — slides ${slideStart}-${slideEnd}`);
+        agentLog(1, `청크 ${c+1}/${numChunks} 스트리밍 중 (슬라이드 ${slideStart}-${slideEnd})…`);
 
-      const cachePrefix1 = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk1}`;
-      const userPrompt1  = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. Write notes for slides ${slide1Start}-${slide1End} only. More slides follow in a separate call.\n\n[강의 녹취록]\n${recText}`;
+        const chunkCache = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk}`;
 
-      agentLog(1, `청크 1/2 스트리밍 중 (슬라이드 ${slide1Start}-${slide1End})…`);
-      const chunk1Text = await callClaudeStream(apiKey, userPrompt1, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix1, 'claude-sonnet-4-20250514');
+        let chunkInstruction;
+        if (c === 0) {
+          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. More slides follow in separate calls.`;
+        } else {
+          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. Continue from previous notes. Match the same format. Do NOT write a **요약** paragraph or any introduction — start directly with the first # heading for these slides.`;
+        }
 
-      const cachePrefix2 = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk2}`;
-      const userPrompt2  = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. Write notes for slides ${slide2Start}-${slide2End} only. Continue from previous notes. Match the same format. Do NOT write a **요약** paragraph or any introduction — start directly with the first # heading for these slides.\n\n[강의 녹취록]\n${recText}`;
+        const chunkPrompt = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}\n\n[강의 녹취록]\n${recText}`;
 
-      agentLog(1, `청크 2/2 스트리밍 중 (슬라이드 ${slide2Start}-${slide2End})…`);
-      const chunk2Text = await callClaudeStream(apiKey, userPrompt2, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix2, 'claude-sonnet-4-20250514');
+        const chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-20250514');
 
-      notesText = chunk1Text + '\n\n' + chunk2Text;
+        combinedNotes += (c > 0 ? '\n\n' : '') + chunkText;
+      }
+
+      agentLog(1, `${numChunks}개 청크 완료 — 슬라이드 전체 통합`);
+      notesText = combinedNotes;
       targetEl.innerHTML = renderMarkdown(notesText);
 
     } else {
