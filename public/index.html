@@ -2091,6 +2091,7 @@
   </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -2164,8 +2165,12 @@
     <div id="sidebarFolders"></div>
     <button class="sidebar-folder-add" onclick="createFolderFromSidebar()">+ 새 폴더</button>
   </div>
-  <div style="padding:0.5rem 0.8rem; border-top:1px solid var(--border); font-size:0.72rem; color:var(--text-muted);">
-    💾 <span id="sidebarStorageSize">0 MB</span> 사용 중
+  <div style="padding:0.5rem 0.8rem; border-top:1px solid var(--border);">
+    <div id="sidebarUserInfo" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.3rem;">
+      <img id="sidebarAvatar" style="width:20px; height:20px; border-radius:50%;" />
+      <span id="sidebarUserName" style="font-size:0.78rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;"></span>
+    </div>
+    <div style="font-size:0.72rem; color:var(--text-muted);">💾 <span id="sidebarStorageSize">0 MB</span> 사용 중</div>
   </div>
 </div>
 
@@ -2183,6 +2188,20 @@
 
 <!-- Main Content -->
 <div id="mainContent" style="margin-left:240px; margin-top:48px; padding:1.5rem; min-height:calc(100vh - 48px);">
+
+  <!-- ═══ LANDING VIEW (non-logged-in) ═══ -->
+  <div id="landingView" style="display:none; text-align:center; padding:4rem 2rem; max-width:600px; margin:0 auto;">
+    <div style="font-size:3.5rem; margin-bottom:1rem;">📝</div>
+    <h1 style="font-size:1.8rem; font-weight:800; background:linear-gradient(135deg, #a78bfa, #7c4dff, #00b4d8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:0.6rem;">LectureNote AI</h1>
+    <p style="color:var(--text-muted); font-size:1rem; line-height:1.7; margin-bottom:2rem;">PPT 슬라이드와 강의 녹취록을 업로드하면<br>AI가 시험 대비에 최적화된 학습 노트를 자동 생성합니다.</p>
+    <div style="display:flex; flex-direction:column; gap:0.8rem; align-items:center; margin-bottom:2.5rem;">
+      <div style="display:flex; align-items:center; gap:0.6rem; color:var(--text-muted); font-size:0.9rem;">✅ PPT/PDF + 녹취록 → 구조화된 학습 가이드</div>
+      <div style="display:flex; align-items:center; gap:0.6rem; color:var(--text-muted); font-size:0.9rem;">✅ 교수님 강조 사항 자동 추출</div>
+      <div style="display:flex; align-items:center; gap:0.6rem; color:var(--text-muted); font-size:0.9rem;">✅ 슬라이드 + 노트 분할 뷰어</div>
+    </div>
+    <button onclick="loginWithGoogle()" style="padding:0.85rem 2.5rem; background:linear-gradient(135deg, #7c4dff, #5b8ef7); border:none; border-radius:12px; color:#fff; font-size:1rem; font-weight:700; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 20px rgba(124,77,255,0.3);">🔑 Google로 시작하기</button>
+    <p style="color:var(--text-dim); font-size:0.78rem; margin-top:1rem;">Google 계정으로 간편하게 로그인</p>
+  </div>
 
   <!-- ═══ HOME VIEW ═══ -->
   <div id="homeView">
@@ -2495,6 +2514,7 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const db = firebase.firestore();
 let currentUser = null;
 
 auth.onAuthStateChanged(user => {
@@ -2507,14 +2527,34 @@ function updateAuthUI() {
   const userInfo = document.getElementById('userInfo');
   const userName = document.getElementById('userName');
   const userAvatar = document.getElementById('userAvatar');
+  const landingView = document.getElementById('landingView');
+  const sidebar = document.getElementById('sidebar');
+  const homeView = document.getElementById('homeView');
+  const newNoteView = document.getElementById('newNoteView');
+
   if (currentUser) {
     loginBtn.style.display = 'none';
     userInfo.style.display = 'flex';
     userName.textContent = currentUser.displayName || currentUser.email;
     userAvatar.src = currentUser.photoURL || '';
+    landingView.style.display = 'none';
+    sidebar.style.display = '';
+    // Show whichever view was active, default to home
+    if (newNoteView.style.display !== 'block') {
+      homeView.style.display = '';
+    }
+    renderHomeView();
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
+    const sidebarUserName = document.getElementById('sidebarUserName');
+    if (sidebarAvatar) sidebarAvatar.src = currentUser.photoURL || '';
+    if (sidebarUserName) sidebarUserName.textContent = currentUser.displayName || currentUser.email;
   } else {
     loginBtn.style.display = '';
     userInfo.style.display = 'none';
+    landingView.style.display = '';
+    sidebar.style.display = 'none';
+    homeView.style.display = 'none';
+    newNoteView.style.display = 'none';
   }
 }
 
@@ -2530,6 +2570,71 @@ async function loginWithGoogle() {
 async function logout() {
   await auth.signOut();
   showSuccessToast('로그아웃 완료');
+}
+
+function userNotesRef() {
+  if (!currentUser) return null;
+  return db.collection('users').doc(currentUser.uid).collection('notes');
+}
+function userFoldersRef() {
+  if (!currentUser) return null;
+  return db.collection('users').doc(currentUser.uid).collection('folders');
+}
+async function saveNoteFS(note) {
+  const ref = userNotesRef();
+  if (!ref) return saveNote(note);
+  const now = new Date().toISOString();
+  const id = note.id || uuidv4();
+  const record = Object.assign({ folderId: null, createdAt: now }, note, { id, updatedAt: now });
+  const toSave = Object.assign({}, record);
+  delete toSave.slideImages;
+  await ref.doc(id).set(toSave, { merge: true });
+  return record;
+}
+async function getNoteFS(id) {
+  const ref = userNotesRef();
+  if (!ref) return getNote(id);
+  const doc = await ref.doc(id).get();
+  return doc.exists ? doc.data() : null;
+}
+async function getAllNotesFS() {
+  const ref = userNotesRef();
+  if (!ref) return getAllNotes();
+  const snap = await ref.orderBy('updatedAt', 'desc').get();
+  return snap.docs.map(d => d.data());
+}
+async function deleteNoteFS(id) {
+  const ref = userNotesRef();
+  if (!ref) return deleteNote(id);
+  await ref.doc(id).delete();
+}
+async function searchNotesFS(query) {
+  const all = await getAllNotesFS();
+  const q = query.toLowerCase();
+  return all.filter(n => (n.title || '').toLowerCase().includes(q) || (n.notesText || '').toLowerCase().includes(q));
+}
+async function saveFolderFS(folder) {
+  const ref = userFoldersRef();
+  if (!ref) return saveFolder(folder);
+  const id = folder.id || uuidv4();
+  const record = Object.assign({ createdAt: new Date().toISOString() }, folder, { id });
+  await ref.doc(id).set(record, { merge: true });
+  return record;
+}
+async function getAllFoldersFS() {
+  const ref = userFoldersRef();
+  if (!ref) return getAllFolders();
+  const snap = await ref.orderBy('name').get();
+  return snap.docs.map(d => d.data());
+}
+async function deleteFolderFS(id) {
+  const ref = userFoldersRef();
+  if (!ref) return deleteFolder(id);
+  const notes = await getAllNotesFS();
+  for (const note of notes.filter(n => n.folderId === id)) {
+    await saveNoteFS(Object.assign({}, note, { folderId: null }));
+  }
+  await ref.doc(id).delete();
 }
 
 /* ═══════════════════════════════════════════════
@@ -3874,11 +3979,11 @@ function populateSplitImagePanel() {
     // Persist the updated HTML (with images) back to IndexedDB
     if (currentNoteId) {
       try {
-        const existing = await getNote(currentNoteId);
+        const existing = await getNoteFS(currentNoteId);
         if (existing) {
           const prevInserted = existing.insertedSlideNumbers || [];
           const merged = [...new Set([...prevInserted, ...selectedSlides])].sort((a, b) => a - b);
-          await saveNote(Object.assign({}, existing, {
+          await saveNoteFS(Object.assign({}, existing, {
             notesHtml:            splitNotes.innerHTML,
             insertedSlideNumbers: merged,
           }));
@@ -4258,6 +4363,7 @@ document.getElementById('imageConfirmBtn').addEventListener('click', () => {
    Main analysis flow — runs everything automatically
 ═══════════════════════════════════════════════ */
 analyzeBtn.addEventListener('click', async () => {
+  if (!currentUser) { showToast('🔑 로그인 후 이용할 수 있습니다.'); return; }
   if (isRunning) return;  // double-click guard
   const apiKey = 'server-proxied';
   if (!pptFile) return;
@@ -4630,10 +4736,10 @@ document.getElementById('splitPdfBtn').addEventListener('click', () => {
 document.getElementById('splitSaveBtn').addEventListener('click', async () => {
   if (!currentNoteId) { showToast('저장할 노트가 없습니다. 먼저 AI 분석을 실행하세요.'); return; }
   try {
-    const [existing, folders] = await Promise.all([getNote(currentNoteId), getAllFolders()]);
+    const [existing, folders] = await Promise.all([getNoteFS(currentNoteId), getAllFoldersFS()]);
     if (!existing) { showToast('노트를 찾을 수 없습니다.'); return; }
     const splitNotes = document.getElementById('splitNotes');
-    await saveNote(Object.assign({}, existing, { notesHtml: splitNotes.innerHTML }));
+    await saveNoteFS(Object.assign({}, existing, { notesHtml: splitNotes.innerHTML }));
     const folderName = existing.folderId
       ? (folders.find(f => f.id === existing.folderId)?.name ?? '미분류')
       : '미분류';
@@ -5835,6 +5941,7 @@ document.getElementById('batchCancelBtn').addEventListener('click', () => {
 
 /* Run batch */
 document.getElementById('batchStartBtn').addEventListener('click', async () => {
+  if (!currentUser) { showToast('🔑 로그인 후 이용할 수 있습니다.'); return; }
   if (isRunning) return;
   const apiKey = 'server-proxied';
 
@@ -6171,7 +6278,7 @@ async function getStorageSize() {
     return usage || 0;
   }
   // Fallback: rough estimate from note content lengths
-  const notes = await getAllNotes();
+  const notes = await getAllNotesFS();
   return notes.reduce((sum, n) => sum + JSON.stringify(n).length, 0);
 }
 
@@ -6195,10 +6302,10 @@ async function autoSaveNote() {
     const autoTitle        = slide1Title || headingTitle || fileTitle;
     const title = await promptNoteName(autoTitle);
     const notesHtml = document.getElementById('finalNotesBody')?.innerHTML || '';
-    const record = await saveNote({
+    const record = await saveNoteFS({
       id:                   currentNoteId || undefined,
       title,
-      folderId:             currentNoteId ? (await getNote(currentNoteId))?.folderId ?? null : null,
+      folderId:             currentNoteId ? (await getNoteFS(currentNoteId))?.folderId ?? null : null,
       notesText:            storedNotesText,
       notesHtml,
       pptText:              storedPptText,
@@ -6224,7 +6331,7 @@ function fmtDate(iso) {
 }
 
 async function renderSavedNotes(filteredNotes, activeQuery = '') {
-  const [notes, folders] = await Promise.all([getAllNotes(), getAllFolders()]);
+  const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
   const displayNotes = filteredNotes !== undefined ? filteredNotes : notes;
   // Keep home view in sync
   if (typeof renderHomeView === 'function') renderHomeView(filteredNotes, activeQuery).catch(() => {});
@@ -6303,7 +6410,7 @@ async function renderSavedNotes(filteredNotes, activeQuery = '') {
    Open saved note
 ═══════════════════════════════════════════════ */
 async function openSavedNote(id) {
-  const note = await getNote(id);
+  const note = await getNoteFS(id);
   if (!note) { showToast('노트를 찾을 수 없습니다.'); return; }
 
   storedNotesText            = note.notesText            || '';
@@ -6349,7 +6456,7 @@ async function openSavedNote(id) {
 ═══════════════════════════════════════════════ */
 async function confirmDeleteNote(id) {
   if (!confirm('이 노트를 삭제하시겠습니까?')) return;
-  await deleteNote(id);
+  await deleteNoteFS(id);
   if (currentNoteId === id) currentNoteId = null;
   showToast('🗑 노트 삭제 완료');
   renderSavedNotes();
@@ -6359,7 +6466,7 @@ async function confirmDeleteNote(id) {
    Move note to folder
 ═══════════════════════════════════════════════ */
 async function moveSavedNote(id) {
-  const [note, folders] = await Promise.all([getNote(id), getAllFolders()]);
+  const [note, folders] = await Promise.all([getNoteFS(id), getAllFoldersFS()]);
   if (!note) return;
 
   const overlay = document.createElement('div');
@@ -6384,7 +6491,7 @@ async function moveSavedNote(id) {
     row.onclick = async () => {
       const newSortOrder = await getNextSortOrder(folder.id, note.id);
       const updated = Object.assign({}, note, { folderId: folder.id, sortOrder: newSortOrder });
-      await saveNote(updated);
+      await saveNoteFS(updated);
       overlay.remove();
       showSuccessToast(`📁 "${note.title || '노트'}" 이동 완료`);
       renderSavedNotes();
@@ -6417,7 +6524,7 @@ async function showFolderManager() {
 async function refreshFolderManagerList() {
   const listEl = document.getElementById('folderManagerList');
   if (!listEl) return;
-  const folders = await getAllFolders();
+  const folders = await getAllFoldersFS();
   listEl.innerHTML = '';
   if (!folders.length) {
     listEl.innerHTML = '<div style="font-size:0.82rem; color:var(--text-muted); padding:0.5rem;">폴더가 없습니다.</div>';
@@ -6454,7 +6561,7 @@ async function createFolderFromInput() {
   const input = document.getElementById('newFolderInput');
   const name  = input?.value.trim();
   if (!name) return;
-  await saveFolder({ name });
+  await saveFolderFS({ name });
   input.value = '';
   await refreshFolderManagerList();
   renderSavedNotes();
@@ -6508,7 +6615,7 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
       if (id) {
         await renameFolder(id, name, chosenColorRef.value);
       } else {
-        await saveFolder({ name, color: chosenColorRef.value });
+        await saveFolderFS({ name, color: chosenColorRef.value });
       }
       overlay.remove();
       await refreshFolderManagerList().catch(() => {});
@@ -6521,18 +6628,18 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
 }
 
 async function renameSavedNote(id) {
-  const note = await getNote(id);
+  const note = await getNoteFS(id);
   if (!note) return;
   const newTitle = prompt('노트 이름:', note.title || '');
   if (!newTitle || newTitle.trim() === note.title) return;
-  await saveNote(Object.assign({}, note, { title: newTitle.trim() }));
+  await saveNoteFS(Object.assign({}, note, { title: newTitle.trim() }));
   renderSavedNotes();
   renderHomeView();
 }
 
 async function deleteFolderConfirm(id) {
   if (!confirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)')) return;
-  await deleteFolder(id);
+  await deleteFolderFS(id);
   await refreshFolderManagerList();
   renderSavedNotes();
 }
@@ -6546,7 +6653,7 @@ document.getElementById('noteSearchInput').addEventListener('input', function() 
   const query = this.value.trim();
   _searchTimer = setTimeout(async () => {
     if (!query) { renderSavedNotes(); return; }
-    const results = await searchNotes(query);
+    const results = await searchNotesFS(query);
     renderSavedNotes(results, query);
   }, 300);
 });
@@ -6555,7 +6662,7 @@ document.getElementById('noteSearchInput').addEventListener('input', function() 
    Export / Import
 ═══════════════════════════════════════════════ */
 async function exportAllNotes() {
-  const [notes, folders] = await Promise.all([getAllNotes(), getAllFolders()]);
+  const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
   const data = JSON.stringify({ notes, folders, exportedAt: new Date().toISOString() }, null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -6573,15 +6680,15 @@ async function importNotes(input) {
     const data = JSON.parse(text);
     const notes   = data.notes   || [];
     const folders = data.folders || [];
-    const [existingNotes, existingFolders] = await Promise.all([getAllNotes(), getAllFolders()]);
+    const [existingNotes, existingFolders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
     const existingNoteIds   = new Set(existingNotes.map(n => n.id));
     const existingFolderIds = new Set(existingFolders.map(f => f.id));
     let imported = 0;
     for (const folder of folders) {
-      if (!existingFolderIds.has(folder.id)) { await saveFolder(folder); }
+      if (!existingFolderIds.has(folder.id)) { await saveFolderFS(folder); }
     }
     for (const note of notes) {
-      if (!existingNoteIds.has(note.id)) { await saveNote(note); imported++; }
+      if (!existingNoteIds.has(note.id)) { await saveNoteFS(note); imported++; }
     }
     input.value = '';
     showSuccessToast(`⬆ ${imported}개 노트 가져오기 완료`);
@@ -6669,7 +6776,7 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     ).join('');
   }
 
-  const [notes, folders] = await Promise.all([getAllNotes(), getAllFolders()]);
+  const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
   const folderMap      = Object.fromEntries(folders.map(f => [f.id, f.name]));
   const folderColorMap = Object.fromEntries(folders.map(f => [f.id, f.color || null]));
 
@@ -6839,7 +6946,7 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
    Sidebar folder list
 ═══════════════════════════════════════════════ */
 async function renderSidebarFolders(notes, folders) {
-  if (!notes || !folders) [notes, folders] = await Promise.all([getAllNotes(), getAllFolders()]);
+  if (!notes || !folders) [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
   const container = document.getElementById('sidebarFolders');
   if (!container) return;
   container.innerHTML = '';
@@ -6901,7 +7008,7 @@ document.getElementById('globalSearchInput').addEventListener('input', function(
   _globalSearchTimer = setTimeout(async () => {
     if (_currentView !== 'home') switchView('home');
     if (!query) { renderHomeView(); return; }
-    const results = await searchNotes(query);
+    const results = await searchNotesFS(query);
     renderHomeView(results, query);
   }, 300);
 });
@@ -7011,7 +7118,7 @@ async function bulkDeleteSelected() {
   if (!_selectedNoteIds.size) return;
   if (!confirm(`${_selectedNoteIds.size}개의 노트를 삭제하시겠습니까?`)) return;
   for (const id of _selectedNoteIds) {
-    await deleteNote(id);
+    await deleteNoteFS(id);
     if (currentNoteId === id) currentNoteId = null;
   }
   showToast(`🗑 ${_selectedNoteIds.size}개 노트 삭제 완료`);
@@ -7036,12 +7143,17 @@ async function bulkDeleteSelected() {
   }
   // Set initial view: home if notes exist, new if empty
   try {
-    const notes = await getAllNotes();
+    const notes = await getAllNotesFS();
     switchView(notes.length > 0 ? 'home' : 'new');
   } catch (_) {
     switchView('new');
   }
 })();
+
+// Initial state: hide sidebar and content views until auth resolves
+document.getElementById('sidebar').style.display = 'none';
+document.getElementById('homeView').style.display = 'none';
+document.getElementById('landingView').style.display = '';
 </script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
