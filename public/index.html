@@ -2089,6 +2089,8 @@
       #splitViewer > div:last-of-type > div:last-child { width:100% !important; }
     }
   </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -2101,6 +2103,12 @@
   </div>
   <div style="display:flex; align-items:center; gap:0.5rem;">
     <input id="globalSearchInput" type="text" placeholder="검색..." style="padding:0.3rem 0.8rem; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.82rem; width:200px;" />
+    <button id="loginBtn" class="action-btn" onclick="loginWithGoogle()" style="font-size:0.82rem;">🔑 로그인</button>
+    <div id="userInfo" style="display:none; align-items:center; gap:0.4rem;">
+      <img id="userAvatar" style="width:24px; height:24px; border-radius:50%; border:1px solid var(--border);" />
+      <span id="userName" style="font-size:0.8rem; color:var(--text); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      <button class="action-btn" onclick="logout()" style="font-size:0.75rem; padding:0.2rem 0.5rem;">로그아웃</button>
+    </div>
     <button class="action-btn" id="themeToggleBtn" onclick="toggleTheme()">☀️</button>
     <button class="action-btn" id="settingsBtn" onclick="toggleSettings()">⚙️</button>
   </div>
@@ -2474,6 +2482,56 @@
 </div>
 
 <script>
+/* ═══════════════════════════════════════════════
+   Firebase Auth
+═══════════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyC68aMiCvyfR3QycxUknmxB3z7NS0qRE2g",
+  authDomain: "lazyuniv-ai.firebaseapp.com",
+  projectId: "lazyuniv-ai",
+  storageBucket: "lazyuniv-ai.firebasestorage.app",
+  messagingSenderId: "152431469306",
+  appId: "1:152431469306:web:a7292a51bd41b31a229f43"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+let currentUser = null;
+
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  updateAuthUI();
+});
+
+function updateAuthUI() {
+  const loginBtn = document.getElementById('loginBtn');
+  const userInfo = document.getElementById('userInfo');
+  const userName = document.getElementById('userName');
+  const userAvatar = document.getElementById('userAvatar');
+  if (currentUser) {
+    loginBtn.style.display = 'none';
+    userInfo.style.display = 'flex';
+    userName.textContent = currentUser.displayName || currentUser.email;
+    userAvatar.src = currentUser.photoURL || '';
+  } else {
+    loginBtn.style.display = '';
+    userInfo.style.display = 'none';
+  }
+}
+
+async function loginWithGoogle() {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await auth.signInWithPopup(provider);
+  } catch (e) {
+    if (e.code !== 'auth/popup-closed-by-user') showToast('❌ 로그인 실패: ' + e.message);
+  }
+}
+
+async function logout() {
+  await auth.signOut();
+  showSuccessToast('로그아웃 완료');
+}
+
 /* ═══════════════════════════════════════════════
    PDF.js — load worker via importScripts-compatible shim.
    pdf.min.mjs is an ES module; we load it dynamically so we
