@@ -2470,7 +2470,6 @@
     <div style="display:flex; gap:0.5rem; align-items:center;">
       <button id="splitDebugBtn" class="action-btn" title="디버그 리포트 복사" style="display:none; font-size:0.85rem; padding:0.25rem 0.5rem;" onclick="copyDebugReport()">📋</button>
       <button id="splitPdfBtn" class="action-btn">⬇ PDF</button>
-      <button id="splitSaveBtn" class="action-btn">💾 저장</button>
       <button id="splitCloseBtn" class="action-btn">✕ 닫기</button>
     </div>
   </div>
@@ -2544,6 +2543,7 @@ function updateAuthUI() {
       homeView.style.display = '';
     }
     renderHomeView();
+    migrateLocalToFirestore();
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     const sidebarUserName = document.getElementById('sidebarUserName');
     if (sidebarAvatar) sidebarAvatar.src = currentUser.photoURL || '';
@@ -2588,6 +2588,7 @@ async function saveNoteFS(note) {
   const record = Object.assign({ folderId: null, createdAt: now }, note, { id, updatedAt: now });
   const toSave = Object.assign({}, record);
   delete toSave.slideImages;
+  delete toSave.notesHtml;
   await ref.doc(id).set(toSave, { merge: true });
   return record;
 }
@@ -2653,6 +2654,29 @@ async function updateNoteOrderFS(orderedIds) {
     batch.update(ref.doc(id), { sortOrder: sortIndex });
   });
   await batch.commit();
+}
+
+async function migrateLocalToFirestore() {
+  if (!currentUser) return;
+  const migrated = localStorage.getItem('fs_migrated_' + currentUser.uid);
+  if (migrated) return;
+  try {
+    const localNotes = await getAllNotes(); // IndexedDB
+    const localFolders = await getAllFolders(); // IndexedDB
+    if (localFolders.length > 0 || localNotes.length > 0) {
+      showToast('📦 로컬 노트를 클라우드로 이전 중...');
+      for (const folder of localFolders) {
+        await saveFolderFS(folder);
+      }
+      for (const note of localNotes) {
+        await saveNoteFS(note);
+      }
+      showSuccessToast(`☁️ ${localNotes.length}개 노트 클라우드 이전 완료`);
+    }
+    localStorage.setItem('fs_migrated_' + currentUser.uid, 'true');
+  } catch (e) {
+    console.error('Migration error:', e);
+  }
 }
 
 /* ═══════════════════════════════════════════════
@@ -4751,21 +4775,6 @@ document.getElementById('splitPdfBtn').addEventListener('click', () => {
   openPdfPopup(document.getElementById('splitNotes'));
 });
 
-document.getElementById('splitSaveBtn').addEventListener('click', async () => {
-  if (!currentNoteId) { showToast('저장할 노트가 없습니다. 먼저 AI 분석을 실행하세요.'); return; }
-  try {
-    const [existing, folders] = await Promise.all([getNoteFS(currentNoteId), getAllFoldersFS()]);
-    if (!existing) { showToast('노트를 찾을 수 없습니다.'); return; }
-    const splitNotes = document.getElementById('splitNotes');
-    await saveNoteFS(Object.assign({}, existing, { notesHtml: splitNotes.innerHTML }));
-    const folderName = existing.folderId
-      ? (folders.find(f => f.id === existing.folderId)?.name ?? '미분류')
-      : '미분류';
-    showSuccessToast(`💾 ${folderName}에 저장 완료`);
-  } catch (e) {
-    showToast(`❌ 저장 실패: ${e.message}`);
-  }
-});
 
 function openPdfPopup(bodyEl) {
   const contentEl = bodyEl.querySelector('.md-content') || bodyEl;
@@ -6430,6 +6439,10 @@ async function renderSavedNotes(filteredNotes, activeQuery = '') {
 async function openSavedNote(id) {
   const note = await getNoteFS(id);
   if (!note) { showToast('노트를 찾을 수 없습니다.'); return; }
+  // Regenerate notesHtml from notesText if missing (Firestore excludes it to stay under 1MB)
+  if (!note.notesHtml && note.notesText) {
+    note.notesHtml = renderMarkdown(note.notesText);
+  }
 
   storedNotesText            = note.notesText            || '';
   storedPptText              = note.pptText              || '';
