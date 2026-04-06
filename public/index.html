@@ -2636,6 +2636,24 @@ async function deleteFolderFS(id) {
   }
   await ref.doc(id).delete();
 }
+async function renameFolderFS(id, newName, color) {
+  const ref = userFoldersRef();
+  if (!ref) return renameFolder(id, newName, color);
+  const doc = await ref.doc(id).get();
+  if (!doc.exists) return;
+  const updated = Object.assign({}, doc.data(), { name: newName }, color !== undefined ? { color } : {});
+  await ref.doc(id).set(updated);
+  return updated;
+}
+async function updateNoteOrderFS(orderedIds) {
+  const ref = userNotesRef();
+  if (!ref) return updateNoteOrder(orderedIds);
+  const batch = db.batch();
+  orderedIds.forEach((id, sortIndex) => {
+    batch.update(ref.doc(id), { sortOrder: sortIndex });
+  });
+  await batch.commit();
+}
 
 /* ═══════════════════════════════════════════════
    PDF.js — load worker via importScripts-compatible shim.
@@ -6177,7 +6195,7 @@ async function getAllNotes() {
 }
 
 async function getNextSortOrder(folderId, excludeId = null) {
-  const notes = await getAllNotes();
+  const notes = await getAllNotesFS();
   const folderNotes = notes.filter(n =>
     (n.folderId ?? null) === (folderId ?? null) && n.id !== excludeId
   );
@@ -6613,7 +6631,7 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
     if (!name) { showToast('폴더 이름을 입력하세요.'); return; }
     try {
       if (id) {
-        await renameFolder(id, name, chosenColorRef.value);
+        await renameFolderFS(id, name, chosenColorRef.value);
       } else {
         await saveFolderFS({ name, color: chosenColorRef.value });
       }
@@ -6935,7 +6953,7 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
     const targetIdx  = orderedIds.indexOf(note.id);
     orderedIds.splice(insertBefore ? targetIdx : targetIdx + 1, 0, draggedNoteId);
 
-    await updateNoteOrder(orderedIds);
+    await updateNoteOrderFS(orderedIds);
     renderHomeView();
   });
 
