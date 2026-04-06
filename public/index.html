@@ -2600,6 +2600,11 @@ async function saveNoteFS(note) {
       toSave.slideImageUrls = await uploadSlideImages(id, toSave.slideImages);
     }
     delete toSave.slideImages;
+    const jsonSize = JSON.stringify(toSave).length;
+    if (jsonSize > 950000) {
+      console.warn('saveNoteFS: too large (' + jsonSize + '), stripping pptText');
+      delete toSave.pptText;
+    }
     await ref.doc(id).set(toSave, { merge: true });
   }
   return record;
@@ -2689,22 +2694,24 @@ async function migrateLocalToFirestore() {
   const migrated = localStorage.getItem('fs_migrated_' + currentUser.uid);
   if (migrated) return;
   try {
-    const localNotes = await getAllNotes(); // IndexedDB
-    const localFolders = await getAllFolders(); // IndexedDB
+    const localNotes = await getAllNotes();
+    const localFolders = await getAllFolders();
     if (localFolders.length > 0 || localNotes.length > 0) {
       showToast('📦 로컬 노트를 클라우드로 이전 중...');
       for (const folder of localFolders) {
-        await saveFolderFS(folder);
+        try { await saveFolderFS(folder); } catch (e) { console.warn('Folder migration skip:', e); }
       }
+      let ok = 0;
       for (const note of localNotes) {
-        await saveNoteFS(note);
+        try { await saveNoteFS(note); ok++; } catch (e) { console.warn('Note migration skip:', note.id, e.message); }
       }
-      showSuccessToast(`☁️ ${localNotes.length}개 노트 클라우드 이전 완료`);
+      showSuccessToast('☁️ ' + ok + '/' + localNotes.length + '개 노트 이전 완료');
     }
-    localStorage.setItem('fs_migrated_' + currentUser.uid, 'true');
   } catch (e) {
     console.error('Migration error:', e);
   }
+  // Always set flag so we don't retry
+  localStorage.setItem('fs_migrated_' + currentUser.uid, 'true');
 }
 
 async function uploadSlideImages(noteId, slideImages) {
