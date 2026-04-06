@@ -2092,6 +2092,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -2514,6 +2515,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
+const storage = firebase.storage();
 let currentUser = null;
 
 auth.onAuthStateChanged(user => {
@@ -2581,22 +2583,45 @@ function userFoldersRef() {
   return db.collection('users').doc(currentUser.uid).collection('folders');
 }
 async function saveNoteFS(note) {
-  const ref = userNotesRef();
-  if (!ref) return saveNote(note);
   const now = new Date().toISOString();
   const id = note.id || uuidv4();
   const record = Object.assign({ folderId: null, createdAt: now }, note, { id, updatedAt: now });
-  const toSave = Object.assign({}, record);
-  delete toSave.slideImages;
-  delete toSave.notesHtml;
-  await ref.doc(id).set(toSave, { merge: true });
+
+  // Always save full data to IndexedDB (local cache with base64 images)
+  await saveNote(record);
+
+  // If logged in, upload images to Storage and save to Firestore
+  const ref = userNotesRef();
+  if (ref) {
+    const toSave = Object.assign({}, record);
+    delete toSave.notesHtml;
+    // Upload slideImages to Firebase Storage, replace with URLs
+    if (toSave.slideImages && toSave.slideImages.length) {
+      toSave.slideImageUrls = await uploadSlideImages(id, toSave.slideImages);
+    }
+    delete toSave.slideImages;
+    await ref.doc(id).set(toSave, { merge: true });
+  }
   return record;
 }
 async function getNoteFS(id) {
+  // Try IndexedDB first (has base64 slideImages for speed)
+  const local = await getNote(id);
+  if (local) return local;
+  // Fallback to Firestore
   const ref = userNotesRef();
-  if (!ref) return getNote(id);
+  if (!ref) return null;
   const doc = await ref.doc(id).get();
-  return doc.exists ? doc.data() : null;
+  if (!doc.exists) return null;
+  const note = doc.data();
+  // Convert slideImageUrls back to slideImages for viewer compatibility
+  if (note.slideImageUrls && !note.slideImages) {
+    note.slideImages = note.slideImageUrls;
+  }
+  if (!note.notesHtml && note.notesText) {
+    note.notesHtml = renderMarkdown(note.notesText);
+  }
+  return note;
 }
 async function getAllNotesFS() {
   const ref = userNotesRef();
@@ -2605,9 +2630,12 @@ async function getAllNotesFS() {
   return snap.docs.map(d => d.data());
 }
 async function deleteNoteFS(id) {
+  await deleteNote(id);
   const ref = userNotesRef();
-  if (!ref) return deleteNote(id);
-  await ref.doc(id).delete();
+  if (ref) {
+    await ref.doc(id).delete();
+    await deleteSlideImages(id);
+  }
 }
 async function searchNotesFS(query) {
   const all = await getAllNotesFS();
@@ -2676,6 +2704,45 @@ async function migrateLocalToFirestore() {
     localStorage.setItem('fs_migrated_' + currentUser.uid, 'true');
   } catch (e) {
     console.error('Migration error:', e);
+  }
+}
+
+async function uploadSlideImages(noteId, slideImages) {
+  if (!currentUser || !slideImages || !slideImages.length) return [];
+  const urls = [];
+  for (let i = 0; i < slideImages.length; i++) {
+    const img = slideImages[i];
+    if (!img) { urls.push(null); continue; }
+    // If already a storage URL, keep it
+    if (typeof img === 'string' && img.startsWith('https://')) { urls.push(img); continue; }
+    // Upload base64 to Firebase Storage
+    const path = 'users/' + currentUser.uid + '/notes/' + noteId + '/slide_' + i + '.png';
+    const ref = storage.ref(path);
+    try {
+      let data = img;
+      if (typeof img === 'string' && img.includes('base64,')) {
+        data = img.split('base64,')[1];
+      }
+      await ref.putString(data, 'base64', { contentType: 'image/png' });
+      const url = await ref.getDownloadURL();
+      urls.push(url);
+    } catch (e) {
+      console.error('Slide upload error:', i, e);
+      urls.push(null);
+    }
+  }
+  return urls;
+}
+
+async function deleteSlideImages(noteId) {
+  if (!currentUser) return;
+  const prefix = 'users/' + currentUser.uid + '/notes/' + noteId + '/';
+  try {
+    const listRef = storage.ref(prefix);
+    const list = await listRef.listAll();
+    await Promise.all(list.items.map(item => item.delete()));
+  } catch (e) {
+    console.error('deleteSlideImages error:', e);
   }
 }
 
