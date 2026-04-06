@@ -2642,8 +2642,32 @@ async function getNoteFS(id) {
 async function getAllNotesFS() {
   const ref = userNotesRef();
   if (!ref) return getAllNotes();
-  const snap = await ref.orderBy('updatedAt', 'desc').get();
-  return snap.docs.map(d => d.data());
+
+  // Get from BOTH sources and merge
+  const [localNotes, fsSnap] = await Promise.all([
+    getAllNotes(),
+    ref.orderBy('updatedAt', 'desc').get()
+  ]);
+  const fsNotes = fsSnap.docs.map(d => d.data());
+
+  // Merge: Firestore notes take priority, but add local-only notes too
+  const fsMap = Object.fromEntries(fsNotes.map(n => [n.id, n]));
+  const localMap = Object.fromEntries(localNotes.map(n => [n.id, n]));
+
+  // Start with Firestore notes, enrich with local slideImages
+  const merged = fsNotes.map(n => {
+    const local = localMap[n.id];
+    return local ? Object.assign({}, n, { slideImages: local.slideImages, notesHtml: local.notesHtml }) : n;
+  });
+
+  // Add local-only notes (not yet in Firestore)
+  for (const ln of localNotes) {
+    if (!fsMap[ln.id]) merged.push(ln);
+  }
+
+  // Sort by updatedAt desc
+  merged.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  return merged;
 }
 async function deleteNoteFS(id) {
   await deleteNote(id);
