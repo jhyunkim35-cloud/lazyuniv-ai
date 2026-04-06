@@ -2600,11 +2600,22 @@ async function saveNoteFS(note) {
       toSave.slideImageUrls = await uploadSlideImages(id, toSave.slideImages);
     }
     delete toSave.slideImages;
-    const jsonSize = JSON.stringify(toSave).length;
-    if (jsonSize > 950000) {
-      console.warn('saveNoteFS: too large (' + jsonSize + '), stripping pptText');
-      delete toSave.pptText;
+
+    // Progressive size reduction until under 900KB
+    const stripOrder = ['pipelineLog', 'highlightedTranscript', 'pptText', 'recText'];
+    for (const key of stripOrder) {
+      if (JSON.stringify(toSave).length <= 900000) break;
+      console.warn('saveNoteFS: stripping', key, '(' + JSON.stringify(toSave[key] || '').length + ' chars)');
+      delete toSave[key];
     }
+
+    const finalSize = JSON.stringify(toSave).length;
+    if (finalSize > 950000) {
+      console.error('saveNoteFS: STILL too large after all strips:', finalSize,
+        Object.keys(toSave).map(k => k + ':' + JSON.stringify(toSave[k] || '').length).join(', '));
+      return record; // skip Firestore write, IndexedDB already saved
+    }
+
     await ref.doc(id).set(toSave, { merge: true });
   }
   return record;
