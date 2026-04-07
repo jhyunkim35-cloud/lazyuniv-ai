@@ -410,19 +410,15 @@
     .split-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
 
     /* ── Accordion tab ─────────────────────────── */
-    #splitAccordion { display:flex; flex-direction:column; gap:0.5rem; padding:1rem; overflow-y:auto; height:100%; }
-    #splitAccordion .acc-section { border:1px solid var(--border); border-radius:8px; overflow:hidden; }
-    #splitAccordion .acc-header { display:flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem; background:var(--surface2); cursor:pointer; font-weight:700; font-size:0.95rem; width:100%; }
-    #splitAccordion .acc-body { padding:0.8rem 1rem; }
-    #splitAccordion .acc-body .acc-item { display:block; width:100%; padding:0.3rem 0; cursor:pointer; font-size:0.85rem; color:var(--text); white-space:normal; word-break:keep-all; }
-    details.accordion-h1 { margin:0.5rem 0; border-left:3px solid var(--primary); padding-left:0.8rem; }
-    details.accordion-h2 { margin:0.3rem 0 0.3rem 0.5rem; border-left:2px solid var(--secondary); padding-left:0.8rem; }
-    .accordion-h1 > summary { font-size:1.05rem; color:#b4a0ff; font-weight:700; cursor:pointer; padding:0.4rem 0; }
-    .accordion-h2 > summary { font-size:0.92rem; color:var(--secondary); font-weight:600; cursor:pointer; padding:0.3rem 0; }
-    .accordion-content { padding:0.4rem 0 0.4rem 0.5rem; font-size:0.88rem; line-height:1.7; }
-    details summary { list-style:none; display:flex; align-items:center; gap:0.4rem; user-select:none; }
-    details summary::before { content:'▶'; font-size:0.65rem; transition:transform 0.2s; }
-    details[open] > summary::before { transform:rotate(90deg); }
+    #splitAccordion { display:block; padding:1rem; overflow-y:auto; height:100%; }
+    #splitAccordion .acc-section { border:1px solid var(--border); border-radius:8px; overflow:hidden; width:100%; box-sizing:border-box; }
+    #splitAccordion .acc-header { display:flex; align-items:center; gap:0.5rem; padding:0.6rem 1rem; background:var(--surface2); cursor:pointer; font-weight:700; font-size:0.95rem; width:100%; box-sizing:border-box; user-select:none; }
+    #splitAccordion .acc-header::before { content:'▶'; font-size:0.65rem; flex-shrink:0; transition:transform 0.2s; }
+    #splitAccordion .acc-section.open .acc-header::before { transform:rotate(90deg); }
+    #splitAccordion .acc-body { display:none; padding:0; }
+    #splitAccordion .acc-section.open .acc-body { display:block; padding:0.4rem 0.5rem 0.5rem 1rem; }
+    #splitAccordion .acc-body .acc-item { display:block; width:100%; padding:0.3rem 0; font-size:0.85rem; color:var(--text); white-space:normal; word-break:keep-all; line-height:1.6; box-sizing:border-box; }
+    #splitAccordion .acc-body .acc-extra { font-size:0.82rem; color:var(--text-muted); line-height:1.7; padding:0.2rem 0 0.2rem 0.8rem; }
 
     /* ── Mind map tab ──────────────────────────── */
 
@@ -4817,8 +4813,7 @@ function switchSplitTab(tab) {
 
   notesEl.style.display      = tab === 'notes'      ? 'flex' : 'none';
   transcriptEl.style.display = tab === 'transcript' ? 'flex' : 'none';
-  accordionEl.style.display  = tab === 'accordion'  ? 'flex' : 'none';
-  accordionEl.style.flexDirection = 'column';
+  accordionEl.style.display  = tab === 'accordion'  ? 'block' : 'none';
 
   if (tab === 'transcript' && !transcriptEl.innerHTML.trim()) {
     if (storedHighlightedTranscript) {
@@ -4833,8 +4828,8 @@ function switchSplitTab(tab) {
   if (tab !== 'accordion') {
     // Save open state before leaving accordion tab
     _accordionOpenLabels = new Set(
-      Array.from(accordionEl.querySelectorAll('details[open] > summary'))
-        .map(s => s.textContent.trim())
+      Array.from(accordionEl.querySelectorAll('.acc-section.open .acc-header'))
+        .map(h => h.textContent.trim())
     );
   }
 
@@ -4843,8 +4838,12 @@ function switchSplitTab(tab) {
       ? buildAccordionView(notesEl)
       : '<span class="placeholder-msg">노트가 없습니다.</span>';
     if (_accordionOpenLabels.size) {
-      accordionEl.querySelectorAll('details > summary').forEach(s => {
-        if (_accordionOpenLabels.has(s.textContent.trim())) s.parentElement.open = true;
+      accordionEl.querySelectorAll('.acc-header').forEach(h => {
+        const sec = h.closest('.acc-section');
+        if (sec) {
+          if (_accordionOpenLabels.has(h.textContent.trim())) sec.classList.add('open');
+          else sec.classList.remove('open');
+        }
       });
     }
   }
@@ -4856,58 +4855,40 @@ function buildAccordionView(sourceEl) {
   const container = sourceEl.querySelector('.md-content') || sourceEl;
   const nodes = Array.from(container.childNodes);
 
-  let outerHtml = '';
-  let h1Label   = null;
-  let h1Body    = '';   // accumulates accordion-h2 blocks only
-  let h2Label   = null;
-  let h2Content = '';   // Level 3: all content under each ##
+  let html = '';
+  let section = null; // { label, body }
 
-  function closeH2() {
-    if (h2Label === null) return;
-    const contentDiv = h2Content
-      ? `<div class="accordion-content">${h2Content}</div>`
-      : '';
-    const d = `<details class="accordion-h2"><summary>${h2Label}</summary>${contentDiv}</details>`;
-    if (h1Label !== null) h1Body += d; else outerHtml += d;
-    h2Label = null; h2Content = '';
-  }
-
-  function closeH1() {
-    closeH2();
-    if (h1Label === null) return;
-    // Add visual separator between Level 1 blocks
-    if (outerHtml) outerHtml += '<hr style="margin:0.8rem 0; border:none; border-top:1px solid var(--border);">';
-    outerHtml += `<details class="accordion-h1" open><summary>${h1Label}</summary>${h1Body}</details>`;
-    h1Label = null; h1Body = '';
+  function closeSection() {
+    if (!section) return;
+    html += `<div class="acc-section open">`;
+    html += `<div class="acc-header" onclick="this.closest('.acc-section').classList.toggle('open')">${section.label}</div>`;
+    html += `<div class="acc-body">${section.body}</div>`;
+    html += `</div>`;
+    section = null;
   }
 
   for (const node of nodes) {
     if (node.nodeType !== Node.ELEMENT_NODE) continue;
     const tag = node.tagName.toLowerCase();
+
     if (tag === 'h1') {
-      closeH1();
-      h1Label = node.innerHTML;
+      closeSection();
+      section = { label: node.innerHTML, body: '' };
     } else if (tag === 'h2') {
-      closeH2();
-      h2Label = node.innerHTML;
+      const item = `<div class="acc-item">► ${node.innerHTML}</div>`;
+      if (section) section.body += item;
+      else html += item;
     } else if (tag === 'hr') {
-      // Skip raw HR nodes — we generate our own separators between Level 1 blocks
+      // skip
     } else {
-      const frag = node.outerHTML;
-      if (h2Label !== null) {
-        // Content belongs inside the current Level 2 block
-        h2Content += frag;
-      } else if (h1Label !== null) {
-        // Content between h1 and first h2 goes directly into the h1 body
-        h1Body += `<div class="accordion-content">${frag}</div>`;
-      } else {
-        // Pre-h1 content (e.g. summary paragraph before first #)
-        outerHtml += frag;
-      }
+      const extra = `<div class="acc-extra">${node.outerHTML}</div>`;
+      if (section) section.body += extra;
+      else html += node.outerHTML;
     }
   }
-  closeH1();
-  return outerHtml || '<span class="placeholder-msg">내용이 없습니다.</span>';
+  closeSection();
+
+  return html || '<span class="placeholder-msg">내용이 없습니다.</span>';
 }
 
 document.getElementById('splitPdfBtn').addEventListener('click', () => {
