@@ -6168,7 +6168,7 @@ async function autoDownloadPdf(notesBodyEl, filename) {
 
 /* Create a per-lecture result card and return its body element */
 function createBatchResultCard(item, index) {
-  const baseName = item.pptFile.name.replace(/\.[^.]+$/, '');
+  const baseName = (item.pptFile?.name || item.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
   const list     = document.getElementById('batchResultsList');
 
   const card = document.createElement('div');
@@ -6196,7 +6196,7 @@ function createBatchResultCard(item, index) {
 
 /* Attach download buttons to a finished card */
 function finalizeCard(item, notesText) {
-  const baseName  = item.pptFile.name.replace(/\.[^.]+$/, '');
+  const baseName  = (item.pptFile?.name || item.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
   const card      = document.querySelector(`.batch-result-card[data-item-id="${item.id}"]`);
   const dot       = document.getElementById('batchDot_'    + item.id);
   const actionsEl = document.getElementById('batchActions_' + item.id);
@@ -6300,8 +6300,8 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
 
       try {
         setProgress(5 + Math.round(i / pending.length * 85), `${i + 1}번째: 파일 읽는 중…`);
-        const pptText = await extractPresentationText(item.pptFile);
-        const rawTxt  = await item.txtFile.text();
+        const pptText = item.pptFile ? await extractPresentationText(item.pptFile) : '';
+        const rawTxt  = item.txtFile ? await item.txtFile.text() : '';
 
         const separated = separateSpeakers(rawTxt, professorNum);
         storedPptText      = pptText;
