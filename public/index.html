@@ -2601,9 +2601,10 @@ async function saveNoteFS(note) {
   if (ref) {
     const toSave = Object.assign({}, record);
     delete toSave.notesHtml;
-    // Upload slideImages to Firebase Storage, replace with URLs
-    if (toSave.slideImages && toSave.slideImages.length) {
-      toSave.slideImageUrls = await uploadSlideImages(id, toSave.slideImages);
+    // Upload slide images (could be in slideImages or extractedImages)
+    const images = toSave.slideImages || toSave.extractedImages;
+    if (images && images.length) {
+      toSave.slideImageUrls = await uploadSlideImages(id, images);
     }
     delete toSave.slideImages;
     delete toSave.extractedImages;
