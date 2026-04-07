@@ -2794,6 +2794,15 @@ async function syncNotesOnLogin() {
       }
     }
 
+    // 4. Convert slideImageUrls to extractedImages for any note missing them
+    const allLocal = await getAllNotes();
+    for (const note of allLocal) {
+      if (note.slideImageUrls && !note.extractedImages) {
+        note.extractedImages = note.slideImageUrls.map((url, i) => url ? { slideNumber: i + 1, imageBase64: url, mimeType: 'url' } : null).filter(Boolean);
+        await saveNote(note);
+      }
+    }
+
     sessionStorage.setItem('synced_' + currentUser.uid, 'true');
   } catch (e) {
     console.error('Sync error:', e);
