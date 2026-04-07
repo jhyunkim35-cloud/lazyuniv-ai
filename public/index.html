@@ -419,6 +419,13 @@
     #splitAccordion .acc-section.open .acc-body { display:block; padding:0.4rem 0.5rem 0.5rem 1rem; }
     #splitAccordion .acc-body .acc-item { display:block; width:100%; padding:0.3rem 0; font-size:0.85rem; color:var(--text); white-space:normal; word-break:keep-all; line-height:1.6; box-sizing:border-box; }
     #splitAccordion .acc-body .acc-extra { font-size:0.82rem; color:var(--text-muted); line-height:1.7; padding:0.2rem 0 0.2rem 0.8rem; }
+    #splitAccordion .acc-sub { border-left:3px solid var(--primary); margin:0.3rem 0; border-radius:4px; }
+    #splitAccordion .acc-sub-header { padding:0.4rem 0.8rem; cursor:pointer; font-size:0.88rem; font-weight:600; color:var(--secondary); user-select:none; }
+    #splitAccordion .acc-sub-header:hover { background:rgba(124,77,255,0.06); }
+    #splitAccordion .acc-sub-body { display:none; padding:0.3rem 0.8rem 0.5rem 1.2rem; font-size:0.84rem; line-height:1.7; color:var(--text); }
+    #splitAccordion .acc-sub.open .acc-sub-body { display:block; }
+    #splitAccordion .acc-sub.open .acc-sub-header { color:var(--primary); }
+    #splitAccordion .acc-section { margin-bottom:0.5rem; }
 
     /* ── Mind map tab ──────────────────────────── */
 
@@ -4856,15 +4863,29 @@ function buildAccordionView(sourceEl) {
   const nodes = Array.from(container.childNodes);
 
   let html = '';
-  let section = null; // { label, body }
+  let h1Section = null; // { label, body }
+  let h2Section = null; // { label, body }
 
-  function closeSection() {
-    if (!section) return;
-    html += `<div class="acc-section open">`;
-    html += `<div class="acc-header" onclick="this.closest('.acc-section').classList.toggle('open')">${section.label}</div>`;
-    html += `<div class="acc-body">${section.body}</div>`;
-    html += `</div>`;
-    section = null;
+  function closeH2() {
+    if (!h2Section) return;
+    const content = h2Section.body || '';
+    const h2Html = `<div class="acc-sub open">` +
+      `<div class="acc-sub-header" onclick="this.closest('.acc-sub').classList.toggle('open')">► ${h2Section.label}</div>` +
+      `<div class="acc-sub-body">${content}</div>` +
+      `</div>`;
+    if (h1Section) h1Section.body += h2Html;
+    else html += h2Html;
+    h2Section = null;
+  }
+
+  function closeH1() {
+    closeH2();
+    if (!h1Section) return;
+    html += `<div class="acc-section open">` +
+      `<div class="acc-header" onclick="this.closest('.acc-section').classList.toggle('open')">${h1Section.label}</div>` +
+      `<div class="acc-body">${h1Section.body}</div>` +
+      `</div>`;
+    h1Section = null;
   }
 
   for (const node of nodes) {
@@ -4872,21 +4893,21 @@ function buildAccordionView(sourceEl) {
     const tag = node.tagName.toLowerCase();
 
     if (tag === 'h1') {
-      closeSection();
-      section = { label: node.innerHTML, body: '' };
+      closeH1();
+      h1Section = { label: node.innerHTML, body: '' };
     } else if (tag === 'h2') {
-      const item = `<div class="acc-item">► ${node.innerHTML}</div>`;
-      if (section) section.body += item;
-      else html += item;
+      closeH2();
+      h2Section = { label: node.innerHTML, body: '' };
     } else if (tag === 'hr') {
       // skip
     } else {
-      const extra = `<div class="acc-extra">${node.outerHTML}</div>`;
-      if (section) section.body += extra;
-      else html += node.outerHTML;
+      const content = node.outerHTML;
+      if (h2Section) h2Section.body += content;
+      else if (h1Section) h1Section.body += content;
+      else html += content;
     }
   }
-  closeSection();
+  closeH1();
 
   return html || '<span class="placeholder-msg">내용이 없습니다.</span>';
 }
