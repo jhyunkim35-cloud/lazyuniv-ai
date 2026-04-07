@@ -2642,6 +2642,13 @@ async function deleteNoteFS(id) {
     await ref.doc(id).delete();
     await deleteSlideImages(id);
   }
+  // Track deletion for sync
+  if (currentUser) {
+    const deletedKey = 'deleted_notes_' + currentUser.uid;
+    const deleted = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    deleted.push(id);
+    localStorage.setItem(deletedKey, JSON.stringify(deleted));
+  }
 }
 async function searchNotesFS(query) {
   const all = await getAllNotesFS();
@@ -2729,6 +2736,15 @@ async function syncNotesOnLogin() {
       ref.get(), fRef.get()
     ]);
 
+    // Check for notes that were deleted locally — remove from Firestore too
+    const localIds = new Set(localNotes.map(n => n.id));
+    const deletedKey = 'deleted_notes_' + currentUser.uid;
+    const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    for (const did of deletedIds) {
+      try { await ref.doc(did).delete(); } catch(e) {}
+    }
+    localStorage.removeItem(deletedKey);
+
     const fsNotes = fsNotesSnap.docs.map(d => d.data());
     const fsFolders = fsFoldersSnap.docs.map(d => d.data());
     const fsNoteMap = Object.fromEntries(fsNotes.map(n => [n.id, n]));
@@ -2740,7 +2756,9 @@ async function syncNotesOnLogin() {
     for (const fsNote of fsNotes) {
       if (!localNoteMap[fsNote.id]) {
         if (!fsNote.notesHtml && fsNote.notesText) fsNote.notesHtml = renderMarkdown(fsNote.notesText);
-        if (fsNote.slideImageUrls && !fsNote.slideImages) fsNote.slideImages = fsNote.slideImageUrls;
+        if (fsNote.slideImageUrls && !fsNote.extractedImages) {
+          fsNote.extractedImages = fsNote.slideImageUrls.map((url, i) => url ? { slideNumber: i + 1, imageBase64: url, mimeType: 'url' } : null).filter(Boolean);
+        }
         await saveNote(fsNote);
       }
     }
@@ -3714,6 +3732,11 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
 /* ═══════════════════════════════════════════════
    Markdown renderer
 ═══════════════════════════════════════════════ */
+function getImgSrc(img) {
+  if (img.mimeType === 'url') return img.imageBase64;
+  return `data:${img.mimeType};base64,${img.imageBase64}`;
+}
+
 function renderMarkdown(raw) {
   const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
@@ -3958,7 +3981,7 @@ function renderImageGallery(images) {
 
     const thumb = document.createElement('img');
     thumb.className = 'image-thumb';
-    thumb.src = `data:${img.mimeType};base64,${img.imageBase64}`;
+    thumb.src = getImgSrc(img);
     thumb.alt = `슬라이드 ${img.slideNumber}`;
     thumb.loading = 'lazy';
 
@@ -4079,7 +4102,7 @@ function insertImagesInline(containerEl) {
     figure.className = 'inserted-slide-figure';
     figure.dataset.slideInserted = String(slideNum);
     const imgEl = document.createElement('img');
-    imgEl.src = `data:${img.mimeType};base64,${img.imageBase64}`;
+    imgEl.src = getImgSrc(img);
     imgEl.className = 'inserted-slide-img';
     imgEl.alt = `슬라이드 ${slideNum}`;
     const caption = document.createElement('figcaption');
@@ -4124,7 +4147,7 @@ function populateSplitImagePanel() {
     item.dataset.slide = String(img.slideNumber);
 
     const thumbImg = document.createElement('img');
-    thumbImg.src = `data:${img.mimeType};base64,${img.imageBase64}`;
+    thumbImg.src = getImgSrc(img);
     thumbImg.style.cssText = 'width:120px; height:90px; object-fit:cover; border-radius:4px; display:block;';
 
     const label = document.createElement('div');
@@ -4508,7 +4531,7 @@ function insertImagesIntoNotes(images) {
     figure.className = 'inserted-slide-figure';
 
     const imgEl = document.createElement('img');
-    imgEl.src = `data:${img.mimeType};base64,${img.imageBase64}`;
+    imgEl.src = getImgSrc(img);
     imgEl.alt = `슬라이드 ${img.slideNumber}`;
     imgEl.className = 'inserted-slide-img';
 
@@ -4770,7 +4793,7 @@ splitViewBtn.addEventListener('click', async () => {
       if (seen.has(img.slideNumber)) continue;
       seen.add(img.slideNumber);
       const imgEl = document.createElement('img');
-      imgEl.src = `data:${img.mimeType};base64,${img.imageBase64}`;
+      imgEl.src = getImgSrc(img);
       splitSlides.appendChild(imgEl);
       const label = document.createElement('div');
       label.className = 'slide-label';
