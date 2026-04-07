@@ -6089,8 +6089,8 @@ function renderBatchQueue() {
     return `<div class="batch-queue-item ${item.status}">
       <div class="batch-item-num">${i + 1}</div>
       <div class="batch-item-files">
-        <div class="batch-item-ppt">📊 ${escHtml(item.pptFile.name)}</div>
-        <div class="batch-item-txt">🎙️ ${escHtml(item.txtFile.name)}</div>
+        <div class="batch-item-ppt">📊 ${escHtml(item.pptFile?.name || '(없음)')}</div>
+        <div class="batch-item-txt">🎙️ ${escHtml(item.txtFile?.name || '(없음)')}</div>
       </div>
       <span class="batch-item-status ${cls}">${label}</span>
       ${canRemove
