@@ -2100,6 +2100,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+<script src="https://js.tosspayments.com/v2/standard"></script>
 </head>
 <body>
 
@@ -2880,10 +2881,31 @@ function showPaymentModal() {
 }
 
 async function startPayment(plan) {
+  // Close payment modal
+  document.querySelector('div[style*="position:fixed"][style*="z-index:10000"]')?.remove();
+
   const amount = plan === 'monthly' ? 7900 : 500;
   const orderName = plan === 'monthly' ? 'LectureNote AI 월정액' : 'LectureNote AI 1회 이용권';
-  showToast('💳 결제 연동 준비 중...');
-  // TODO: Toss 결제 위젯 호출
+  const orderId = 'order_' + currentUser.uid.substring(0, 8) + '_' + Date.now();
+
+  try {
+    const tossPayments = TossPayments('test_ck_mBZ1gQ4YVXBjEx6651Wj8l2KPoqN');
+    const payment = tossPayments.payment({ customerKey: currentUser.uid });
+
+    await payment.requestPayment({
+      method: 'CARD',
+      amount: { currency: 'KRW', value: amount },
+      orderId,
+      orderName,
+      customerEmail: currentUser.email,
+      customerName: currentUser.displayName || '사용자',
+      successUrl: window.location.origin + '?payment=success&plan=' + plan + '&orderId=' + orderId,
+      failUrl: window.location.origin + '?payment=fail',
+    });
+  } catch (e) {
+    if (e.code === 'USER_CANCEL') return;
+    showToast('❌ 결제 실패: ' + e.message);
+  }
 }
 
 async function uploadSlideImages(noteId, slideImages) {
@@ -7479,6 +7501,49 @@ setInterval(() => {
     c.scrollTop = c.scrollHeight;
   }
 }, 1000);
+
+// Handle Toss payment callback
+(async function handlePaymentCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const paymentStatus = params.get('payment');
+  if (!paymentStatus) return;
+
+  if (paymentStatus === 'success') {
+    const paymentKey = params.get('paymentKey');
+    const orderId = params.get('orderId');
+    const amount = params.get('amount');
+    const plan = params.get('plan');
+
+    try {
+      // Verify payment on server
+      const res = await fetch('/api/toss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) })
+      });
+      const result = await res.json();
+
+      if (result.success) {
+        // Wait for auth to be ready
+        await new Promise(resolve => {
+          if (currentUser) resolve();
+          else auth.onAuthStateChanged(u => { if (u) resolve(); });
+        });
+        await setPaidPlan(plan, orderId);
+        showSuccessToast('✅ 결제 완료! ' + (plan === 'monthly' ? '월정액이 활성화되었습니다.' : '1회 이용권이 추가되었습니다.'));
+      } else {
+        showToast('❌ 결제 확인 실패: ' + (result.message || ''));
+      }
+    } catch (e) {
+      showToast('❌ 결제 확인 오류: ' + e.message);
+    }
+  } else if (paymentStatus === 'fail') {
+    showToast('❌ 결제가 취소되었습니다.');
+  }
+
+  // Clean URL
+  window.history.replaceState({}, '', window.location.pathname);
+})();
 </script>
 
 </body>
