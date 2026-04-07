@@ -2794,11 +2794,18 @@ async function uploadSlideImages(noteId, slideImages) {
     const path = 'users/' + currentUser.uid + '/notes/' + noteId + '/slide_' + i + '.png';
     const ref = storage.ref(path);
     try {
-      let data = img;
-      if (typeof img === 'string' && img.includes('base64,')) {
+      let data, contentType = 'image/png';
+      if (typeof img === 'object' && img.imageBase64) {
+        data = img.imageBase64;
+        contentType = img.mimeType || 'image/png';
+      } else if (typeof img === 'string' && img.includes('base64,')) {
         data = img.split('base64,')[1];
+      } else if (typeof img === 'string') {
+        data = img;
+      } else {
+        urls.push(null); continue;
       }
-      await ref.putString(data, 'base64', { contentType: 'image/png' });
+      await ref.putString(data, 'base64', { contentType });
       const url = await ref.getDownloadURL();
       urls.push(url);
     } catch (e) {
