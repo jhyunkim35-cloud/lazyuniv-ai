@@ -2737,15 +2737,6 @@ async function syncNotesOnLogin() {
       ref.get(), fRef.get()
     ]);
 
-    // Check for notes that were deleted locally — remove from Firestore too
-    const localIds = new Set(localNotes.map(n => n.id));
-    const deletedKey = 'deleted_notes_' + currentUser.uid;
-    const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
-    for (const did of deletedIds) {
-      try { await ref.doc(did).delete(); } catch(e) {}
-    }
-    localStorage.removeItem(deletedKey);
-
     const fsNotes = fsNotesSnap.docs.map(d => d.data());
     const fsFolders = fsFoldersSnap.docs.map(d => d.data());
     const fsNoteMap = Object.fromEntries(fsNotes.map(n => [n.id, n]));
@@ -2753,8 +2744,19 @@ async function syncNotesOnLogin() {
     const fsFolderMap = Object.fromEntries(fsFolders.map(f => [f.id, f]));
     const localFolderMap = Object.fromEntries(localFolders.map(f => [f.id, f]));
 
-    // 1. Firestore에 있는데 로컬에 없으면 → 로컬에 저장
+    // 1. Process deleted notes tracked in localStorage
+    const deletedKey = 'deleted_notes_' + currentUser.uid;
+    const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    for (const did of deletedIds) {
+      try { await ref.doc(did).delete(); } catch(e) {}
+      try { await deleteNote(did); } catch(e) {}
+    }
+    localStorage.removeItem(deletedKey);
+    const deletedSet = new Set(deletedIds);
+
+    // 2. Firestore에 있는데 로컬에 없으면 → 로컬에 저장 (단, 삭제 목록에 없는 경우만)
     for (const fsNote of fsNotes) {
+      if (deletedSet.has(fsNote.id)) continue;
       if (!localNoteMap[fsNote.id]) {
         if (!fsNote.notesHtml && fsNote.notesText) fsNote.notesHtml = renderMarkdown(fsNote.notesText);
         if (fsNote.slideImageUrls && !fsNote.extractedImages) {
@@ -2767,8 +2769,9 @@ async function syncNotesOnLogin() {
       if (!localFolderMap[fsFolder.id]) await saveFolder(fsFolder);
     }
 
-    // 2. 로컬에 있는데 Firestore에 없으면 → Firestore에 업로드
+    // 3. 로컬에 있는데 Firestore에 없으면 → Firestore에 업로드
     for (const ln of localNotes) {
+      if (deletedSet.has(ln.id)) continue;
       if (!fsNoteMap[ln.id]) {
         try { await saveNoteFS(ln); } catch (e) { console.warn('Sync upload skip:', ln.id, e.message); }
       }
@@ -2779,23 +2782,22 @@ async function syncNotesOnLogin() {
       }
     }
 
-    // 3. 둘 다 있으면 → updatedAt 비교, 최신 걸로 통일
+    // 4. 둘 다 있으면 → updatedAt 비교
     for (const fsNote of fsNotes) {
+      if (deletedSet.has(fsNote.id)) continue;
       const local = localNoteMap[fsNote.id];
       if (!local) continue;
       const fsTime = fsNote.updatedAt || '';
       const localTime = local.updatedAt || '';
       if (fsTime > localTime) {
-        // Firestore가 최신 → 로컬 갱신 (slideImages 유지)
-        const merged = Object.assign({}, fsNote, { slideImages: local.slideImages, notesHtml: local.notesHtml });
+        const merged = Object.assign({}, fsNote, { slideImages: local.slideImages, notesHtml: local.notesHtml, extractedImages: local.extractedImages });
         await saveNote(merged);
       } else if (localTime > fsTime) {
-        // 로컬이 최신 → Firestore 갱신
         try { await saveNoteFS(local); } catch (e) { console.warn('Sync push skip:', e.message); }
       }
     }
 
-    // 4. Convert slideImageUrls to extractedImages for any note missing them
+    // 5. Convert slideImageUrls for any local note missing extractedImages
     const allLocal = await getAllNotes();
     for (const note of allLocal) {
       if (note.slideImageUrls && !note.extractedImages) {
@@ -6037,11 +6039,14 @@ document.getElementById('batchTxtInput').addEventListener('change', e => {
 });
 
 function checkAddPairReady() {
-  document.getElementById('addPairBtn').disabled = !(batchPptStaging && batchTxtStaging);
+  document.getElementById('addPairBtn').disabled = !(batchPptStaging || batchTxtStaging);
 }
 
 document.getElementById('addPairBtn').addEventListener('click', () => {
-  if (!batchPptStaging || !batchTxtStaging) return;
+  if (!batchPptStaging && !batchTxtStaging) {
+    showToast('PPT/PDF 또는 녹취록 중 하나 이상 업로드하세요.');
+    return;
+  }
   batchQueue.push({ id: ++batchIdCounter, pptFile: batchPptStaging, txtFile: batchTxtStaging, status: 'waiting' });
 
   // reset staging
