@@ -2302,7 +2302,7 @@
         <span class="batch-file-btn-label">발표 자료 선택</span>
       </label>
       <label class="batch-file-btn" id="batchTxtBtn">
-        <input type="file" id="batchTxtInput" accept=".txt" />
+        <input type="file" id="batchTxtInput" accept=".txt" multiple />
         <span class="batch-file-btn-icon">🎙️</span>
         <span class="batch-file-btn-label">녹취록 선택</span>
       </label>
@@ -5990,7 +5990,7 @@ let isBatchMode = false;
 let batchQueue  = [];   // [{id, pptFile, txtFile, status}]
 let batchIdCounter = 0;
 let batchPptStaging = null;
-let batchTxtStaging = null;
+let batchTxtStaging = [];
 
 /* Mode switching */
 document.getElementById('modeSingle').addEventListener('click', () => setMode('single'));
@@ -6025,33 +6025,40 @@ document.getElementById('batchPptInput').addEventListener('change', e => {
 });
 
 document.getElementById('batchTxtInput').addEventListener('change', e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  if (!f.name.toLowerCase().endsWith('.txt')) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  const invalid = files.find(f => !f.name.toLowerCase().endsWith('.txt'));
+  if (invalid) {
     showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
     return;
   }
-  batchTxtStaging = f;
+  batchTxtStaging = files;
   const btn = document.getElementById('batchTxtBtn');
   btn.classList.add('has-file');
-  btn.querySelector('.batch-file-btn-label').textContent = f.name;
+  btn.querySelector('.batch-file-btn-label').textContent = batchTxtStaging.length + '개 녹취록 선택됨';
   checkAddPairReady();
 });
 
 function checkAddPairReady() {
-  document.getElementById('addPairBtn').disabled = !(batchPptStaging || batchTxtStaging);
+  document.getElementById('addPairBtn').disabled = !(batchPptStaging || batchTxtStaging.length);
 }
 
 document.getElementById('addPairBtn').addEventListener('click', () => {
-  if (!batchPptStaging && !batchTxtStaging) {
+  if (!batchPptStaging && !batchTxtStaging.length) {
     showToast('PPT/PDF 또는 녹취록 중 하나 이상 업로드하세요.');
     return;
   }
-  batchQueue.push({ id: ++batchIdCounter, pptFile: batchPptStaging, txtFile: batchTxtStaging, status: 'waiting' });
+  if (batchTxtStaging.length > 0) {
+    for (const txt of batchTxtStaging) {
+      batchQueue.push({ id: ++batchIdCounter, pptFile: batchPptStaging, txtFile: txt, status: 'waiting' });
+    }
+  } else {
+    batchQueue.push({ id: ++batchIdCounter, pptFile: batchPptStaging, txtFile: null, status: 'waiting' });
+  }
 
   // reset staging
   batchPptStaging = null;
-  batchTxtStaging = null;
+  batchTxtStaging = [];
   const pBtn = document.getElementById('batchPptBtn');
   const tBtn = document.getElementById('batchTxtBtn');
   pBtn.classList.remove('has-file');
