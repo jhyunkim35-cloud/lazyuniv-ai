@@ -2294,20 +2294,8 @@
   <!-- Batch Section -->
   <div class="batch-section" id="batchSection">
 
-    <!-- Add pair -->
-    <div class="card batch-add-card">
-      <label class="batch-file-btn" id="batchPptBtn">
-        <input type="file" id="batchPptInput" accept=".pptx,.pdf" />
-        <span class="batch-file-btn-icon">📊</span>
-        <span class="batch-file-btn-label">발표 자료 선택</span>
-      </label>
-      <label class="batch-file-btn" id="batchTxtBtn">
-        <input type="file" id="batchTxtInput" accept=".txt" multiple />
-        <span class="batch-file-btn-icon">🎙️</span>
-        <span class="batch-file-btn-label">녹취록 선택</span>
-      </label>
-      <button class="add-pair-btn" id="addPairBtn" disabled>+ 쌍 추가</button>
-    </div>
+    <div id="batchSessions" style="display:flex; flex-direction:column; gap:1rem;"></div>
+    <button id="addSessionBtn" class="action-btn" style="align-self:flex-start; margin-top:0.5rem; font-size:0.85rem;">＋ 교시 추가</button>
 
     <!-- Queue -->
     <div class="batch-queue" id="batchQueue">
@@ -5989,8 +5977,8 @@ ${notesText}`;
 let isBatchMode = false;
 let batchQueue  = [];   // [{id, pptFile, txtFile, status}]
 let batchIdCounter = 0;
-let batchPptStaging = null;
-let batchTxtStaging = [];
+let batchSessions = [];
+let sessionIdCounter = 0;
 
 /* Mode switching */
 document.getElementById('modeSingle').addEventListener('click', () => setMode('single'));
@@ -6005,78 +5993,81 @@ function setMode(mode) {
   document.getElementById('batchSection').classList.toggle('visible', isBatchMode);
   document.getElementById('singleNoteCard').style.display  = isBatchMode ? 'none' : '';
   document.getElementById('batchResultsList').style.display = isBatchMode ? '' : 'none';
+  if (isBatchMode && batchSessions.length === 0) addSession();
   checkReady();
 }
 
-/* Batch staging file inputs */
-document.getElementById('batchPptInput').addEventListener('change', e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  const n = f.name.toLowerCase();
-  if (!n.endsWith('.pptx') && !n.endsWith('.pdf')) {
-    showToast('⚠️ .pptx 또는 .pdf 파일만 업로드할 수 있습니다.');
-    return;
-  }
-  batchPptStaging = f;
-  const btn = document.getElementById('batchPptBtn');
-  btn.classList.add('has-file');
-  btn.querySelector('.batch-file-btn-label').textContent = f.name;
-  checkAddPairReady();
-});
-
-document.getElementById('batchTxtInput').addEventListener('change', e => {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
-  const invalid = files.find(f => !f.name.toLowerCase().endsWith('.txt'));
-  if (invalid) {
-    showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
-    return;
-  }
-  batchTxtStaging = files;
-  const btn = document.getElementById('batchTxtBtn');
-  btn.classList.add('has-file');
-  btn.querySelector('.batch-file-btn-label').textContent = batchTxtStaging.length + '개 녹취록 선택됨';
-  checkAddPairReady();
-});
-
-function checkAddPairReady() {
-  document.getElementById('addPairBtn').disabled = !(batchPptStaging || batchTxtStaging.length);
+function addSession() {
+  const id = ++sessionIdCounter;
+  batchSessions.push({ id, pptFile: null, txtFile: null, professorNum: 1 });
+  renderSessions();
 }
 
-document.getElementById('addPairBtn').addEventListener('click', () => {
-  if (!batchPptStaging && !batchTxtStaging.length) {
-    showToast('PPT/PDF 또는 녹취록 중 하나 이상 업로드하세요.');
-    return;
-  }
-  if (batchTxtStaging.length > 0) {
-    for (const txt of batchTxtStaging) {
-      batchQueue.push({ id: ++batchIdCounter, pptFile: batchPptStaging, txtFile: txt, status: 'waiting' });
+function removeSession(id) {
+  batchSessions = batchSessions.filter(s => s.id !== id);
+  renderSessions();
+  checkBatchReady();
+}
+
+function renderSessions() {
+  const container = document.getElementById('batchSessions');
+  container.innerHTML = batchSessions.map((s, i) => `
+    <div class="batch-session-card" data-session-id="${s.id}" style="border:1px solid var(--border); border-radius:10px; padding:1rem; background:var(--surface2);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+        <span style="font-weight:700; font-size:0.95rem; color:var(--text);">${i + 1}교시</span>
+        <button onclick="removeSession(${s.id})" style="background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:1.1rem;">✕</button>
+      </div>
+      <div style="display:flex; gap:0.6rem; margin-bottom:0.6rem;">
+        <label class="batch-file-btn ${s.pptFile ? 'has-file' : ''}" style="flex:1;">
+          <input type="file" accept=".pptx,.pdf" onchange="handleSessionFile(${s.id}, 'ppt', event)" style="display:none;" />
+          <span class="batch-file-btn-icon">📊</span>
+          <span class="batch-file-btn-label">${s.pptFile?.name || '발표 자료 선택'}</span>
+        </label>
+        <label class="batch-file-btn ${s.txtFile ? 'has-file' : ''}" style="flex:1;">
+          <input type="file" accept=".txt" onchange="handleSessionFile(${s.id}, 'txt', event)" style="display:none;" />
+          <span class="batch-file-btn-icon">🎙️</span>
+          <span class="batch-file-btn-label">${s.txtFile?.name || '녹취록 선택'}</span>
+        </label>
+      </div>
+      ${s.txtFile ? `<div style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; color:var(--text-muted);">
+        <span>🎓 교수님 참석자 번호:</span>
+        <select onchange="handleSessionProfessor(${s.id}, this.value)" style="padding:0.2rem 0.4rem; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:0.82rem;">
+          ${[1,2,3,4,5].map(n => `<option value="${n}" ${s.professorNum === n ? 'selected' : ''}> 참석자 ${n}</option>`).join('')}
+        </select>
+      </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function handleSessionFile(sessionId, type, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const session = batchSessions.find(s => s.id === sessionId);
+  if (!session) return;
+  if (type === 'ppt') {
+    const ext = file.name.toLowerCase();
+    if (!ext.endsWith('.pptx') && !ext.endsWith('.pdf')) {
+      showToast('⚠️ .pptx 또는 .pdf 파일만 업로드할 수 있습니다.');
+      return;
     }
+    session.pptFile = file;
   } else {
-    batchQueue.push({ id: ++batchIdCounter, pptFile: batchPptStaging, txtFile: null, status: 'waiting' });
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+      showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    session.txtFile = file;
   }
-
-  // reset staging
-  batchPptStaging = null;
-  batchTxtStaging = [];
-  const pBtn = document.getElementById('batchPptBtn');
-  const tBtn = document.getElementById('batchTxtBtn');
-  pBtn.classList.remove('has-file');
-  pBtn.querySelector('.batch-file-btn-label').textContent = '발표 자료 선택';
-  tBtn.classList.remove('has-file');
-  tBtn.querySelector('.batch-file-btn-label').textContent = '녹취록 선택';
-  document.getElementById('batchPptInput').value = '';
-  document.getElementById('batchTxtInput').value = '';
-  checkAddPairReady();
-  renderBatchQueue();
-  checkBatchReady();
-});
-
-function removeBatchItem(id) {
-  batchQueue = batchQueue.filter(item => item.id !== id);
-  renderBatchQueue();
+  renderSessions();
   checkBatchReady();
 }
+
+function handleSessionProfessor(sessionId, value) {
+  const session = batchSessions.find(s => s.id === sessionId);
+  if (session) session.professorNum = Number(value);
+}
+
+document.getElementById('addSessionBtn').addEventListener('click', addSession);
 
 function renderBatchQueue() {
   const container = document.getElementById('batchQueue');
@@ -6108,8 +6099,8 @@ function renderBatchQueue() {
 }
 
 function checkBatchReady() {
-  document.getElementById('batchStartBtn').disabled =
-    isRunning || !batchQueue.some(i => i.status === 'waiting');
+  const hasAny = batchSessions.some(s => s.pptFile || s.txtFile);
+  document.getElementById('batchStartBtn').disabled = !hasAny;
 }
 
 function updateBatchProgress(current, total) {
@@ -6270,6 +6261,9 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
   if (isRunning) return;
   const apiKey = 'server-proxied';
 
+  batchQueue = batchSessions
+    .filter(s => s.pptFile || s.txtFile)
+    .map(s => ({ id: s.id, pptFile: s.pptFile, txtFile: s.txtFile, professorNum: s.professorNum || 1, status: 'waiting' }));
   const pending = batchQueue.filter(item => item.status === 'waiting');
   if (pending.length === 0) return;
 
@@ -6289,7 +6283,6 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
 
   setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 
-  const professorNum = parseInt(document.getElementById('professorNum').value) || 1;
   let failCount = 0;
 
   try {
@@ -6310,7 +6303,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         const pptText = item.pptFile ? await extractPresentationText(item.pptFile) : '';
         const rawTxt  = item.txtFile ? await item.txtFile.text() : '';
 
-        const separated = separateSpeakers(rawTxt, professorNum);
+        const separated = separateSpeakers(rawTxt, item.professorNum);
         storedPptText      = pptText;
         storedFilteredText = separated.text;
 
@@ -6341,6 +6334,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
       // Reset any items still stuck in 'processing' so they can be retried
       batchQueue.filter(it => it.status === 'processing').forEach(it => { it.status = 'waiting'; });
       renderBatchQueue();
+      checkBatchReady();
       showToast('배치 처리가 취소되었습니다.');
       setProgress(null);
     } else {
