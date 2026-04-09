@@ -1297,12 +1297,35 @@
 
     .batch-section.visible { display: flex; }
 
-    .batch-add-card {
-      display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 0.75rem;
-      align-items: center;
-      padding: 1rem 1.25rem;
+    /* Staging panel */
+    .batch-staging {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface2);
+      overflow: hidden;
+    }
+
+    .batch-staging-section {
+      padding: 0.9rem 1.1rem;
+    }
+
+    .batch-staging-section + .batch-staging-section {
+      border-top: 1px solid var(--border);
+    }
+
+    .batch-staging-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 0.55rem;
+    }
+
+    .batch-staging-footer {
+      padding: 0.75rem 1.1rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface3);
     }
 
     .batch-file-btn {
@@ -1310,8 +1333,8 @@
       flex-direction: column;
       align-items: center;
       gap: 0.35rem;
-      padding: 0.7rem 0.9rem;
-      background: var(--surface2);
+      padding: 0.65rem 0.9rem;
+      background: var(--surface);
       border: 1.5px dashed var(--border-bright);
       border-radius: var(--radius-sm);
       color: var(--text-muted);
@@ -1328,42 +1351,69 @@
     .batch-file-btn.has-file { border-style: solid; border-color: var(--success); color: var(--success); background: var(--success-dim); }
     .batch-file-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .batch-file-btn-icon { font-size: 1.1rem; }
-    .batch-file-btn-label { font-size: 0.76rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .batch-file-btn-label { font-size: 0.76rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .add-pair-btn {
-      padding: 0.65rem 1.1rem;
-      background: var(--primary-dim);
-      border: 1px solid var(--primary);
+    /* Session rows inside staging */
+    .batch-session-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      color: var(--primary);
-      font-size: 0.88rem;
+      background: var(--surface);
+    }
+
+    .batch-session-num {
+      font-size: 0.78rem;
       font-weight: 700;
-      cursor: pointer;
-      transition: all 0.2s;
+      color: var(--text-muted);
+      min-width: 38px;
       white-space: nowrap;
     }
 
-    .add-pair-btn:hover { background: var(--primary); color: #fff; }
-    .add-pair-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .batch-session-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .batch-session-remove:hover { background: rgba(248,113,113,0.15); color: #fca5a5; }
 
+    .batch-prof-select {
+      padding: 0.25rem 0.4rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+
+    /* Queue */
     .batch-queue { display: flex; flex-direction: column; gap: 0.5rem; }
 
     .batch-queue-empty {
       text-align: center;
-      padding: 1.5rem;
+      padding: 1.4rem;
       background: var(--surface);
       border: 1px dashed var(--border);
       border-radius: var(--radius);
       color: var(--text-dim);
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       font-style: italic;
     }
 
     .batch-queue-item {
       display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.65rem 1rem;
+      flex-direction: column;
+      gap: 0.45rem;
+      padding: 0.75rem 1rem;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
@@ -1371,33 +1421,39 @@
       transition: border-color 0.2s;
     }
 
-    .batch-queue-item.processing { border-color: var(--primary); }
+    .batch-queue-item.processing { border-color: var(--primary); background: var(--primary-dim); }
     .batch-queue-item.done { border-color: rgba(74, 222, 128, 0.4); }
     .batch-queue-item.error { border-color: rgba(248, 113, 113, 0.4); }
 
+    .batch-queue-item-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
     .batch-item-num {
-      width: 1.7rem;
-      height: 1.7rem;
+      width: 1.6rem;
+      height: 1.6rem;
       border-radius: 50%;
       background: var(--surface3);
       border: 1px solid var(--border-bright);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 700;
       color: var(--text-muted);
       flex-shrink: 0;
     }
 
-    .batch-item-files { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
-    .batch-item-ppt { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .batch-item-txt { color: var(--text-muted); font-size: 0.78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .batch-item-files { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+    .batch-item-ppt { color: var(--text); font-weight: 600; font-size: 0.84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .batch-item-txt { color: var(--text-muted); font-size: 0.76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .batch-item-status {
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       font-weight: 600;
-      padding: 0.2rem 0.6rem;
+      padding: 0.18rem 0.55rem;
       border-radius: 99px;
       flex-shrink: 0;
       white-space: nowrap;
@@ -1425,6 +1481,33 @@
     }
     .batch-item-remove:hover { background: rgba(248,113,113,0.15); color: #fca5a5; }
 
+    .batch-item-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-left: 2.2rem;
+    }
+
+    .batch-item-name-label {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .batch-item-name-input {
+      flex: 1;
+      padding: 0.22rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.8rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .batch-item-name-input:focus { border-color: var(--primary); }
+
     .batch-overall-banner {
       display: none;
       align-items: center;
@@ -1440,11 +1523,6 @@
     .batch-overall-banner.visible { display: flex; }
     .batch-overall-banner.done { background: var(--success-dim); border-color: rgba(74,222,128,0.3); color: var(--success); }
     .batch-overall-banner .spinner { border-top-color: var(--primary); }
-
-    @media (max-width: 600px) {
-      .batch-add-card { grid-template-columns: 1fr 1fr; }
-      .add-pair-btn { grid-column: 1 / -1; }
-    }
 
     /* ── Batch result cards (one per lecture) ───── */
     .batch-results-list {
@@ -2294,18 +2372,25 @@
   <!-- Batch Section -->
   <div class="batch-section" id="batchSection">
 
-    <div id="batchStaging" style="border:1px solid var(--border); border-radius:10px; padding:1rem; background:var(--surface2); margin-bottom:1rem;">
-      <div style="display:flex; gap:0.6rem; margin-bottom:0.8rem;">
-        <label class="batch-file-btn" id="batchPptBtn" style="flex:1;">
+    <div class="batch-staging" id="batchStaging">
+      <!-- PPT 선택 -->
+      <div class="batch-staging-section">
+        <div class="batch-staging-label">📊 발표 자료 선택</div>
+        <label class="batch-file-btn" id="batchPptBtn" style="width:100%;">
           <input type="file" id="batchPptInput" accept=".pptx,.pdf" />
           <span class="batch-file-btn-icon">📊</span>
-          <span class="batch-file-btn-label">발표 자료 선택</span>
+          <span class="batch-file-btn-label">PPT / PDF 파일 선택</span>
         </label>
       </div>
-      <div id="batchSessionList" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
-      <button id="addSessionBtn" class="action-btn" style="font-size:0.82rem; margin-top:0.5rem;">＋ 교시 추가</button>
-      <div style="margin-top:0.8rem;">
-        <button id="addPairBtn" class="action-btn primary" disabled style="width:100%;">쌍 추가</button>
+      <!-- 교시별 녹취록 -->
+      <div class="batch-staging-section">
+        <div class="batch-staging-label">🎙️ 교시별 녹취록</div>
+        <div id="batchSessionList" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+        <button id="addSessionBtn" class="action-btn" style="font-size:0.8rem; margin-top:0.5rem; width:100%;">＋ 교시 추가</button>
+      </div>
+      <!-- 쌍 추가 -->
+      <div class="batch-staging-footer">
+        <button id="addPairBtn" class="analyze-btn" disabled style="width:100%; padding:0.6rem; font-size:0.88rem;">＋ 쌍 추가하기</button>
       </div>
     </div>
 
@@ -6040,38 +6125,21 @@ function removeBatchSession(id) {
 function renderBatchSessions() {
   const container = document.getElementById('batchSessionList');
   container.innerHTML = batchSessionStaging.map((s, i) => `
-    <div style="display:flex; align-items:center; gap:0.5rem; padding:0.5rem; border:1px solid var(--border); border-radius:8px; background:var(--surface);">
-      <span style="font-weight:600; font-size:0.85rem; color:var(--text); min-width:45px;">${i + 1}교시</span>
-      <label class="batch-file-btn ${s.txtFile ? 'has-file' : ''}" style="flex:1; margin:0;">
-        <input type="file" accept=".txt" onchange="handleBatchSessionFile(${s.id}, event)" style="display:none;" />
+    <div class="batch-session-row">
+      <span class="batch-session-num">${i + 1}교시</span>
+      <label class="batch-file-btn ${s.txtFile ? 'has-file' : ''}" style="flex:1; margin:0; min-width:0;">
+        <input type="file" accept=".txt" data-session-id="${s.id}" class="batch-session-file-input" style="display:none;" />
         <span class="batch-file-btn-icon">🎙️</span>
         <span class="batch-file-btn-label">${s.txtFile?.name || '녹취록 선택'}</span>
       </label>
-      <select onchange="handleBatchSessionProf(${s.id}, this.value)" style="padding:0.3rem; border-radius:6px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:0.8rem;">
+      <select data-session-id="${s.id}" class="batch-prof-select batch-session-prof-select">
         ${[1,2,3,4,5].map(n => `<option value="${n}" ${s.professorNum === n ? 'selected' : ''}>참석자${n}</option>`).join('')}
       </select>
-      <button onclick="removeBatchSession(${s.id})" style="background:none; border:none; cursor:pointer; color:var(--text-muted);">✕</button>
+      <button class="batch-session-remove" data-session-id="${s.id}" title="삭제">✕</button>
     </div>
   `).join('');
 }
 
-function handleBatchSessionFile(sessionId, event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  if (!file.name.toLowerCase().endsWith('.txt')) {
-    showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
-    return;
-  }
-  const session = batchSessionStaging.find(s => s.id === sessionId);
-  if (session) session.txtFile = file;
-  renderBatchSessions();
-  checkAddPairReady();
-}
-
-function handleBatchSessionProf(sessionId, value) {
-  const session = batchSessionStaging.find(s => s.id === sessionId);
-  if (session) session.professorNum = Number(value);
-}
 
 function checkAddPairReady() {
   const hasPpt = !!batchPptStaging;
@@ -6081,14 +6149,60 @@ function checkAddPairReady() {
 
 document.getElementById('addSessionBtn').addEventListener('click', addBatchSession);
 
+/* Event delegation for session list (file change, prof select, remove) */
+document.getElementById('batchSessionList').addEventListener('change', e => {
+  const sessionId = parseInt(e.target.dataset.sessionId, 10);
+  if (!sessionId) return;
+  if (e.target.classList.contains('batch-session-file-input')) {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+      showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    const session = batchSessionStaging.find(s => s.id === sessionId);
+    if (session) session.txtFile = file;
+    renderBatchSessions();
+    checkAddPairReady();
+  } else if (e.target.classList.contains('batch-session-prof-select')) {
+    const session = batchSessionStaging.find(s => s.id === sessionId);
+    if (session) session.professorNum = Number(e.target.value);
+  }
+});
+
+document.getElementById('batchSessionList').addEventListener('click', e => {
+  const btn = e.target.closest('.batch-session-remove');
+  if (!btn) return;
+  const sessionId = parseInt(btn.dataset.sessionId, 10);
+  removeBatchSession(sessionId);
+});
+
+/* Event delegation for batch queue (remove + name input) */
+document.getElementById('batchQueue').addEventListener('click', e => {
+  const btn = e.target.closest('.batch-item-remove');
+  if (!btn) return;
+  const id = parseInt(btn.dataset.itemId, 10);
+  removeBatchItem(id);
+});
+
+document.getElementById('batchQueue').addEventListener('input', e => {
+  if (!e.target.classList.contains('batch-item-name-input')) return;
+  const id = parseInt(e.target.dataset.itemId, 10);
+  updateBatchItemName(id, e.target.value);
+});
+
 document.getElementById('addPairBtn').addEventListener('click', () => {
   if (!batchPptStaging && !batchSessionStaging.some(s => s.txtFile)) {
     showToast('발표 자료 또는 녹취록 중 하나 이상 업로드하세요.');
     return;
   }
+  const defaultName = batchPptStaging
+    ? batchPptStaging.name.replace(/\.[^.]+$/, '')
+    : (batchSessionStaging.find(s => s.txtFile)?.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
   batchQueue.push({
     id: ++batchIdCounter,
     pptFile: batchPptStaging,
+    notesName: defaultName,
     sessions: batchSessionStaging.filter(s => s.txtFile).map(s => ({ txtFile: s.txtFile, professorNum: s.professorNum })),
     status: 'waiting'
   });
@@ -6098,9 +6212,10 @@ document.getElementById('addPairBtn').addEventListener('click', () => {
   batchSessionStaging = [];
   const pBtn = document.getElementById('batchPptBtn');
   pBtn.classList.remove('has-file');
-  pBtn.querySelector('.batch-file-btn-label').textContent = '발표 자료 선택';
+  pBtn.querySelector('.batch-file-btn-label').textContent = 'PPT / PDF 파일 선택';
   document.getElementById('batchPptInput').value = '';
   document.getElementById('batchSessionList').innerHTML = '';
+  addBatchSession(); // pre-populate one session row for the next pair
   checkAddPairReady();
   renderBatchQueue();
   checkBatchReady();
@@ -6120,17 +6235,27 @@ function renderBatchQueue() {
   };
   container.innerHTML = batchQueue.map((item, i) => {
     const [cls, label] = statusMap[item.status];
-    const canRemove    = item.status === 'waiting';
-    return `<div class="batch-queue-item ${item.status}">
-      <div class="batch-item-num">${i + 1}</div>
-      <div class="batch-item-files">
-        <div class="batch-item-ppt">📊 ${escHtml(item.pptFile?.name || '(없음)')}</div>
-        <div class="batch-item-txt">🎙️ ${item.sessions?.length || 0}개 교시</div>
+    const canRemove = item.status === 'waiting';
+    const baseName  = (item.pptFile?.name || item.sessions?.[0]?.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
+    const notesName = item.notesName !== undefined ? item.notesName : baseName;
+    const sessCount = item.sessions?.length || 0;
+    const pptLabel  = item.pptFile ? escHtml(item.pptFile.name) : '<span style="color:var(--text-dim)">(발표 자료 없음)</span>';
+    return `<div class="batch-queue-item ${item.status}" data-item-id="${item.id}">
+      <div class="batch-queue-item-row">
+        <div class="batch-item-num">${i + 1}</div>
+        <div class="batch-item-files">
+          <div class="batch-item-ppt">📊 ${pptLabel}</div>
+          <div class="batch-item-txt">🎙️ ${sessCount}개 교시${sessCount > 0 ? ' · ' + item.sessions.map((s,j) => `${j+1}교시`).join(', ') : ''}</div>
+        </div>
+        <span class="batch-item-status ${cls}">${label}</span>
+        ${canRemove
+          ? `<button class="batch-item-remove" data-item-id="${item.id}" title="제거">✕</button>`
+          : '<span style="width:1.5rem;display:inline-block"></span>'}
       </div>
-      <span class="batch-item-status ${cls}">${label}</span>
-      ${canRemove
-        ? `<button class="batch-item-remove" onclick="removeBatchItem(${item.id})" title="제거">✕</button>`
-        : '<span style="width:1.5rem"></span>'}
+      ${canRemove ? `<div class="batch-item-name-row">
+        <span class="batch-item-name-label">노트 이름</span>
+        <input type="text" class="batch-item-name-input" data-item-id="${item.id}" value="${escHtml(notesName)}" placeholder="노트 제목 입력…" />
+      </div>` : ''}
     </div>`;
   }).join('');
 }
@@ -6138,6 +6263,17 @@ function renderBatchQueue() {
 function checkBatchReady() {
   document.getElementById('batchStartBtn').disabled =
     isRunning || !batchQueue.some(i => i.status === 'waiting');
+}
+
+function removeBatchItem(id) {
+  batchQueue = batchQueue.filter(item => item.id !== id);
+  renderBatchQueue();
+  checkBatchReady();
+}
+
+function updateBatchItemName(id, value) {
+  const item = batchQueue.find(i => i.id === id);
+  if (item) item.notesName = value;
 }
 
 function updateBatchProgress(current, total) {
@@ -6203,7 +6339,7 @@ async function autoDownloadPdf(notesBodyEl, filename) {
 
 /* Create a per-lecture result card and return its body element */
 function createBatchResultCard(item, index) {
-  const baseName = (item.pptFile?.name || item.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
+  const baseName = item.notesName || (item.pptFile?.name || item.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
   const list     = document.getElementById('batchResultsList');
 
   const card = document.createElement('div');
@@ -6231,7 +6367,7 @@ function createBatchResultCard(item, index) {
 
 /* Attach download buttons to a finished card */
 function finalizeCard(item, notesText) {
-  const baseName  = (item.pptFile?.name || item.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
+  const baseName  = item.notesName || (item.pptFile?.name || item.txtFile?.name || '항목').replace(/\.[^.]+$/, '');
   const card      = document.querySelector(`.batch-result-card[data-item-id="${item.id}"]`);
   const dot       = document.getElementById('batchDot_'    + item.id);
   const actionsEl = document.getElementById('batchActions_' + item.id);
@@ -6264,9 +6400,12 @@ function finalizeCard(item, notesText) {
   const pdfBtn = document.createElement('button');
   pdfBtn.className   = 'action-btn';
   pdfBtn.textContent = '⬇ PDF';
-  pdfBtn.addEventListener('click', () =>
-    autoDownloadPdf(bodyEl, `학습노트_${baseName}_${dateStamp()}.pdf`)
-      .catch(e => showToast(`❌ PDF 생성 오류: ${e.message}`)));
+  pdfBtn.addEventListener('click', () => {
+    // Use print-popup (same as single mode) — more reliable than html2pdf for batch
+    const tempEl = document.createElement('div');
+    tempEl.innerHTML = renderMarkdown(notesText);
+    openPdfPopup(tempEl);
+  });
 
   actionsEl.append(txtBtn, mdBtn, pdfBtn);
 }
@@ -6296,6 +6435,8 @@ document.getElementById('batchCancelBtn').addEventListener('click', () => {
 document.getElementById('batchStartBtn').addEventListener('click', async () => {
   if (!currentUser) { showToast('🔑 로그인 후 이용할 수 있습니다.'); return; }
   if (isRunning) return;
+  const usageCheck = await canAnalyze();
+  if (!usageCheck.allowed) { showPaymentModal(); return; }
   const apiKey = 'server-proxied';
 
   const pending = batchQueue.filter(item => item.status === 'waiting');
@@ -6318,6 +6459,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
   setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
 
   let failCount = 0;
+  let firstSuccessData = null;
 
   try {
     for (let i = 0; i < pending.length; i++) {
@@ -6358,6 +6500,30 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         // storedNotesText is now the final notes for this item
         finalizeCard(item, storedNotesText);
         item.status = 'done';
+
+        // Auto-save this item
+        const itemName = item.notesName || (item.pptFile?.name || '항목').replace(/\.[^.]+$/, '');
+        const batchBodyHtml = document.getElementById('batchBody_' + item.id)?.innerHTML || '';
+        saveNoteFS({
+          title: itemName,
+          notesText: storedNotesText,
+          notesHtml: batchBodyHtml,
+          pptText: storedPptText,
+          filteredText: storedFilteredText,
+          extractedImages: [...(extractedImages || [])],
+        }).then(() => renderSavedNotes()).catch(e => console.warn('Batch save:', e.message));
+        await incrementUsage();
+
+        // Track first success for split viewer
+        if (!firstSuccessData) {
+          firstSuccessData = {
+            notesText: storedNotesText,
+            notesHtml: batchBodyHtml,
+            pptText: storedPptText,
+            filteredText: storedFilteredText,
+            extractedImages: [...(extractedImages || [])],
+          };
+        }
       } catch (err) {
         if (err.name === 'AbortError') throw err;
         item.status = 'error';
@@ -6373,6 +6539,25 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
     setProgress(100, '완료!');
     setTimeout(() => setProgress(null), 800);
     finalizeBatchProgress(pending.length, failCount);
+
+    // Auto-open split viewer with first successful result
+    if (firstSuccessData) {
+      storedNotesText    = firstSuccessData.notesText;
+      storedPptText      = firstSuccessData.pptText;
+      storedFilteredText = firstSuccessData.filteredText;
+      extractedImages    = firstSuccessData.extractedImages;
+      const finalBody = document.getElementById('finalNotesBody');
+      if (finalBody) finalBody.innerHTML = firstSuccessData.notesHtml;
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      // splitViewBtn may be disabled in batch mode; enable it temporarily so the click fires
+      const splitBtn = document.getElementById('splitViewBtn');
+      if (splitBtn) {
+        const wasDisabled = splitBtn.disabled;
+        splitBtn.disabled = false;
+        splitBtn.click();
+        splitBtn.disabled = wasDisabled;
+      }
+    }
 
   } catch (err) {
     if (err.name === 'AbortError') {
