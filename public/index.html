@@ -3074,7 +3074,7 @@ function debugLog(tag, msg, data = null) {
    State & constants
 ═══════════════════════════════════════════════ */
 const MAX_ITERATIONS        = 2;
-const USE_ADVISOR = false;  // Toggle Opus advisor (beta test) — DISABLED: adds latency
+const USE_ADVISOR = true;  // Toggle Opus advisor (beta test)
 const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];
 const MAX_TOKENS_NOTES      = 24000;
 const MAX_TOKENS_CRITIQUE   = 4096;
@@ -3894,12 +3894,12 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
         ]}]
       : [{ role: 'user', content: userPrompt }];
     const body = { model, max_tokens: maxTokens, system: systemPrompt, messages };
-    if (USE_ADVISOR && model.includes('sonnet')) {
+    if (USE_ADVISOR && model.includes('sonnet') && !systemPrompt.includes('검토자')) {
       body.tools = (body.tools || []).concat([{
         type: 'advisor_20260301',
         name: 'advisor',
         model: 'claude-opus-4-6',
-        max_uses: 3
+        max_uses: 1
       }]);
     }
     const res = await fetch('/api/claude', {
@@ -4063,12 +4063,12 @@ async function callClaudeStream(
     messages,
   };
 
-  if (USE_ADVISOR && model.includes('sonnet')) {
+  if (USE_ADVISOR && model.includes('sonnet') && !systemPrompt.includes('검토자')) {
     body.tools = (body.tools || []).concat([{
       type: 'advisor_20260301',
       name: 'advisor',
       model: 'claude-opus-4-6',
-      max_uses: 3
+      max_uses: 1
     }]);
   }
 
@@ -4128,10 +4128,19 @@ async function callClaudeStream(
             targetEl.innerHTML = renderMarkdown(fullText);
             // scroll hero body to bottom while streaming
             targetEl.scrollTop = targetEl.scrollHeight;
-          } else if (json.type === 'content_block_start' && json.content_block?.type === 'advisor_tool_use') {
-            agentLog(1, '🧠 Opus 자문 요청 중…');
-          } else if (json.type === 'content_block_start' && json.content_block?.type === 'advisor_tool_result') {
-            agentLog(1, '🧠 Opus 자문 수신 완료');
+          } else if (json.type === 'content_block_start') {
+            const blockType = json.content_block?.type || 'unknown';
+            if (blockType === 'advisor_tool_use') {
+              agentLog(1, '🧠 Opus 자문 요청 중…');
+            } else if (blockType === 'advisor_tool_result') {
+              agentLog(1, '🧠 Opus 자문 수신 완료');
+            } else if (blockType !== 'text') {
+              debugLog('SSE', `content_block_start type=${blockType}`);
+            }
+          } else if (json.type === 'content_block_stop' || json.type === 'message_delta') {
+            // silently ignore
+          } else if (json.type !== 'message_start' && json.type !== 'message_stop' && json.type !== 'ping') {
+            debugLog('SSE', `event type=${json.type} ${JSON.stringify(json).slice(0, 200)}`);
           }
         } catch (_) { /* ignore SSE parse errors */ }
       }
