@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json',
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31',
+        'anthropic-beta': 'prompt-caching-2024-07-31,advisor-tool-2026-03-01',
       },
       body: JSON.stringify(req.body),
     });
