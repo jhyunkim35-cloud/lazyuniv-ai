@@ -2924,6 +2924,7 @@ async function incrementUsage() {
 }
 
 async function canAnalyze() {
+  if (DEVELOPER_EMAILS.includes(currentUser?.email)) return { allowed: true, reason: '' };
   const usage = await getUserUsage();
   if (usage.plan === 'monthly') return { allowed: true, reason: '' };
   if (usage.monthlyCount < 3) return { allowed: true, reason: '', remaining: 3 - usage.monthlyCount };
@@ -3074,6 +3075,7 @@ function debugLog(tag, msg, data = null) {
 ═══════════════════════════════════════════════ */
 const MAX_ITERATIONS        = 2;
 const USE_ADVISOR = true;  // Toggle Opus advisor (beta test)
+const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];
 const MAX_TOKENS_NOTES      = 24000;
 const MAX_TOKENS_CRITIQUE   = 4096;
 const DONE_SIGNAL           = '검토 완료 — 수정 필요 없음';
