@@ -5740,7 +5740,7 @@ async function extractChunkConcepts(apiKey, pptText, chunkText, overlapText, chu
 ${overlapSection}[녹취록 구간 ${chunkIndex + 1}/${totalChunks}]
 ${chunkText}`;
 
-  return await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-sonnet-4-20250514', cachePrefix);
+  return await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-sonnet-4-6', cachePrefix);
 }
 */
 
@@ -5843,7 +5843,7 @@ ${critiqueText}`;
     const userPrompt = `위 형식·규칙·PPT 자료를 참고하여 학습 노트를 수정하세요.${revisionClause}${recSection}`;
 
     agentLog(1, 'Claude AI 응답 스트리밍 수신 중…');
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-20250514');
+    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6');
 
   } else if (!hasTxt) {
     /* ── PPT-only mode: single Sonnet call ── */
@@ -5853,7 +5853,7 @@ ${critiqueText}`;
 녹취록이 없으므로 슬라이드 내용만을 기반으로 핵심 개념을 충실히 정리하세요.`;
 
     agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-20250514');
+    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6');
 
   } else {
     /* ── First write: single or chunked Sonnet call with full transcript ── */
@@ -5893,7 +5893,7 @@ ${critiqueText}`;
 
         const chunkPrompt = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}\n\n[강의 녹취록]\n${recText}`;
 
-        const chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-20250514');
+        const chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6');
 
         combinedNotes += (c > 0 ? '\n\n' : '') + chunkText;
       }
@@ -5913,7 +5913,7 @@ ${recText}`;
 
       agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
       debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
-      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-20250514');
+      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6');
     }
   }
 
@@ -6064,7 +6064,7 @@ ${recText}`;
   const userPrompt = `[검토 대상 학습 노트]
 ${notesText}`;
 
-  const raw     = await callClaudeOnce(apiKey, userPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-sonnet-4-20250514', cachePrefix);
+  const raw     = await callClaudeOnce(apiKey, userPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-sonnet-4-6', cachePrefix);
   const cleaned = raw.trim();
 
   /* render critique into tab */
