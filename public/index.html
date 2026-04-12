@@ -6562,6 +6562,18 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
       if (abortController.signal.aborted) break;
 
       const item = pending[i];
+
+      // CHANGE 1: per-item payment check
+      const itemUsageCheck = await canAnalyze();
+      if (!itemUsageCheck.allowed) {
+        item.status = 'error';
+        errorCard(item, '이용 한도 초과');
+        failCount++;
+        renderBatchQueue();
+        showToast('이용 한도를 초과하여 배치 처리를 중단합니다.');
+        break;
+      }
+
       item.status = 'processing';
       renderBatchQueue();
       updateBatchProgress(i + 1, pending.length);
@@ -6569,6 +6581,12 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
 
       // Create a dedicated card for this lecture; pipeline streams into its body
       const cardBodyEl = createBatchResultCard(item, i);
+
+      // CHANGE 3a: snapshot global state before processing this item
+      const prevPptText      = storedPptText;
+      const prevFilteredText = storedFilteredText;
+      const prevNotesText    = storedNotesText;
+      const prevImages       = extractedImages;
 
       try {
         setProgress(5 + Math.round(i / pending.length * 85), `${i + 1}번째: 파일 읽는 중…`);
@@ -6587,7 +6605,22 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         }
 
         const separated = separateSpeakers(rawTxt, professorNum);
-        storedPptText      = pptText;
+        storedPptText = pptText;
+
+        // CHANGE 2: extract images for this item
+        extractedImages = [];
+        if (item.pptFile) {
+          try {
+            const isPdf = item.pptFile.name.toLowerCase().endsWith('.pdf');
+            extractedImages = isPdf
+              ? await extractPdfPageImages(item.pptFile)
+              : await extractPptxImages(item.pptFile);
+          } catch (imgErr) {
+            if (imgErr.name === 'AbortError') throw imgErr;
+            console.warn('Batch image extraction:', imgErr.message);
+          }
+        }
+
         storedFilteredText = separated.text;
 
         // Full agent loop streams into this lecture's card body
@@ -6624,6 +6657,11 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         if (err.name === 'AbortError') throw err;
         item.status = 'error';
         failCount++;
+        // CHANGE 3b: restore global state to pre-item snapshot on failure
+        storedPptText      = prevPptText;
+        storedFilteredText = prevFilteredText;
+        storedNotesText    = prevNotesText;
+        extractedImages    = prevImages;
         errorCard(item, err.message);
         showToast(`❌ ${i + 1}번째 오류: ${err.message}`);
         agentLog(0, `오류: ${err.message}`);
