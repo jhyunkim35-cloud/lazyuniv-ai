@@ -5426,6 +5426,32 @@ dlPdfBtn.addEventListener('click', () => {
 ═══════════════════════════════════════════════ */
 const QUIZ_CHOICES_PREFIX = ['①', '②', '③', '④', '⑤'];
 
+// Try to extract the first complete JSON object from a streaming text buffer.
+// Returns { obj, rest } where rest is the unparsed remainder, or null if incomplete.
+function tryExtractJsonObject(str) {
+  const start = str.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < str.length; i++) {
+    const ch = str[i];
+    if (escape)                    { escape = false; continue; }
+    if (ch === '\\' && inString)   { escape = true;  continue; }
+    if (ch === '"')                { inString = !inString; continue; }
+    if (inString)                  continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      if (--depth === 0) {
+        let obj;
+        try { obj = JSON.parse(str.slice(start, i + 1)); } catch(e) { return null; }
+        // Consume trailing comma/array-close and whitespace
+        const rest = str.slice(i + 1).replace(/^\s*[,\]]\s*/, '');
+        return { obj, rest };
+      }
+    }
+  }
+  return null; // object is incomplete — need more data
+}
+
 async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
   const count        = settings.count        || 10;
   const answerFormat = settings.answerFormat || 'mc';
@@ -5546,6 +5572,182 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
   };
 }
 
+// Streaming variant of generateQuiz.
+// Calls onQuestion(questionObj, index) each time a complete question object is parsed from the stream.
+// Returns { questions, debugInfo } after the stream ends.
+async function generateQuizStream(noteText, settings = {}, prevQuestions = [], onQuestion) {
+  const count        = settings.count        || 10;
+  const answerFormat = settings.answerFormat || 'mc';
+  const style        = settings.style        || 'mixed';
+  const difficulty   = settings.difficulty   || 'medium';
+
+  const styleDesc = {
+    mixed:       '개념 이해, 적용/예시, 비교 문제를 골고루 섞어서',
+    concept:     '핵심 개념 정의와 이해 중심으로',
+    application: '응용, 사례, 예시 기반 문제 위주로',
+  }[style] || '골고루';
+  const diffDesc = {
+    easy:   '기본 개념 확인 수준으로 쉽게',
+    medium: '이해와 적용을 요하는 중간 난이도로',
+    hard:   '심화 이해와 복합 추론이 필요한 어렵게',
+  }[difficulty] || '중간 난이도로';
+
+  const formatSchemas = {
+    mc: {
+      desc: `five-choice multiple choice`,
+      schema: `{"q":"question","choices":["A","B","C","D","E"],"answer":0,"explanation":"why correct + why key wrong answers are wrong","section":"h2 section title"}`,
+      validate(q, i) {
+        if (!q.q || !Array.isArray(q.choices) || q.choices.length !== 5 ||
+            typeof q.answer !== 'number' || q.answer < 0 || q.answer > 4 || !q.explanation)
+          throw new Error(`문제 ${i+1} 형식 오류 (객관식)`);
+      },
+    },
+    short: {
+      desc: `short-answer`,
+      schema: `{"q":"question","type":"short","keywords":["key answer 1","key answer 2"],"fullAnswer":"1-2 sentence model answer","explanation":"brief explanation","section":"h2 section title"}`,
+      validate(q, i) {
+        if (!q.q || !Array.isArray(q.keywords) || q.keywords.length < 1 || !q.fullAnswer)
+          throw new Error(`문제 ${i+1} 형식 오류 (단답형)`);
+      },
+    },
+    essay: {
+      desc: `essay / long-answer`,
+      schema: `{"q":"question","type":"essay","rubric":["criterion 1","criterion 2","criterion 3"],"modelAnswer":"2-4 sentence model answer","explanation":"what a perfect answer covers","section":"h2 section title"}`,
+      validate(q, i) {
+        if (!q.q || !Array.isArray(q.rubric) || q.rubric.length < 2 || !q.modelAnswer)
+          throw new Error(`문제 ${i+1} 형식 오류 (서술형)`);
+      },
+    },
+  };
+
+  let formatInstruction, validateFn;
+  if (answerFormat === 'mixed') {
+    formatInstruction =
+      `Randomly mix all three question types in roughly equal proportion. ` +
+      `Each element must include a "type" field: "mc" | "short" | "essay". ` +
+      `MC schema: ${formatSchemas.mc.schema}. ` +
+      `Short-answer schema: ${formatSchemas.short.schema}. ` +
+      `Essay schema: ${formatSchemas.essay.schema}.`;
+    validateFn = (q, i) => {
+      const t = q.type;
+      if (!t || !formatSchemas[t]) throw new Error(`문제 ${i+1} type 필드 오류 (${t})`);
+      formatSchemas[t].validate(q, i);
+    };
+  } else {
+    const f = formatSchemas[answerFormat] || formatSchemas.mc;
+    formatInstruction = `Generate only ${f.desc} questions. Each element schema: ${f.schema}.`;
+    validateFn = f.validate;
+  }
+
+  const MODEL = 'claude-sonnet-4-20250514';
+  const recentPrev = prevQuestions.slice(-30);
+  const dedupClause = recentPrev.length > 0
+    ? `\n\nCRITICAL: The following questions have been asked in previous quizzes. Do NOT generate any question that is identical or nearly identical to these. Create NEW questions that test the same concepts from different angles:\n` +
+      recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    : '';
+  const systemPrompt =
+    `You are a quiz generator for Korean university exam preparation. ` +
+    `Generate exactly ${count} questions from the provided study notes. ` +
+    `Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. ` +
+    `3) Cover different sections of the notes evenly. 4) All content in Korean. ` +
+    `5) Output ONLY a valid JSON array — no markdown, no preamble, no backticks. ` +
+    formatInstruction +
+    dedupClause;
+
+  const t0  = Date.now();
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 4096,
+      stream: true,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: noteText }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API 오류 (${res.status})`);
+  }
+
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder();
+  let sseRaw   = ''; // raw SSE bytes waiting to be processed
+  let textBuf  = ''; // accumulated model text (partial JSON)
+  let questionIndex = 0;
+  const questions = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    sseRaw += decoder.decode(value, { stream: true });
+
+    // Split by double-newline to isolate complete SSE events; keep trailing incomplete part
+    const events = sseRaw.split('\n\n');
+    sseRaw = events.pop();
+
+    for (const event of events) {
+      const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+      if (!dataLine) continue;
+      const data = dataLine.slice(6);
+      if (data === '[DONE]') continue;
+
+      let evt;
+      try { evt = JSON.parse(data); } catch(e) { continue; }
+
+      if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+        textBuf += evt.delta.text;
+
+        // Extract and deliver every complete JSON object as it arrives
+        let extracted;
+        while ((extracted = tryExtractJsonObject(textBuf)) !== null) {
+          textBuf = extracted.rest;
+          try {
+            validateFn(extracted.obj, questionIndex);
+            questions.push(extracted.obj);
+            onQuestion(extracted.obj, questionIndex++);
+          } catch(e) {
+            console.warn('generateQuizStream: skipping invalid question object:', e.message);
+          }
+        }
+      }
+    }
+  }
+
+  const responseTimeMs = Date.now() - t0;
+
+  // Fallback: if streaming missed objects (e.g. model output was not well-formed incrementally),
+  // try to parse any remaining buffer content
+  if (textBuf.trim() && questions.length < count) {
+    try {
+      const fallback = JSON.parse(textBuf.replace(/^[^\[]*/, '').replace(/[^\]]*$/, '') || '[]');
+      if (Array.isArray(fallback)) {
+        for (const q of fallback) {
+          try {
+            validateFn(q, questionIndex);
+            questions.push(q);
+            onQuestion(q, questionIndex++);
+          } catch(e) { /* skip invalid */ }
+        }
+      }
+    } catch(e) { /* ignore fallback parse error */ }
+  }
+
+  if (questions.length < 1) throw new Error('문제를 생성하지 못했습니다');
+
+  const sliced = questions.slice(0, count);
+  return {
+    questions: sliced,
+    debugInfo: {
+      model:         MODEL,
+      responseTimeMs,
+      rawResponse:   JSON.stringify(sliced, null, 2),
+      noteTextLen:   noteText.length,
+    },
+  };
+}
+
 function clearQuizInlineArea() {
   const area = document.getElementById('quizInlineArea');
   if (!area) return;
@@ -5619,7 +5821,7 @@ function showQuizSettings(noteTitle, noteId, noteText) {
 
   area.querySelector('#qsCloseBtn').addEventListener('click', clearQuizInlineArea);
   area.querySelector('#qsStartBtn').addEventListener('click', async () => {
-    // Show rich loading UI with rotating status messages and elapsed timer
+    // Show loading UI with rotating status messages and elapsed timer
     const statusMessages = [
       '문제를 구상하는 중...',
       '핵심 개념을 분석하는 중...',
@@ -5658,20 +5860,87 @@ function showQuizSettings(noteTitle, noteId, noteText) {
       timerEl.textContent = `경과 시간: ${m}:${s}`;
     }, 1000);
 
+    // Streaming state — cards are appended live as they arrive
+    let firstArrived = false;
+    const streamedQuestions = [];
+    const totalExpected = settings.count;
+
+    // Append one question card to the area as it streams in
+    function appendStreamCard(q, idx) {
+      if (!firstArrived) {
+        firstArrived = true;
+        area.innerHTML = ''; // hide loading UI on first question
+      }
+      const type = q.type || 'mc';
+      const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
+      let inputHtml = '';
+      if (type === 'mc') {
+        inputHtml = `<div class="quiz-card-choices">
+          ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
+        </div>`;
+      } else if (type === 'short') {
+        inputHtml = `<div class="quiz-card-open">
+          <input class="qi-text-input" data-qi="${idx}" type="text" placeholder="답을 입력하세요" autocomplete="off">
+        </div>`;
+      } else if (type === 'essay') {
+        inputHtml = `<div class="quiz-card-open">
+          <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
+        </div>`;
+      }
+      const card = document.createElement('div');
+      card.className = 'quiz-card quiz-card-enter';
+      card.dataset.qi   = String(idx);
+      card.dataset.type = type;
+      card.innerHTML = `
+        <div class="quiz-card-num">문제 ${idx + 1} / ${totalExpected}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
+        <div class="quiz-card-q">${escHtml(q.q)}</div>
+        ${inputHtml}
+        <div class="qi-explanation"></div>`;
+      area.appendChild(card);
+      // Double rAF ensures the opacity:0 base state is painted before the transition fires
+      requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('visible')));
+    }
+
+    // Add grade button and wire up all quiz behavior after cards are in the DOM
+    function finalizeStreamedQuiz(questions, debugInfo) {
+      const gradeBtnDiv = document.createElement('div');
+      gradeBtnDiv.style.cssText = 'display:flex;justify-content:center;padding-top:0.25rem;';
+      gradeBtnDiv.innerHTML = '<button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>';
+      area.appendChild(gradeBtnDiv);
+      runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo, true);
+    }
+
     try {
       const prevResults   = noteId ? await getQuizResultsByNote(noteId) : [];
       const prevQuestions = prevResults
         .flatMap(r => (r.questions || []).map(q => q.questionText))
         .filter(Boolean);
-      const { questions, debugInfo } = await generateQuiz(noteText, settings, prevQuestions);
+
+      const { questions, debugInfo } = await generateQuizStream(
+        noteText, settings, prevQuestions,
+        (q, idx) => { streamedQuestions.push(q); appendStreamCard(q, idx); }
+      );
+
       clearInterval(msgInterval);
       clearInterval(timerInterval);
-      runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
+
+      if (!firstArrived) {
+        // Nothing streamed — fall back to full batch render
+        runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
+      } else {
+        finalizeStreamedQuiz(questions, debugInfo);
+      }
     } catch(e) {
       clearInterval(msgInterval);
       clearInterval(timerInterval);
-      showToast('❌ 퀴즈 생성 실패: ' + e.message);
-      clearQuizInlineArea();
+      if (firstArrived && streamedQuestions.length > 0) {
+        // Partial stream — keep whatever arrived, finalize with those questions
+        showToast('❌ 스트리밍 중 오류: ' + e.message);
+        finalizeStreamedQuiz(streamedQuestions, {});
+      } else {
+        showToast('❌ 퀴즈 생성 실패: ' + e.message);
+        clearQuizInlineArea();
+      }
     }
   });
 
@@ -5712,48 +5981,50 @@ function matchesKeywords(userVal, keywords) {
   });
 }
 
-function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settings = {}, debugInfo = {}) {
+// skipCardRender: pass true from the streaming path where cards are already in the DOM
+function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settings = {}, debugInfo = {}, skipCardRender = false) {
   const startTime = Date.now();
 
   // answers[i]: Number for mc (choice index), String for short/essay, null = unanswered
   const answers = questions.map(q => (q.type && q.type !== 'mc') ? '' : null);
 
-  let html = '';
-  questions.forEach((q, idx) => {
-    const type = q.type || 'mc';
-    const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
-    let inputHtml = '';
-    if (type === 'mc') {
-      inputHtml = `<div class="quiz-card-choices">
-        ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
+  if (!skipCardRender) {
+    let html = '';
+    questions.forEach((q, idx) => {
+      const type = q.type || 'mc';
+      const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
+      let inputHtml = '';
+      if (type === 'mc') {
+        inputHtml = `<div class="quiz-card-choices">
+          ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
+        </div>`;
+      } else if (type === 'short') {
+        inputHtml = `<div class="quiz-card-open">
+          <input class="qi-text-input" data-qi="${idx}" type="text" placeholder="답을 입력하세요" autocomplete="off">
+        </div>`;
+      } else if (type === 'essay') {
+        inputHtml = `<div class="quiz-card-open">
+          <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
+        </div>`;
+      }
+      // Start cards invisible for staggered pop-in animation
+      html += `<div class="quiz-card quiz-card-enter" data-qi="${idx}" data-type="${type}">
+        <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
+        <div class="quiz-card-q">${escHtml(q.q)}</div>
+        ${inputHtml}
+        <div class="qi-explanation"></div>
       </div>`;
-    } else if (type === 'short') {
-      inputHtml = `<div class="quiz-card-open">
-        <input class="qi-text-input" data-qi="${idx}" type="text" placeholder="답을 입력하세요" autocomplete="off">
-      </div>`;
-    } else if (type === 'essay') {
-      inputHtml = `<div class="quiz-card-open">
-        <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
-      </div>`;
-    }
-    // Start cards invisible for staggered pop-in animation
-    html += `<div class="quiz-card quiz-card-enter" data-qi="${idx}" data-type="${type}">
-      <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
-      <div class="quiz-card-q">${escHtml(q.q)}</div>
-      ${inputHtml}
-      <div class="qi-explanation"></div>
+    });
+    html += `<div style="display:flex;justify-content:center;padding-top:0.25rem;">
+      <button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>
     </div>`;
-  });
-  html += `<div style="display:flex;justify-content:center;padding-top:0.25rem;">
-    <button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>
-  </div>`;
+    container.innerHTML = html;
 
-  container.innerHTML = html;
-
-  // Stagger cards in one-by-one with 150ms delay between each
-  container.querySelectorAll('.quiz-card-enter').forEach((card, idx) => {
-    setTimeout(() => card.classList.add('visible'), idx * 150);
-  });
+    // Stagger cards in one-by-one with 150ms delay between each
+    container.querySelectorAll('.quiz-card-enter').forEach((card, idx) => {
+      setTimeout(() => card.classList.add('visible'), idx * 150);
+    });
+  }
 
   // Debug section
   const notePreview  = (noteText || '').slice(0, 500);
