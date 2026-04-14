@@ -5413,9 +5413,10 @@ dlPdfBtn.addEventListener('click', () => {
 const QUIZ_CHOICES_PREFIX = ['①', '②', '③', '④', '⑤'];
 
 async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
-  const count      = settings.count      || 10;
-  const style      = settings.style      || 'mixed';
-  const difficulty = settings.difficulty || 'medium';
+  const count        = settings.count        || 10;
+  const answerFormat = settings.answerFormat || 'mc';
+  const style        = settings.style        || 'mixed';
+  const difficulty   = settings.difficulty   || 'medium';
 
   const styleDesc = {
     mixed:       '개념 이해, 적용/예시, 비교 문제를 골고루 섞어서',
@@ -5428,13 +5429,73 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
     hard:   '심화 이해와 복합 추론이 필요한 어렵게',
   }[difficulty] || '중간 난이도로';
 
+  // Build format-specific JSON schema description and per-question validator
+  const formatSchemas = {
+    mc: {
+      desc: `five-choice multiple choice`,
+      schema: `{"q":"question","choices":["A","B","C","D","E"],"answer":0,"explanation":"why correct + why key wrong answers are wrong","section":"h2 section title"}`,
+      validate(q, i) {
+        if (!q.q || !Array.isArray(q.choices) || q.choices.length !== 5 ||
+            typeof q.answer !== 'number' || q.answer < 0 || q.answer > 4 || !q.explanation)
+          throw new Error(`문제 ${i+1} 형식 오류 (객관식)`);
+      },
+    },
+    short: {
+      desc: `short-answer`,
+      schema: `{"q":"question","type":"short","keywords":["key answer 1","key answer 2"],"fullAnswer":"1-2 sentence model answer","explanation":"brief explanation","section":"h2 section title"}`,
+      validate(q, i) {
+        if (!q.q || !Array.isArray(q.keywords) || q.keywords.length < 1 || !q.fullAnswer)
+          throw new Error(`문제 ${i+1} 형식 오류 (단답형)`);
+      },
+    },
+    essay: {
+      desc: `essay / long-answer`,
+      schema: `{"q":"question","type":"essay","rubric":["criterion 1","criterion 2","criterion 3"],"modelAnswer":"2-4 sentence model answer","explanation":"what a perfect answer covers","section":"h2 section title"}`,
+      validate(q, i) {
+        if (!q.q || !Array.isArray(q.rubric) || q.rubric.length < 2 || !q.modelAnswer)
+          throw new Error(`문제 ${i+1} 형식 오류 (서술형)`);
+      },
+    },
+  };
+
+  // Build system prompt — mixed distributes types randomly
+  let formatInstruction;
+  let validateFn;
+  if (answerFormat === 'mixed') {
+    formatInstruction =
+      `Randomly mix all three question types in roughly equal proportion. ` +
+      `Each element must include a "type" field: "mc" | "short" | "essay". ` +
+      `MC schema: ${formatSchemas.mc.schema}. ` +
+      `Short-answer schema: ${formatSchemas.short.schema}. ` +
+      `Essay schema: ${formatSchemas.essay.schema}.`;
+    validateFn = (q, i) => {
+      const t = q.type;
+      if (!t || !formatSchemas[t]) throw new Error(`문제 ${i+1} type 필드 오류 (${t})`);
+      formatSchemas[t].validate(q, i);
+    };
+  } else {
+    const f = formatSchemas[answerFormat] || formatSchemas.mc;
+    formatInstruction =
+      `Generate only ${f.desc} questions. ` +
+      `Each element schema: ${f.schema}.`;
+    validateFn = f.validate;
+  }
+
   const MODEL = 'claude-sonnet-4-20250514';
   const recentPrev = prevQuestions.slice(-30);
   const dedupClause = recentPrev.length > 0
     ? `\n\nCRITICAL: The following questions have been asked in previous quizzes. Do NOT generate any question that is identical or nearly identical to these. Create NEW questions that test the same concepts from different angles:\n` +
       recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')
     : '';
-  const systemPrompt = `You are a quiz generator for Korean university exam preparation. Generate exactly ${count} five-choice multiple choice questions from the provided study notes. Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. 3) Cover different sections of the notes evenly. 4) All content in Korean. 5) Output ONLY a valid JSON array, no markdown, no preamble, no backticks. Each element: {"q": "question", "choices": ["A","B","C","D","E"], "answer": 0, "explanation": "why correct + why key wrong answers are wrong", "section": "h2 section title the question is from"}` + dedupClause;
+  const systemPrompt =
+    `You are a quiz generator for Korean university exam preparation. ` +
+    `Generate exactly ${count} questions from the provided study notes. ` +
+    `Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. ` +
+    `3) Cover different sections of the notes evenly. 4) All content in Korean. ` +
+    `5) Output ONLY a valid JSON array — no markdown, no preamble, no backticks. ` +
+    formatInstruction +
+    dedupClause;
+
   const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
@@ -5458,11 +5519,7 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
   try { questions = JSON.parse(cleaned); } catch(e) { throw new Error('JSON 파싱 실패: ' + e.message); }
   if (!Array.isArray(questions) || questions.length < 5)
     throw new Error('문제 수가 부족합니다 (' + (questions?.length ?? 0) + '개)');
-  questions.forEach((q, i) => {
-    if (!q.q || !Array.isArray(q.choices) || q.choices.length !== 5 ||
-        typeof q.answer !== 'number' || q.answer < 0 || q.answer > 4 || !q.explanation)
-      throw new Error(`문제 ${i+1} 형식 오류`);
-  });
+  questions.forEach(validateFn);
   const sliced = questions.slice(0, count);
   return {
     questions: sliced,
@@ -5490,7 +5547,7 @@ function showQuizSettings(noteTitle, noteId, noteText) {
   const area = document.getElementById('quizInlineArea');
   area.style.display = 'flex';
 
-  const settings = { count: 10, style: 'mixed', difficulty: 'medium' };
+  const settings = { count: 10, answerFormat: 'mc', style: 'mixed', difficulty: 'medium' };
 
   area.innerHTML = `
     <div class="quiz-settings-panel">
@@ -5504,7 +5561,16 @@ function showQuizSettings(noteTitle, noteId, noteText) {
         </div>
       </div>
       <div class="quiz-setting-row">
-        <span class="quiz-setting-label">유형</span>
+        <span class="quiz-setting-label">답안 형식</span>
+        <div class="quiz-seg-group" id="qsFormat">
+          <button class="quiz-seg-btn active" data-val="mc">객관식</button>
+          <button class="quiz-seg-btn" data-val="short">단답형</button>
+          <button class="quiz-seg-btn" data-val="essay">서술형</button>
+          <button class="quiz-seg-btn" data-val="mixed">혼합</button>
+        </div>
+      </div>
+      <div class="quiz-setting-row">
+        <span class="quiz-setting-label">문제 유형</span>
         <div class="quiz-seg-group" id="qsStyle">
           <button class="quiz-seg-btn active" data-val="mixed">혼합</button>
           <button class="quiz-seg-btn" data-val="concept">개념</button>
@@ -5531,7 +5597,7 @@ function showQuizSettings(noteTitle, noteId, noteText) {
       if (!btn) return;
       group.querySelectorAll('.quiz-seg-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const key = { qsCount: 'count', qsStyle: 'style', qsDiff: 'difficulty' }[group.id];
+      const key = { qsCount: 'count', qsFormat: 'answerFormat', qsStyle: 'style', qsDiff: 'difficulty' }[group.id];
       const val = btn.dataset.val;
       settings[key] = key === 'count' ? Number(val) : val;
     });
