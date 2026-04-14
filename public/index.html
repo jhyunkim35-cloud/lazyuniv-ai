@@ -7958,6 +7958,15 @@ async function openSavedNote(id) {
     note.notesHtml = renderMarkdown(note.notesText);
   }
 
+  // Make newNoteView visible so singleNoteCard / quizBtnArea / quizInlineArea are in the DOM.
+  // switchView('new') resets button state first; openSavedNote re-enables them right after.
+  document.getElementById('homeView').style.display    = 'none';
+  document.getElementById('newNoteView').style.display = '';
+  _currentView = 'new';
+  document.querySelectorAll('#sidebar .sidebar-btn[data-view]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === 'new');
+  });
+
   clearQuizInlineArea();
   storedNotesText            = note.notesText            || '';
   storedPptText              = note.pptText              || '';
