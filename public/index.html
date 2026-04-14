@@ -2832,11 +2832,26 @@ async function syncNotesOnLogin() {
     // 1. Process deleted notes tracked in localStorage
     const deletedKey = 'deleted_notes_' + currentUser.uid;
     const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    const successfulDeletes = [];
     for (const did of deletedIds) {
-      try { await ref.doc(did).delete(); } catch(e) {}
+      try {
+        await ref.doc(did).delete();
+        successfulDeletes.push(did);
+      } catch(e) {
+        console.warn('Firestore delete failed, will retry next sync:', did, e);
+      }
+    }
+    // Only remove successfully deleted IDs; keep failed ones for next sync
+    if (successfulDeletes.length === deletedIds.length) {
+      localStorage.removeItem(deletedKey);
+    } else {
+      const remaining = deletedIds.filter(id => !successfulDeletes.includes(id));
+      localStorage.setItem(deletedKey, JSON.stringify(remaining));
+    }
+    // Purge any zombie notes that exist in IndexedDB despite being on the delete list
+    for (const did of deletedIds) {
       try { await deleteNote(did); } catch(e) {}
     }
-    localStorage.removeItem(deletedKey);
     const deletedSet = new Set(deletedIds);
 
     // 2. Firestore에 있는데 로컬에 없으면 → 로컬에 저장 (단, 삭제 목록에 없는 경우만)
