@@ -8015,6 +8015,88 @@ function toggleBulkSelectAll(checked) {
   _updateBulkBar();
 }
 
+async function bulkExportPdf() {
+  if (!_selectedNoteIds.size) return;
+  const ids = [..._selectedNoteIds];
+  showToast(`📄 ${ids.length}개 노트 PDF 준비 중...`);
+
+  const notes = await Promise.all(ids.map(id => getNoteFS(id)));
+  const valid = notes.filter(Boolean);
+  if (!valid.length) return;
+
+  const win = window.open('', '_blank');
+  if (!win) { showToast('⚠️ 팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.'); return; }
+
+  const sectionsHtml = valid.map((note, i) => {
+    const html = note.notesHtml || renderMarkdown(note.notesText || '');
+    const title = escHtml(note.title || '제목없음');
+    const breakStyle = i > 0 ? ' style="page-break-before:always"' : '';
+    return `<div class="note-section"${breakStyle}>\n<h1 class="note-title">${title}</h1>\n<div class="note-body">${html}</div>\n</div>`;
+  }).join('\n');
+
+  win.document.write(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>노트 ${valid.length}개 묶음 PDF</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family: 'Noto Sans KR', 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; box-sizing:border-box; margin:0; padding:0; color:#1a1a1a; }
+    body { background:#fff; font-size:11pt; line-height:1.8; padding:1.5cm 2cm; max-width:21cm; margin:0 auto; padding-top:calc(1.5cm + 44px); }
+    h1 { font-size:18pt; font-weight:700; border-bottom:2px solid #333; padding-bottom:0.4em; margin:0 0 1em; }
+    h2 { font-size:14pt; font-weight:700; border-bottom:1px solid #ccc; padding-bottom:0.25em; margin:1.8em 0 0.6em; }
+    h3 { font-size:12pt; font-weight:700; margin:1.4em 0 0.4em; }
+    p { margin:0.4em 0; }
+    p:empty { margin:0.15em 0; }
+    ul, ol { padding-left:1.6em; margin:0.3em 0 0.5em; }
+    li { margin:0.2em 0; }
+    strong { font-weight:700; }
+    em { font-style:italic; }
+    hr { border:none; border-top:1px solid #ccc; margin:1.4em 0; }
+    code { font-family:'Courier New',monospace; font-size:10pt; background:#f3f4f6; padding:0.1em 0.4em; border-radius:3px; }
+    blockquote { border-left:3px solid #7c4dff; margin:0.5em 0; padding:0.4em 0.8em; background:#f5f3ff; border-radius:0 4px 4px 0; }
+    blockquote p { margin:0.15em 0; color:#555; }
+    table { width:auto; border-collapse:collapse; margin:0.8em 0; font-size:10pt; }
+    th, td { border:1px solid #999; padding:0.3em 0.6em; text-align:left; }
+    th { background:#e8e8e8; font-weight:700; }
+    .highlight-important { background:#fff3cd; color:#856404; border:1px solid #ffc107; padding:0.1em 0.35em; border-radius:3px; }
+    figure { margin:1.2em 0; page-break-inside:avoid; }
+    .inserted-slide-img { width:100%; max-width:100%; border:1px solid #ddd; border-radius:4px; }
+    .inserted-slide-caption { font-size:9pt; color:#666; text-align:center; margin-top:0.3em; }
+    .note-title { font-size:16pt; font-weight:700; border-bottom:2px solid #333; padding-bottom:0.4em; margin:0 0 1em; }
+    .note-section + .note-section { page-break-before:always; padding-top:0.5cm; }
+    #printBar { position:fixed; top:0; left:0; right:0; background:#f0f0f0; border-bottom:2px solid #ccc; padding:8px 16px; display:flex; align-items:center; gap:12px; z-index:9999; }
+    #printBar button { padding:6px 16px; font-size:10pt; font-weight:600; border:none; border-radius:4px; cursor:pointer; }
+    #printBtn { background:#2563eb; color:#fff; }
+    #printBtn:hover { background:#1d4ed8; }
+    #closeBtn { background:#e5e7eb; color:#333; }
+    #closeBtn:hover { background:#d1d5db; }
+    @media print {
+      #printBar { display:none !important; }
+      body { padding:0; }
+      h2, h3 { page-break-after:avoid; }
+      ul, ol, p { page-break-inside:avoid; }
+      figure { page-break-inside:avoid; }
+      table, th, td { border:1px solid #333 !important; }
+      th { background:#e0e0e0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .highlight-important { background:#fff3cd !important; color:#856404 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .note-section + .note-section { page-break-before:always; }
+    }
+  </style>
+</head>
+<body>
+  <div id="printBar">
+    <button id="printBtn" onclick="window.print()">📄 PDF로 저장 (Ctrl+P)</button>
+    <button id="closeBtn" onclick="window.close()">✕ 닫기</button>
+    <span style="font-size:9pt;color:#666;">인쇄 대화상자에서 'PDF로 저장' 선택 · ${valid.length}개 노트</span>
+  </div>
+  ${sectionsHtml}
+</body>
+</html>`);
+  win.document.close();
+  setTimeout(() => { try { win.print(); } catch(e) {} }, 800);
+}
+
 async function bulkDeleteSelected() {
   if (!_selectedNoteIds.size) return;
   if (!confirm(`${_selectedNoteIds.size}개의 노트를 삭제하시겠습니까?`)) return;
@@ -8062,6 +8144,7 @@ document.getElementById('landingView').style.display = '';
     전체 선택
   </label>
   <span id="bulkSelectCount" style="color:var(--text);font-weight:600;">0개 선택됨</span>
+  <button class="action-btn" onclick="bulkExportPdf()" style="border-color:#2563eb;color:#2563eb;background:rgba(37,99,235,0.1);">📄 PDF</button>
   <button class="action-btn" onclick="bulkDeleteSelected()" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.1);">🗑 선택 삭제</button>
   <button class="action-btn" onclick="toggleBulkSelectMode()">취소</button>
 </div>
