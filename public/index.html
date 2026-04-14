@@ -5072,7 +5072,11 @@ function transformToNotionToggles(htmlString) {
     return out;
   }
 
-  return wrapSection(root).innerHTML;
+  // Unwrap .md-content wrapper so h2/h3 are direct children of the container
+  const container = (root.children.length === 1 && root.children[0].classList?.contains('md-content'))
+    ? root.children[0]
+    : root;
+  return wrapSection(container).innerHTML;
 }
 
 async function copyToNotionClipboard(htmlContent, plainText, useToggles = true) {
