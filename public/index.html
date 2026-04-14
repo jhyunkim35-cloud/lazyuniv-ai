@@ -6503,7 +6503,12 @@ function finalizeCard(item, notesText) {
     openPdfPopup(tempEl);
   });
 
-  actionsEl.append(txtBtn, mdBtn, pdfBtn);
+  const dbgBtn = document.createElement('button');
+  dbgBtn.className   = 'action-btn';
+  dbgBtn.textContent = '📋 디버그';
+  dbgBtn.addEventListener('click', () => copyDebugReport());
+
+  actionsEl.append(dbgBtn, txtBtn, mdBtn, pdfBtn);
 }
 
 /* Mark a card as errored */
