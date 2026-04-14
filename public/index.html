@@ -2885,6 +2885,8 @@ async function deleteFolderFS(id) {
     await saveNoteFS(Object.assign({}, note, { folderId: null }));
   }
   await ref.doc(id).delete();
+  // Also purge from IndexedDB — prevents ghost folder on next login sync
+  await deleteFolder(id);
 }
 async function renameFolderFS(id, newName, color) {
   const ref = userFoldersRef();
@@ -8327,7 +8329,18 @@ async function deleteNote(id) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('notes', 'readwrite');
     tx.objectStore('notes').delete(id);
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      resolve();
+      // Also delete from Firestore — fire-and-forget safety net
+      const user = firebase.auth().currentUser;
+      if (user) {
+        firebase.firestore()
+          .collection('users').doc(user.uid)
+          .collection('notes').doc(id)
+          .delete()
+          .catch(e => console.warn('Firestore note delete failed:', e));
+      }
+    };
     tx.onerror    = e => reject(e.target.error);
     tx.onabort    = e => reject(e.target.error);
   });
@@ -8372,7 +8385,18 @@ async function deleteFolder(id) {
   }
   tx.objectStore('folders').delete(id);
   return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      resolve();
+      // Also delete from Firestore — fire-and-forget safety net
+      const user = firebase.auth().currentUser;
+      if (user) {
+        firebase.firestore()
+          .collection('users').doc(user.uid)
+          .collection('folders').doc(id)
+          .delete()
+          .catch(e => console.warn('Firestore folder delete failed:', e));
+      }
+    };
     tx.onerror    = e => reject(e.target.error);
   });
 }
