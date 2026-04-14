@@ -1804,6 +1804,17 @@
     .quiz-wrong-item .qwi-q { font-weight:600; color:var(--text); margin-bottom:0.3rem; }
     .quiz-wrong-item .qwi-ans { color:#22c55e; margin-bottom:0.2rem; }
     .quiz-wrong-item .qwi-exp { color:var(--text-muted); line-height:1.5; }
+    .weakness-section-row { display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; }
+    .weakness-label { font-size:0.82rem; color:var(--text); min-width:120px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .weakness-bar-bg { flex:1; height:8px; background:var(--surface3); border-radius:4px; overflow:hidden; }
+    .weakness-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
+    .weakness-red    { background:#ef4444; }
+    .weakness-yellow { background:#eab308; }
+    .weakness-green  { background:#22c55e; }
+    .weakness-pct { font-size:0.78rem; min-width:40px; text-align:right; font-weight:600; }
+    .weakness-pct.weakness-red    { color:#ef4444; }
+    .weakness-pct.weakness-yellow { color:#eab308; }
+    .weakness-pct.weakness-green  { color:#22c55e; }
     .inserted-slide-img {
       width: 100%;
       max-width: 100%;
@@ -5421,11 +5432,12 @@ function showQuizModal(noteTitle) {
           <button class="quiz-next-btn" id="quizNextBtn" style="display:none;" onclick="_quizNext()">다음 문제 →</button>
         </div>
       </div>
-      <div id="quizResultsState" style="display:none;flex-direction:column;flex:1;overflow:hidden;gap:0.6rem;min-height:0;">
+      <div id="quizResultsState" style="display:none;flex-direction:column;flex:1;overflow-y:auto;gap:0.6rem;min-height:0;">
         <div class="quiz-results-score" id="quizScore"></div>
         <div class="quiz-results-time"  id="quizTime"></div>
+        <div id="quizWeakness" style="flex-shrink:0;"></div>
         <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);flex-shrink:0;">오답 목록</div>
-        <div class="quiz-wrong-list" id="quizWrongList"></div>
+        <div class="quiz-wrong-list" id="quizWrongList" style="overflow-y:visible;flex:none;"></div>
         <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding-top:0.4rem;">
           <button id="quizHistoryBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;">📊 퀴즈 이력</button>
           <button onclick="document.getElementById('quizModal').remove()" style="padding:0.5rem 1.2rem;border-radius:6px;border:none;background:var(--surface3);color:var(--text);cursor:pointer;">닫기</button>
@@ -5543,7 +5555,7 @@ function startQuiz(questions, overlay, noteId, noteTitle) {
           correct: answers[i]?.correct ?? false,
         })),
       };
-      saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
+      await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
 
       // Wire history button now that we have noteId
       const histBtn = overlay.querySelector('#quizHistoryBtn');
@@ -5551,10 +5563,62 @@ function startQuiz(questions, overlay, noteId, noteTitle) {
         histBtn.style.display = 'inline-block';
         histBtn.addEventListener('click', () => showQuizHistory(overlay, noteId, noteTitle));
       }
+
+      // Weakness analysis (includes the just-saved result)
+      const weaknessEl = overlay.querySelector('#quizWeakness');
+      if (weaknessEl) {
+        try {
+          const allResults = await getQuizResultsByNote(noteId);
+          const report     = await getWeaknessReport(noteId);
+          renderWeaknessReport(weaknessEl, report, allResults.length);
+        } catch(e) { /* non-critical */ }
+      }
     }
   }
 
   renderQuestion(0);
+}
+
+async function getWeaknessReport(noteId) {
+  const results = await getQuizResultsByNote(noteId);
+  if (!results.length) return null;
+  const allQs = results.flatMap(r => r.questions || []);
+  const map = new Map();
+  for (const q of allQs) {
+    const sec = q.section || '기타';
+    if (!map.has(sec)) map.set(sec, { name: sec, total: 0, correct: 0 });
+    const entry = map.get(sec);
+    entry.total++;
+    if (q.correct) entry.correct++;
+  }
+  const sections = [...map.values()].map(s => {
+    const accuracy = s.total ? Math.round(s.correct / s.total * 100) : 0;
+    const status   = accuracy < 60 ? 'weak' : accuracy <= 80 ? 'medium' : 'good';
+    return { ...s, accuracy, status };
+  }).sort((a, b) => a.accuracy - b.accuracy);
+  return { totalQuizzes: results.length, totalQuestions: allQs.length, sections };
+}
+
+function renderWeaknessReport(containerEl, report, quizCount) {
+  if (quizCount < 3) {
+    containerEl.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.4rem 0;">📊 약점 분석은 3회 이상 퀴즈 후 제공됩니다 (${quizCount}/3)</div>`;
+    return;
+  }
+  if (!report || !report.sections.length) return;
+
+  const colorClass = s => s.status === 'weak' ? 'weakness-red' : s.status === 'medium' ? 'weakness-yellow' : 'weakness-green';
+  const weakNames  = report.sections.filter(s => s.status === 'weak').map(s => escHtml(s.name)).join(', ');
+
+  containerEl.innerHTML = `
+    <div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;">📊 약점 분석 (퀴즈 ${report.totalQuizzes}회 기준)</div>
+    ${report.sections.map(s => `
+      <div class="weakness-section-row">
+        <span class="weakness-label" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+        <div class="weakness-bar-bg"><div class="weakness-bar-fill ${colorClass(s)}" style="width:${s.accuracy}%;"></div></div>
+        <span class="weakness-pct ${colorClass(s)}">${s.accuracy}%</span>
+      </div>`).join('')}
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">총 ${report.totalQuizzes}회 퀴즈, ${report.totalQuestions}문제 풀이</div>
+    ${weakNames ? `<div style="font-size:0.8rem;color:#ef4444;margin-top:0.2rem;">💡 약점 섹션에 집중해서 복습하세요: ${weakNames}</div>` : ''}`;
 }
 
 async function showQuizHistory(parentOverlay, noteId, noteTitle) {
