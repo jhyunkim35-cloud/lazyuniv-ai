@@ -7566,7 +7566,15 @@ async function moveNoteToFolder(noteId, folderId) {
   if (!note) return;
   const newSortOrder = await getNextSortOrder(folderId, noteId);
   const updated = Object.assign({}, note, { folderId, sortOrder: newSortOrder });
-  await saveNoteFS(updated);
+  // Use saveNote (IndexedDB only) — avoids re-uploading slide images via saveNoteFS
+  await saveNote(updated);
+  // Firestore: update only the changed fields, fire-and-forget (no image upload)
+  const ref = userNotesRef();
+  if (ref) {
+    const { updatedAt } = updated;
+    ref.doc(noteId).set({ folderId, sortOrder: newSortOrder, updatedAt }, { merge: true })
+      .catch(e => console.warn('Firestore folder move sync failed:', e));
+  }
   showToast(`📁 노트를 폴더로 이동했습니다`);
 }
 
@@ -7622,7 +7630,14 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
       if (!noteId) return;
       const n = await getNoteFS(noteId);
       if (!n) return;
-      await saveNoteFS(Object.assign({}, n, { folderId: null }));
+      const updated = Object.assign({}, n, { folderId: null });
+      await saveNote(updated);
+      const fsRef = userNotesRef();
+      if (fsRef) {
+        const updatedAt = new Date().toISOString();
+        fsRef.doc(noteId).set({ folderId: null, updatedAt }, { merge: true })
+          .catch(e2 => console.warn('Firestore eject sync failed:', e2));
+      }
       showToast('📤 홈으로 이동했습니다');
       await renderHomeView();
     });
@@ -7761,7 +7776,14 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
     ejectBtn.textContent = '📤';
     ejectBtn.addEventListener('click', async e => {
       e.stopPropagation();
-      await saveNoteFS(Object.assign({}, note, { folderId: null }));
+      const updated = Object.assign({}, note, { folderId: null });
+      await saveNote(updated);
+      const ref = userNotesRef();
+      if (ref) {
+        const updatedAt = new Date().toISOString();
+        ref.doc(note.id).set({ folderId: null, updatedAt }, { merge: true })
+          .catch(e2 => console.warn('Firestore eject sync failed:', e2));
+      }
       showToast('📤 홈으로 이동했습니다');
       await renderHomeView();
     });
