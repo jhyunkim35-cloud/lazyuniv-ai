@@ -1819,6 +1819,17 @@
     .quiz-wrong-item .qwi-q { font-weight:600; color:var(--text); margin-bottom:0.3rem; }
     .quiz-wrong-item .qwi-ans { color:#22c55e; margin-bottom:0.2rem; }
     .quiz-wrong-item .qwi-exp { color:var(--text-muted); line-height:1.5; }
+    .quiz-debug-details { border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .quiz-debug-summary { padding:0.5rem 0.85rem; font-size:0.78rem; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; list-style:none; display:flex; align-items:center; gap:0.4rem; background:var(--surface2); }
+    .quiz-debug-summary::before { content:'▶'; font-size:0.6rem; transition:transform 0.15s; }
+    details[open].quiz-debug-details > .quiz-debug-summary::before { transform:rotate(90deg); }
+    .quiz-debug-body { padding:0.75rem 0.85rem; display:flex; flex-direction:column; gap:0.5rem; background:var(--surface); max-height:300px; overflow-y:auto; }
+    .quiz-debug-row { display:flex; gap:0.5rem; font-family:monospace; font-size:0.75rem; color:var(--text-muted); }
+    .quiz-debug-key { color:var(--text); font-weight:600; min-width:72px; flex-shrink:0; }
+    .quiz-debug-label { font-family:monospace; font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-top:0.25rem; }
+    .quiz-debug-pre { font-family:monospace; font-size:0.75rem; color:var(--text-muted); background:var(--surface2); border:1px solid var(--border); border-radius:5px; padding:0.55rem 0.7rem; white-space:pre-wrap; word-break:break-all; margin:0; }
+    .quiz-debug-full-wrap { margin-top:0.25rem; }
+    .quiz-debug-full-toggle { font-family:monospace; font-size:0.75rem; color:#7c3aed; cursor:pointer; list-style:none; padding:0.2rem 0; }
     .weakness-section-row { display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; }
     .weakness-label { font-size:0.82rem; color:var(--text); min-width:120px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .weakness-bar-bg { flex:1; height:8px; background:var(--surface3); border-radius:4px; overflow:hidden; }
@@ -5418,17 +5429,20 @@ async function generateQuiz(noteText, settings = {}) {
     hard:   '심화 이해와 복합 추론이 필요한 어렵게',
   }[difficulty] || '중간 난이도로';
 
+  const MODEL = 'claude-sonnet-4-20250514';
   const systemPrompt = `You are a quiz generator for Korean university exam preparation. Generate exactly ${count} five-choice multiple choice questions from the provided study notes. Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. 3) Cover different sections of the notes evenly. 4) All content in Korean. 5) Output ONLY a valid JSON array, no markdown, no preamble, no backticks. Each element: {"q": "question", "choices": ["A","B","C","D","E"], "answer": 0, "explanation": "why correct + why key wrong answers are wrong", "section": "h2 section title the question is from"}`;
+  const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: MODEL,
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
     }),
   });
+  const responseTimeMs = Date.now() - t0;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || `API 오류 (${res.status})`);
@@ -5445,7 +5459,16 @@ async function generateQuiz(noteText, settings = {}) {
         typeof q.answer !== 'number' || q.answer < 0 || q.answer > 4 || !q.explanation)
       throw new Error(`문제 ${i+1} 형식 오류`);
   });
-  return questions.slice(0, count);
+  const sliced = questions.slice(0, count);
+  return {
+    questions: sliced,
+    debugInfo: {
+      model:         MODEL,
+      responseTimeMs,
+      rawResponse:   JSON.stringify(sliced, null, 2),
+      noteTextLen:   noteText.length,
+    },
+  };
 }
 
 function clearQuizInlineArea() {
@@ -5508,8 +5531,8 @@ function showQuizSettings(noteTitle, noteId, noteText) {
   area.querySelector('#qsStartBtn').addEventListener('click', async () => {
     area.innerHTML = `<div class="quiz-inline-loading"><span class="qi-spinner"></span><span class="quiz-dot-anim">문제 생성 중</span></div>`;
     try {
-      const questions = await generateQuiz(noteText, settings);
-      runInlineQuiz(questions, area, noteId, noteTitle, noteText);
+      const { questions, debugInfo } = await generateQuiz(noteText, settings);
+      runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
     } catch(e) {
       showToast('❌ 퀴즈 생성 실패: ' + e.message);
       clearQuizInlineArea();
@@ -5519,7 +5542,7 @@ function showQuizSettings(noteTitle, noteId, noteText) {
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function runInlineQuiz(questions, container, noteId, noteTitle, noteText) {
+function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settings = {}, debugInfo = {}) {
   const startTime = Date.now();
 
   let html = '';
@@ -5538,6 +5561,27 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText) {
   </div>`;
 
   container.innerHTML = html;
+
+  // Debug section
+  const notePreview  = (noteText || '').slice(0, 500);
+  const noteFullLen  = (noteText || '').length;
+  const hasTrunc     = noteFullLen > 500;
+  const debugEl      = document.createElement('details');
+  debugEl.className  = 'quiz-debug-details';
+  debugEl.innerHTML  = `
+    <summary class="quiz-debug-summary">🔧 디버그</summary>
+    <div class="quiz-debug-body">
+      <div class="quiz-debug-row"><span class="quiz-debug-key">모델</span><span>${escHtml(debugInfo.model || '—')}</span></div>
+      <div class="quiz-debug-row"><span class="quiz-debug-key">응답 시간</span><span>${debugInfo.responseTimeMs != null ? (debugInfo.responseTimeMs / 1000).toFixed(2) + 's' : '—'}</span></div>
+      <div class="quiz-debug-row"><span class="quiz-debug-key">설정</span><span>문제 ${settings.count || '?'}개 · ${settings.style || '?'} · ${settings.difficulty || '?'}</span></div>
+      <div class="quiz-debug-row"><span class="quiz-debug-key">노트 길이</span><span>${noteFullLen.toLocaleString()}자</span></div>
+      <div class="quiz-debug-label">노트 입력 (앞 500자)</div>
+      <pre class="quiz-debug-pre">${escHtml(notePreview)}${hasTrunc ? '\n…' : ''}</pre>
+      ${hasTrunc ? `<details class="quiz-debug-full-wrap"><summary class="quiz-debug-full-toggle">전체 보기 (${noteFullLen.toLocaleString()}자)</summary><pre class="quiz-debug-pre">${escHtml(noteText)}</pre></details>` : ''}
+      <div class="quiz-debug-label">JSON 응답</div>
+      <pre class="quiz-debug-pre">${escHtml(debugInfo.rawResponse || '—')}</pre>
+    </div>`;
+  container.appendChild(debugEl);
 
   const answers  = new Array(questions.length).fill(null);
   const gradeBtn = container.querySelector('#quizGradeBtn');
