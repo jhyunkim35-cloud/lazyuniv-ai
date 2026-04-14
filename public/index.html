@@ -6889,9 +6889,10 @@ async function saveNote(note) {
   });
   return new Promise((resolve, reject) => {
     const tx  = db.transaction('notes', 'readwrite');
-    const req = tx.objectStore('notes').put(record);
-    req.onsuccess = () => resolve(record);
-    req.onerror   = e => reject(e.target.error);
+    tx.objectStore('notes').put(record);
+    tx.oncomplete = () => resolve(record);
+    tx.onerror    = e => reject(e.target.error);
+    tx.onabort    = e => reject(e.target.error);
   });
 }
 
@@ -6946,9 +6947,11 @@ async function updateNoteOrder(orderedIds) {
 async function deleteNote(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const req = db.transaction('notes', 'readwrite').objectStore('notes').delete(id);
-    req.onsuccess = () => resolve();
-    req.onerror   = e => reject(e.target.error);
+    const tx = db.transaction('notes', 'readwrite');
+    tx.objectStore('notes').delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror    = e => reject(e.target.error);
+    tx.onabort    = e => reject(e.target.error);
   });
 }
 
@@ -6963,9 +6966,11 @@ async function saveFolder(folder) {
   const now = new Date().toISOString();
   const record = Object.assign({ createdAt: now }, folder, { id: folder.id || uuidv4() });
   return new Promise((resolve, reject) => {
-    const req = db.transaction('folders', 'readwrite').objectStore('folders').put(record);
-    req.onsuccess = () => resolve(record);
-    req.onerror   = e => reject(e.target.error);
+    const tx  = db.transaction('folders', 'readwrite');
+    tx.objectStore('folders').put(record);
+    tx.oncomplete = () => resolve(record);
+    tx.onerror    = e => reject(e.target.error);
+    tx.onabort    = e => reject(e.target.error);
   });
 }
 
