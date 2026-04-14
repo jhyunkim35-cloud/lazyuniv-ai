@@ -6595,20 +6595,20 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
       try {
         setProgress(5 + Math.round(i / pending.length * 85), `${i + 1}번째: 파일 읽는 중…`);
         const pptText = item.pptFile ? await extractPresentationText(item.pptFile) : '';
-        let rawTxt = '';
-        let professorNum = 1;
+        let filteredParts = [];
         if (item.sessions && item.sessions.length > 0) {
-          const txts = [];
           for (const sess of item.sessions) {
-            if (sess.txtFile) txts.push(await sess.txtFile.text());
+            if (!sess.txtFile) continue;
+            const sessText = await sess.txtFile.text();
+            const sessSeparated = separateSpeakers(sessText, sess.professorNum || 1);
+            filteredParts.push(sessSeparated.text);
           }
-          rawTxt = txts.join('\n\n');
-          professorNum = item.sessions[0].professorNum;
         } else if (item.txtFile) {
-          rawTxt = await item.txtFile.text();
+          const raw = await item.txtFile.text();
+          const sep = separateSpeakers(raw, 1);
+          filteredParts.push(sep.text);
         }
-
-        const separated = separateSpeakers(rawTxt, professorNum);
+        const separatedText = filteredParts.join('\n\n');
         storedPptText = pptText;
 
         // CHANGE 2: extract images for this item
@@ -6625,7 +6625,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
           }
         }
 
-        storedFilteredText = separated.text;
+        storedFilteredText = separatedText;
 
         // Full agent loop streams into this lecture's card body
         await runAgentPipeline(apiKey, cardBodyEl);
