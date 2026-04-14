@@ -5426,7 +5426,8 @@ function showQuizModal(noteTitle) {
         <div class="quiz-results-time"  id="quizTime"></div>
         <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);flex-shrink:0;">오답 목록</div>
         <div class="quiz-wrong-list" id="quizWrongList"></div>
-        <div style="display:flex;justify-content:flex-end;flex-shrink:0;padding-top:0.4rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding-top:0.4rem;">
+          <button id="quizHistoryBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;">📊 퀴즈 이력</button>
           <button onclick="document.getElementById('quizModal').remove()" style="padding:0.5rem 1.2rem;border-radius:6px;border:none;background:var(--surface3);color:var(--text);cursor:pointer;">닫기</button>
         </div>
       </div>
@@ -5436,7 +5437,7 @@ function showQuizModal(noteTitle) {
   return overlay;
 }
 
-function startQuiz(questions, overlay) {
+function startQuiz(questions, overlay, noteId, noteTitle) {
   const loadingEl    = overlay.querySelector('#quizLoadingState');
   const questionEl   = overlay.querySelector('#quizQuestionState');
   const resultsEl    = overlay.querySelector('#quizResultsState');
@@ -5497,7 +5498,7 @@ function startQuiz(questions, overlay) {
     }
   };
 
-  function showResults() {
+  async function showResults() {
     questionEl.style.display = 'none';
     resultsEl.style.display  = 'flex';
 
@@ -5526,20 +5527,91 @@ function startQuiz(questions, overlay) {
         </div>`;
       }).join('');
     }
+
+    // Save result to IndexedDB
+    if (noteId) {
+      const record = {
+        id:        uuidv4(),
+        noteId,
+        noteTitle: noteTitle || '',
+        timestamp: new Date().toISOString(),
+        score,
+        total,
+        timeTaken: elapsed,
+        questions: questions.map((q, i) => ({
+          section: q.section || '',
+          correct: answers[i]?.correct ?? false,
+        })),
+      };
+      saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
+
+      // Wire history button now that we have noteId
+      const histBtn = overlay.querySelector('#quizHistoryBtn');
+      if (histBtn) {
+        histBtn.style.display = 'inline-block';
+        histBtn.addEventListener('click', () => showQuizHistory(overlay, noteId, noteTitle));
+      }
+    }
   }
 
   renderQuestion(0);
 }
 
+async function showQuizHistory(parentOverlay, noteId, noteTitle) {
+  const histOverlay = document.createElement('div');
+  histOverlay.className = 'db-modal-overlay';
+  histOverlay.style.zIndex = '10001';
+  histOverlay.addEventListener('click', e => { if (e.target === histOverlay) histOverlay.remove(); });
+
+  histOverlay.innerHTML = `
+    <div class="db-modal" style="max-width:500px;display:flex;flex-direction:column;max-height:85vh;">
+      <h3>📊 퀴즈 이력 — ${escHtml(noteTitle || '노트')}</h3>
+      <div class="db-modal-list" id="quizHistList" style="overflow-y:auto;flex:1;"></div>
+      <div class="db-modal-footer" style="justify-content:flex-end;">
+        <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">닫기</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(histOverlay);
+
+  const listEl = histOverlay.querySelector('#quizHistList');
+  listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0;">불러오는 중...</div>';
+
+  try {
+    const results = await getQuizResultsByNote(noteId);
+    if (!results.length) {
+      listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0;">저장된 이력이 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = results.map(r => {
+      const d   = new Date(r.timestamp);
+      const dateStr = `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const pct = Math.round(r.score / r.total * 100);
+      const m   = Math.floor(r.timeTaken / 60);
+      const s   = r.timeTaken % 60;
+      const timeStr = (m > 0 ? m + '분 ' : '') + s + '초';
+      const color = pct >= 80 ? '#22c55e' : pct >= 60 ? '#f59e0b' : '#ef4444';
+      return `<div class="db-modal-row">
+        <span style="font-size:0.82rem;color:var(--text-muted);min-width:110px;">${escHtml(dateStr)}</span>
+        <span style="font-weight:700;color:${color};min-width:80px;">${r.score}/${r.total} (${pct}%)</span>
+        <span style="font-size:0.82rem;color:var(--text-muted);">${escHtml(timeStr)}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = `<div style="color:#ef4444;font-size:0.85rem;">불러오기 실패: ${escHtml(e.message)}</div>`;
+  }
+}
+
 async function launchQuiz() {
   const noteText  = storedNotesText;
   const noteTitle = document.getElementById('notesCardTitle').textContent.replace(/^📚\s*/, '').trim() || '노트';
+  const noteId    = currentNoteId || null;
   if (!noteText) { showToast('먼저 AI 분석을 실행해주세요.'); return; }
 
   const overlay = showQuizModal(noteTitle);
   try {
     const questions = await generateQuiz(noteText);
-    startQuiz(questions, overlay);
+    startQuiz(questions, overlay, noteId, noteTitle);
   } catch(e) {
     showToast('❌ 퀴즈 생성 실패: ' + e.message);
     overlay.remove();
@@ -7350,7 +7422,7 @@ function showToast(msg) {
    IndexedDB — openDB / notes / folders
 ═══════════════════════════════════════════════ */
 const DB_NAME    = 'meetingAppDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -7367,6 +7439,11 @@ function openDB() {
         const fs = db.createObjectStore('folders', { keyPath: 'id' });
         fs.createIndex('name', 'name', { unique: false });
       }
+      if (!db.objectStoreNames.contains('quizResults')) {
+        const qr = db.createObjectStore('quizResults', { keyPath: 'id' });
+        qr.createIndex('noteId',    'noteId',    { unique: false });
+        qr.createIndex('timestamp', 'timestamp', { unique: false });
+      }
     };
     req.onsuccess = e => resolve(e.target.result);
     req.onerror   = e => reject(e.target.error);
@@ -7377,6 +7454,33 @@ function uuidv4() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+async function saveQuizResult(result) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('quizResults', 'readwrite');
+    tx.objectStore('quizResults').put(result);
+    tx.oncomplete = () => resolve(result);
+    tx.onerror    = e => reject(e.target.error);
+    tx.onabort    = e => reject(e.target.error);
+  });
+}
+
+async function getQuizResultsByNote(noteId) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx      = db.transaction('quizResults', 'readonly');
+    const store   = tx.objectStore('quizResults');
+    const index   = store.index('noteId');
+    const req     = index.getAll(noteId);
+    req.onsuccess = e => {
+      const results = e.target.result || [];
+      results.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      resolve(results);
+    };
+    req.onerror = e => reject(e.target.error);
   });
 }
 
