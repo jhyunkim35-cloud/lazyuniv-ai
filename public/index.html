@@ -2452,6 +2452,7 @@
         <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">
           <button class="collapse-btn" id="collapseBtn">▲ 접기</button>
           <div class="notes-actions" id="notesActions">
+            <button class="action-btn" id="notionCopyBtn" disabled>📋 노션</button>
             <button class="action-btn" id="copyNotesBtn" disabled>📋 복사</button>
             <button class="action-btn" id="dlTxtBtn" disabled>⬇ .txt</button>
             <button class="action-btn" id="dlMdBtn" disabled>⬇ .md</button>
@@ -2586,6 +2587,7 @@
     <span style="font-size:0.9rem; font-weight:600; color:var(--text);">📖 슬라이드 + 학습 노트</span>
     <div style="display:flex; gap:0.5rem; align-items:center;">
       <button id="splitDebugBtn" class="action-btn" title="디버그 리포트 복사" style="display:none; font-size:0.85rem; padding:0.25rem 0.5rem;" onclick="copyDebugReport()">📋</button>
+      <button id="splitNotionBtn" class="action-btn">📋 노션</button>
       <button id="splitPdfBtn" class="action-btn">⬇ PDF</button>
       <button id="splitCloseBtn" class="action-btn">✕ 닫기</button>
     </div>
@@ -3179,8 +3181,9 @@ const analyzeBtn = document.getElementById('analyzeBtn');
 const resultsEl  = document.getElementById('results');
 const toast      = document.getElementById('toast');
 
-const copyNotesBtn = document.getElementById('copyNotesBtn');
-const dlTxtBtn     = document.getElementById('dlTxtBtn');
+const notionCopyBtn = document.getElementById('notionCopyBtn');
+const copyNotesBtn  = document.getElementById('copyNotesBtn');
+const dlTxtBtn      = document.getElementById('dlTxtBtn');
 const dlMdBtn      = document.getElementById('dlMdBtn');
 const dlPdfBtn     = document.getElementById('dlPdfBtn');
 const splitViewBtn = document.getElementById('splitViewBtn');
@@ -4859,7 +4862,7 @@ analyzeBtn.addEventListener('click', async () => {
   cancelBtn.classList.add('visible');
 
   // disable download buttons until notes are ready
-  [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+  [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
   const _dbgBtnReset = document.getElementById('splitDebugBtn');
   if (_dbgBtnReset) _dbgBtnReset.style.display = 'none';
   _lastGenerationError = '';
@@ -5013,6 +5016,50 @@ async function copyDebugReport() {
 }
 
 /* ═══════════════════════════════════════════════
+   Notion clipboard helper
+═══════════════════════════════════════════════ */
+async function copyToNotionClipboard(htmlContent, plainText) {
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':  new Blob([htmlContent], { type: 'text/html' }),
+        'text/plain': new Blob([plainText],   { type: 'text/plain' }),
+      })]);
+    } else {
+      // Fallback: contenteditable selection + execCommand
+      const div = document.createElement('div');
+      div.contentEditable = 'true';
+      div.style.cssText = 'position:fixed;left:-9999px;opacity:0;pointer-events:none;';
+      div.innerHTML = htmlContent;
+      document.body.appendChild(div);
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(div);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+      document.body.removeChild(div);
+    }
+    showToast('📋 클립보드에 복사됨 — 노션에 붙여넣기하세요');
+  } catch(e) {
+    showToast('❌ 복사 실패: ' + e.message);
+  }
+}
+
+async function bulkNotionCopy() {
+  if (!_selectedNoteIds.size) return;
+  const ids = [..._selectedNoteIds];
+  showToast(`📋 ${ids.length}개 노트 복사 중...`);
+  const notes = await Promise.all(ids.map(id => getNoteFS(id)));
+  const valid = notes.filter(Boolean);
+  if (!valid.length) return;
+  const html  = valid.map(n => `<h1>${escHtml(n.title || '제목없음')}</h1>${n.notesHtml || renderMarkdown(n.notesText || '')}`).join('\n<hr>\n');
+  const plain = valid.map(n => `# ${n.title || '제목없음'}\n\n${n.notesText || ''}`).join('\n\n---\n\n');
+  await copyToNotionClipboard(html, plain);
+}
+
+/* ═══════════════════════════════════════════════
    Download button handlers
 ═══════════════════════════════════════════════ */
 copyNotesBtn.addEventListener('click', async () => {
@@ -5025,6 +5072,20 @@ copyNotesBtn.addEventListener('click', async () => {
   }
   copyNotesBtn.textContent = '✅ 복사됨!';
   setTimeout(() => { copyNotesBtn.textContent = '📋 복사'; }, 2000);
+});
+
+notionCopyBtn.addEventListener('click', async () => {
+  const bodyEl = document.getElementById('finalNotesBody');
+  const html   = (bodyEl.querySelector('.md-content') || bodyEl).innerHTML;
+  await copyToNotionClipboard(html, storedNotesText || '');
+  notionCopyBtn.textContent = '✅ 복사됨!';
+  setTimeout(() => { notionCopyBtn.textContent = '📋 노션'; }, 2000);
+});
+
+document.getElementById('splitNotionBtn').addEventListener('click', async () => {
+  const splitEl = document.getElementById('splitNotes');
+  const html    = splitEl ? (splitEl.querySelector('.md-content') || splitEl).innerHTML : '';
+  await copyToNotionClipboard(html, storedNotesText || '');
 });
 
 dlTxtBtn.addEventListener('click', () => {
@@ -6042,7 +6103,7 @@ ${recText}`;
 
   /* enable download buttons — single mode only */
   if (!targetBodyEl) {
-    [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -6124,7 +6185,7 @@ ${critiqueText}`;
   storedNotesText = patched;
 
   if (!targetBodyEl) {
-    [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -7184,7 +7245,7 @@ async function openSavedNote(id) {
   if (splitAccordion)  splitAccordion.innerHTML  = '';
 
   // Enable action buttons (they start disabled until a pipeline runs)
-  [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+  [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
   const _dbgBtnRestore = document.getElementById('splitDebugBtn');
   if (_dbgBtnRestore) _dbgBtnRestore.style.display = '';
   document.getElementById('notesActions')?.classList.add('visible');
@@ -7507,7 +7568,7 @@ function switchView(view) {
   if (view === 'home') renderHomeView();
   if (view === 'new') {
     // Clear stale action-button state from any previously loaded note
-    [copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+    [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
     document.getElementById('notesActions')?.classList.remove('visible');
     document.getElementById('collapseBtn')?.classList.remove('visible');
   }
@@ -8144,6 +8205,7 @@ document.getElementById('landingView').style.display = '';
     전체 선택
   </label>
   <span id="bulkSelectCount" style="color:var(--text);font-weight:600;">0개 선택됨</span>
+  <button class="action-btn" onclick="bulkNotionCopy()" style="border-color:#7c3aed;color:#7c3aed;background:rgba(124,58,237,0.1);">📋 노션</button>
   <button class="action-btn" onclick="bulkExportPdf()" style="border-color:#2563eb;color:#2563eb;background:rgba(37,99,235,0.1);">📄 PDF</button>
   <button class="action-btn" onclick="bulkDeleteSelected()" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.1);">🗑 선택 삭제</button>
   <button class="action-btn" onclick="toggleBulkSelectMode()">취소</button>
