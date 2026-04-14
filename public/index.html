@@ -5415,7 +5415,7 @@ dlPdfBtn.addEventListener('click', () => {
 ═══════════════════════════════════════════════ */
 const QUIZ_CHOICES_PREFIX = ['①', '②', '③', '④', '⑤'];
 
-async function generateQuiz(noteText, settings = {}) {
+async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
   const count      = settings.count      || 10;
   const style      = settings.style      || 'mixed';
   const difficulty = settings.difficulty || 'medium';
@@ -5432,7 +5432,12 @@ async function generateQuiz(noteText, settings = {}) {
   }[difficulty] || '중간 난이도로';
 
   const MODEL = 'claude-sonnet-4-20250514';
-  const systemPrompt = `You are a quiz generator for Korean university exam preparation. Generate exactly ${count} five-choice multiple choice questions from the provided study notes. Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. 3) Cover different sections of the notes evenly. 4) All content in Korean. 5) Output ONLY a valid JSON array, no markdown, no preamble, no backticks. Each element: {"q": "question", "choices": ["A","B","C","D","E"], "answer": 0, "explanation": "why correct + why key wrong answers are wrong", "section": "h2 section title the question is from"}`;
+  const recentPrev = prevQuestions.slice(-30);
+  const dedupClause = recentPrev.length > 0
+    ? `\n\nCRITICAL: The following questions have been asked in previous quizzes. Do NOT generate any question that is identical or nearly identical to these. Create NEW questions that test the same concepts from different angles:\n` +
+      recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    : '';
+  const systemPrompt = `You are a quiz generator for Korean university exam preparation. Generate exactly ${count} five-choice multiple choice questions from the provided study notes. Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. 3) Cover different sections of the notes evenly. 4) All content in Korean. 5) Output ONLY a valid JSON array, no markdown, no preamble, no backticks. Each element: {"q": "question", "choices": ["A","B","C","D","E"], "answer": 0, "explanation": "why correct + why key wrong answers are wrong", "section": "h2 section title the question is from"}` + dedupClause;
   const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
@@ -5533,7 +5538,11 @@ function showQuizSettings(noteTitle, noteId, noteText) {
   area.querySelector('#qsStartBtn').addEventListener('click', async () => {
     area.innerHTML = `<div class="quiz-inline-loading"><span class="qi-spinner"></span><span class="quiz-dot-anim">문제 생성 중</span></div>`;
     try {
-      const { questions, debugInfo } = await generateQuiz(noteText, settings);
+      const prevResults   = noteId ? await getQuizResultsByNote(noteId) : [];
+      const prevQuestions = prevResults
+        .flatMap(r => (r.questions || []).map(q => q.questionText))
+        .filter(Boolean);
+      const { questions, debugInfo } = await generateQuiz(noteText, settings, prevQuestions);
       runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
     } catch(e) {
       showToast('❌ 퀴즈 생성 실패: ' + e.message);
@@ -5666,8 +5675,9 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
         timestamp: new Date().toISOString(),
         score, total, timeTaken: elapsed,
         questions: questions.map((q, i) => ({
-          section: q.section || '',
-          correct: answers[i] === q.answer,
+          section:      q.section || '',
+          correct:      answers[i] === q.answer,
+          questionText: q.q || '',
         })),
       };
       await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
