@@ -1798,6 +1798,13 @@
     .qi-spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border-bright); border-top-color:#7c3aed; border-radius:50%; animation:spin 0.7s linear infinite; flex-shrink:0; }
     .quiz-dot-anim::after { content:''; animation:quiz-dots 1.4s steps(4,end) infinite; }
     @keyframes quiz-dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+    .quiz-loading-container { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; padding:2.5rem 1rem; }
+    .quiz-loading-spinner { width:40px; height:40px; border:3px solid var(--border-bright); border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; }
+    .quiz-loading-msg { font-size:0.92rem; color:var(--text-muted); transition:opacity 0.35s ease; }
+    .quiz-loading-msg.fade-out { opacity:0; }
+    .quiz-loading-timer { font-size:0.78rem; color:var(--text-muted); opacity:0.6; }
+    .quiz-card-enter { opacity:0; transform:translateY(20px); transition:opacity 0.3s ease, transform 0.3s ease; }
+    .quiz-card-enter.visible { opacity:1; transform:translateY(0); }
     .quiz-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem; display:flex; flex-direction:column; gap:0.55rem; }
     .quiz-card-num { font-size:0.75rem; font-weight:700; color:var(--text-muted); letter-spacing:0.04em; }
     .quiz-card-q { font-size:0.95rem; font-weight:600; color:var(--text); line-height:1.65; }
@@ -5612,15 +5619,57 @@ function showQuizSettings(noteTitle, noteId, noteText) {
 
   area.querySelector('#qsCloseBtn').addEventListener('click', clearQuizInlineArea);
   area.querySelector('#qsStartBtn').addEventListener('click', async () => {
-    area.innerHTML = `<div class="quiz-inline-loading"><span class="qi-spinner"></span><span class="quiz-dot-anim">문제 생성 중</span></div>`;
+    // Show rich loading UI with rotating status messages and elapsed timer
+    const statusMessages = [
+      '문제를 구상하는 중...',
+      '핵심 개념을 분석하는 중...',
+      '보기를 만드는 중...',
+      '난이도를 조절하는 중...',
+      '거의 다 됐어요!',
+    ];
+    let msgIndex = 0;
+    let elapsedSec = 0;
+
+    area.innerHTML = `
+      <div class="quiz-loading-container">
+        <div class="quiz-loading-spinner"></div>
+        <div class="quiz-loading-msg" id="qlMsg">${statusMessages[0]}</div>
+        <div class="quiz-loading-timer" id="qlTimer">경과 시간: 0:00</div>
+      </div>`;
+
+    const msgEl   = area.querySelector('#qlMsg');
+    const timerEl = area.querySelector('#qlTimer');
+
+    // Rotate status messages every 2s with a brief fade
+    const msgInterval = setInterval(() => {
+      msgIndex = (msgIndex + 1) % statusMessages.length;
+      msgEl.classList.add('fade-out');
+      setTimeout(() => {
+        msgEl.textContent = statusMessages[msgIndex];
+        msgEl.classList.remove('fade-out');
+      }, 350);
+    }, 2000);
+
+    // Tick elapsed timer every second
+    const timerInterval = setInterval(() => {
+      elapsedSec++;
+      const m = Math.floor(elapsedSec / 60);
+      const s = String(elapsedSec % 60).padStart(2, '0');
+      timerEl.textContent = `경과 시간: ${m}:${s}`;
+    }, 1000);
+
     try {
       const prevResults   = noteId ? await getQuizResultsByNote(noteId) : [];
       const prevQuestions = prevResults
         .flatMap(r => (r.questions || []).map(q => q.questionText))
         .filter(Boolean);
       const { questions, debugInfo } = await generateQuiz(noteText, settings, prevQuestions);
+      clearInterval(msgInterval);
+      clearInterval(timerInterval);
       runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
     } catch(e) {
+      clearInterval(msgInterval);
+      clearInterval(timerInterval);
       showToast('❌ 퀴즈 생성 실패: ' + e.message);
       clearQuizInlineArea();
     }
@@ -5687,7 +5736,8 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
         <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
       </div>`;
     }
-    html += `<div class="quiz-card" data-qi="${idx}" data-type="${type}">
+    // Start cards invisible for staggered pop-in animation
+    html += `<div class="quiz-card quiz-card-enter" data-qi="${idx}" data-type="${type}">
       <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
       <div class="quiz-card-q">${escHtml(q.q)}</div>
       ${inputHtml}
@@ -5699,6 +5749,11 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
   </div>`;
 
   container.innerHTML = html;
+
+  // Stagger cards in one-by-one with 150ms delay between each
+  container.querySelectorAll('.quiz-card-enter').forEach((card, idx) => {
+    setTimeout(() => card.classList.add('visible'), idx * 150);
+  });
 
   // Debug section
   const notePreview  = (noteText || '').slice(0, 500);
