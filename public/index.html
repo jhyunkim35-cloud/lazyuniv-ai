@@ -2466,6 +2466,7 @@
           <button class="collapse-btn" id="collapseBtn">▲ 접기</button>
           <div class="notes-actions" id="notesActions">
             <button class="action-btn" id="notionCopyBtn" disabled>📋 노션</button>
+            <button class="action-btn" id="dlNotionFileBtn" disabled>📄 노션파일</button>
             <button class="action-btn" id="copyNotesBtn" disabled>📋 복사</button>
             <button class="action-btn" id="dlTxtBtn" disabled>⬇ .txt</button>
             <button class="action-btn" id="dlMdBtn" disabled>⬇ .md</button>
@@ -3194,12 +3195,13 @@ const analyzeBtn = document.getElementById('analyzeBtn');
 const resultsEl  = document.getElementById('results');
 const toast      = document.getElementById('toast');
 
-const notionCopyBtn = document.getElementById('notionCopyBtn');
-const copyNotesBtn  = document.getElementById('copyNotesBtn');
-const dlTxtBtn      = document.getElementById('dlTxtBtn');
-const dlMdBtn      = document.getElementById('dlMdBtn');
-const dlPdfBtn     = document.getElementById('dlPdfBtn');
-const splitViewBtn = document.getElementById('splitViewBtn');
+const notionCopyBtn   = document.getElementById('notionCopyBtn');
+const dlNotionFileBtn = document.getElementById('dlNotionFileBtn');
+const copyNotesBtn    = document.getElementById('copyNotesBtn');
+const dlTxtBtn        = document.getElementById('dlTxtBtn');
+const dlMdBtn         = document.getElementById('dlMdBtn');
+const dlPdfBtn        = document.getElementById('dlPdfBtn');
+const splitViewBtn    = document.getElementById('splitViewBtn');
 
 /* ═══════════════════════════════════════════════
    File handling
@@ -4875,7 +4877,7 @@ analyzeBtn.addEventListener('click', async () => {
   cancelBtn.classList.add('visible');
 
   // disable download buttons until notes are ready
-  [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+  [notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
   const _dbgBtnReset = document.getElementById('splitDebugBtn');
   if (_dbgBtnReset) _dbgBtnReset.style.display = 'none';
   _lastGenerationError = '';
@@ -5206,12 +5208,18 @@ function showNotionReorderModal(notes) {
       <div class="db-modal-list" id="notionReorderList" style="overflow-y:auto;max-height:50vh;flex:1;"></div>
       <div class="db-modal-footer">
         <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">취소</button>
-        <button id="notionReorderCopyBtn" style="padding:0.5rem 1rem;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:0.85rem;cursor:pointer;white-space:nowrap;">📋 복사 (${notes.length}개)</button>
+        <button id="notionReorderFileBtn" style="padding:0.5rem 1rem;border-radius:6px;border:none;background:#2563eb;color:#fff;font-size:0.85rem;cursor:pointer;white-space:nowrap;">📄 파일 저장</button>
+        <button id="notionReorderCopyBtn" style="padding:0.5rem 1rem;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:0.85rem;cursor:pointer;white-space:nowrap;">📋 클립보드 복사</button>
       </div>
     </div>`;
 
   const list = overlay.querySelector('#notionReorderList');
   buildRows();
+
+  overlay.querySelector('#notionReorderFileBtn').addEventListener('click', () => {
+    overlay.remove();
+    generateNotionHtmlFile(orderedNotes);
+  });
 
   overlay.querySelector('#notionReorderCopyBtn').addEventListener('click', async () => {
     overlay.remove();
@@ -5222,14 +5230,7 @@ function showNotionReorderModal(notes) {
 }
 
 async function executeNotionBulkCopy(orderedNotes) {
-  // Each note becomes a top-level <details open><summary>title</summary>…content…</details>
-  // The inner content goes through transformToNotionToggles so h2/h3 become nested toggles
-  const htmlParts = orderedNotes.map(n => {
-    const rawHtml = n.notesHtml || renderMarkdown(n.notesText || '');
-    const innerHtml = transformToNotionToggles(rawHtml);
-    return `<details open><summary>${escHtml(n.title || '제목없음')}</summary>${innerHtml}</details>`;
-  });
-  const finalHtml = htmlParts.join('\n');
+  const finalHtml = buildNotionToggleHtml(orderedNotes);
   const plainText = orderedNotes.map(n => `# ${n.title || '제목없음'}\n\n${n.notesText || ''}`).join('\n\n---\n\n');
 
   try {
@@ -5259,6 +5260,26 @@ async function executeNotionBulkCopy(orderedNotes) {
   }
 }
 
+function buildNotionToggleHtml(notes) {
+  return notes.map(n => {
+    const rawHtml = n.notesHtml || renderMarkdown(n.notesText || '');
+    const innerHtml = transformToNotionToggles(rawHtml);
+    return `<details open><summary>${escHtml(n.title || '제목없음')}</summary>${innerHtml}</details>`;
+  }).join('\n');
+}
+
+function generateNotionHtmlFile(notes, filename) {
+  const content = buildNotionToggleHtml(notes);
+  const doc = `<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>노트 모음</title></head>\n<body>\n${content}\n</body></html>`;
+  const url = URL.createObjectURL(new Blob([doc], { type: 'text/html' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename || 'notes_export.html' });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('📄 HTML 파일 저장됨 — 노션에서 가져오기로 열어주세요');
+}
+
 /* ═══════════════════════════════════════════════
    Download button handlers
 ═══════════════════════════════════════════════ */
@@ -5281,6 +5302,16 @@ notionCopyBtn.addEventListener('click', async (e) => {
   await copyToNotionClipboard(html, storedNotesText || '', useToggles);
   notionCopyBtn.textContent = '✅ 복사됨!';
   setTimeout(() => { notionCopyBtn.textContent = '📋 노션'; }, 2000);
+});
+
+dlNotionFileBtn.addEventListener('click', () => {
+  const bodyEl  = document.getElementById('finalNotesBody');
+  const rawHtml = (bodyEl.querySelector('.md-content') || bodyEl).innerHTML;
+  const title   = document.getElementById('notesCardTitle').textContent.replace(/^📚\s*/, '').trim() || '노트';
+  const noteObj = { title, notesHtml: rawHtml, notesText: storedNotesText || '' };
+  generateNotionHtmlFile([noteObj], `노트_${dateStamp()}.html`);
+  dlNotionFileBtn.textContent = '✅ 저장됨';
+  setTimeout(() => { dlNotionFileBtn.textContent = '📄 노션파일'; }, 2000);
 });
 
 document.getElementById('splitNotionBtn').addEventListener('click', async (e) => {
@@ -6304,7 +6335,7 @@ ${recText}`;
 
   /* enable download buttons — single mode only */
   if (!targetBodyEl) {
-    [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    [notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -6386,7 +6417,7 @@ ${critiqueText}`;
   storedNotesText = patched;
 
   if (!targetBodyEl) {
-    [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    [notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -7446,7 +7477,7 @@ async function openSavedNote(id) {
   if (splitAccordion)  splitAccordion.innerHTML  = '';
 
   // Enable action buttons (they start disabled until a pipeline runs)
-  [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+  [notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
   const _dbgBtnRestore = document.getElementById('splitDebugBtn');
   if (_dbgBtnRestore) _dbgBtnRestore.style.display = '';
   document.getElementById('notesActions')?.classList.add('visible');
@@ -7769,7 +7800,7 @@ function switchView(view) {
   if (view === 'home') renderHomeView();
   if (view === 'new') {
     // Clear stale action-button state from any previously loaded note
-    [notionCopyBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+    [notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
     document.getElementById('notesActions')?.classList.remove('visible');
     document.getElementById('collapseBtn')?.classList.remove('visible');
   }
