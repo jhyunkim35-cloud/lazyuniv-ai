@@ -1815,6 +1815,7 @@
     .weakness-pct.weakness-red    { color:#ef4444; }
     .weakness-pct.weakness-yellow { color:#eab308; }
     .weakness-pct.weakness-green  { color:#22c55e; }
+    #importNoteBody:empty::before { content:attr(data-placeholder); color:var(--text-muted); pointer-events:none; }
     .inserted-slide-img {
       width: 100%;
       max-width: 100%;
@@ -2369,6 +2370,7 @@
         </div>
         <div style="display:flex;gap:0.4rem;">
           <button id="bulkSelectToggleBtn" class="action-btn" onclick="toggleBulkSelectMode()">선택</button>
+          <button class="action-btn" onclick="showImportNoteModal()">📥 가져오기</button>
           <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
         </div>
       </div>
@@ -7924,6 +7926,74 @@ async function moveSavedNote(id) {
 /* ═══════════════════════════════════════════════
    Folder manager modal
 ═══════════════════════════════════════════════ */
+function showImportNoteModal() {
+  const existing = document.getElementById('importNoteOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'importNoteOverlay';
+  overlay.className = 'db-modal-overlay';
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.innerHTML = `
+    <div class="db-modal" style="max-width:600px;display:flex;flex-direction:column;max-height:90vh;">
+      <h3>📥 노트 가져오기</h3>
+      <input id="importNoteTitle" type="text" placeholder="노트 제목"
+        style="padding:0.5rem 0.7rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:0.9rem;outline:none;flex-shrink:0;">
+      <div id="importNoteBody" contenteditable="true"
+        style="min-height:300px;max-height:60vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:1rem;background:var(--surface2);color:var(--text);font-size:0.9rem;line-height:1.6;flex:1;outline:none;cursor:text;"
+        data-placeholder="노션에서 복사한 내용을 여기에 붙여넣기 (Ctrl+V)"></div>
+      <div class="db-modal-footer" style="justify-content:flex-end;">
+        <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">취소</button>
+        <button id="importNoteSaveBtn" style="padding:0.5rem 1.2rem;border-radius:6px;border:none;background:var(--primary);color:#fff;font-size:0.85rem;cursor:pointer;">저장</button>
+      </div>
+    </div>`;
+
+  // Placeholder behaviour for contenteditable
+  const body = overlay.querySelector('#importNoteBody');
+  const updatePlaceholder = () => {
+    body.style.setProperty('--ce-empty', body.textContent.trim() ? '"" ' : '"노션에서 복사한 내용을 여기에 붙여넣기 (Ctrl+V)"');
+  };
+  body.addEventListener('input', updatePlaceholder);
+  updatePlaceholder();
+
+  overlay.querySelector('#importNoteSaveBtn').addEventListener('click', async () => {
+    const titleEl = overlay.querySelector('#importNoteTitle');
+    const title   = titleEl.value.trim() || '가져온 노트';
+    const html    = body.innerHTML.trim();
+    const text    = body.innerText.trim();
+    if (!html || html === '<br>') { showToast('내용을 입력해주세요.'); return; }
+
+    const saveBtn = overlay.querySelector('#importNoteSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중…';
+
+    try {
+      const note = {
+        id:        uuidv4(),
+        title,
+        notesHtml: html,
+        notesText: text,
+        createdAt: new Date().toISOString(),
+        folderId:  null,
+        source:    'import',
+        extractedImages: [],
+      };
+      await saveNoteFS(note);
+      showToast('📥 노트 저장 완료');
+      overlay.remove();
+      await renderHomeView();
+    } catch(e) {
+      showToast('❌ 저장 실패: ' + e.message);
+      saveBtn.disabled = false;
+      saveBtn.textContent = '저장';
+    }
+  });
+
+  document.body.appendChild(overlay);
+  overlay.querySelector('#importNoteTitle').focus();
+}
+
 async function showFolderManager() {
   const overlay = document.createElement('div');
   overlay.className = 'db-modal-overlay';
