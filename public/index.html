@@ -5455,7 +5455,7 @@ function resetAgentNodes() {
   document.getElementById('elapsedTime').textContent = '0:00';
   updateIterCounter('idle', 0);
   feedStartTime = null;
-  clearActivityFeed();
+  if (!isBatchMode) clearActivityFeed();
   document.getElementById('tab-critique').innerHTML =
     '<span class="placeholder-msg">검토가 완료되면 비평 내용이 여기에 표시됩니다.</span>';
 }
@@ -6546,8 +6546,11 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
   batchStartBtn.disabled = true;
   batchCancelBtn.classList.add('visible');
 
-  // Clear previous batch result cards
-  document.getElementById('batchResultsList').innerHTML = '';
+  // Clear only cards that belong to pending items (preserve done cards from prior partial run)
+  const pendingIds = new Set(pending.map(p => String(p.id)));
+  document.querySelectorAll('.batch-result-card').forEach(card => {
+    if (pendingIds.has(card.dataset.itemId)) card.remove();
+  });
 
   resultsEl.classList.add('visible');
   document.getElementById('agentSection').classList.add('visible');
@@ -6581,6 +6584,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
 
       // Create a dedicated card for this lecture; pipeline streams into its body
       const cardBodyEl = createBatchResultCard(item, i);
+      if (isBatchMode) agentLog(0, `══════ ${i + 1}/${pending.length}: ${escHtml(item.notesName || 'item')} ══════`);
 
       // CHANGE 3a: snapshot global state before processing this item
       const prevPptText      = storedPptText;
