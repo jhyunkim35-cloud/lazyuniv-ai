@@ -7544,7 +7544,7 @@ function buildFolderCard(folder, noteCount) {
     const noteId = e.dataTransfer.getData('text/plain');
     if (!noteId) return;
     await moveNoteToFolder(noteId, folder.id);
-    renderHomeView();
+    await renderHomeView();
   });
 
   card.addEventListener('click', () => filterByFolder(folder.id));
