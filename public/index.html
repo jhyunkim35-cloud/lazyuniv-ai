@@ -406,8 +406,9 @@
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
-    .split-tab:hover { color:var(--text); }
+    .split-tab:hover:not(:disabled) { color:var(--text); }
     .split-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .split-tab:disabled { opacity:0.38; cursor:not-allowed; }
 
     /* ── Accordion tab ─────────────────────────── */
     #splitAccordion { display:block; padding:1rem; overflow-y:auto; height:100%; }
@@ -2680,7 +2681,7 @@
         <button class="split-tab active" data-tab="notes" onclick="switchSplitTab('notes')">📖 학습 노트</button>
         <button class="split-tab" data-tab="transcript" onclick="switchSplitTab('transcript')">🎙 녹취록</button>
         <button class="split-tab" data-tab="accordion" onclick="switchSplitTab('accordion')">📑 아코디언</button>
-        <button id="quizBtn" style="display:none; margin-left:auto; margin-right:0.75rem; padding:0.3rem 0.75rem; border-radius:6px; border:none; background:#7c3aed; color:#fff; font-size:0.8rem; cursor:pointer; font-weight:600; white-space:nowrap; flex-shrink:0;" disabled>🧪 퀴즈</button>
+        <button id="quizBtn" class="split-tab" data-tab="quiz" onclick="switchSplitTab('quiz')" disabled>🧪 퀴즈</button>
       </div>
       <div id="splitNotes" style="flex:1; min-height:0; overflow-y:auto; padding:1.5rem;"></div>
       <div id="splitTranscript" style="flex:1; min-height:0; overflow-y:auto; padding:1.5rem; display:none;"></div>
@@ -4964,7 +4965,6 @@ analyzeBtn.addEventListener('click', async () => {
   const collapseBtnEl = document.getElementById('collapseBtn');
   collapseBtnEl.textContent = '▲ 접기';
   collapseBtnEl.classList.remove('visible');
-  quizBtn.style.display = 'none';
   clearQuizInlineArea();
 
   // scroll results into view
@@ -5478,7 +5478,13 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
 
 function clearQuizInlineArea() {
   const area = document.getElementById('quizInlineArea');
-  if (area) { area.innerHTML = ''; area.style.display = 'none'; }
+  if (!area) return;
+  area.innerHTML = '';
+  area.style.display = 'none';
+  // If quiz tab was active, switch back to notes tab
+  if (document.getElementById('quizBtn')?.classList.contains('active')) {
+    switchSplitTab('notes');
+  }
 }
 
 function showQuizSettings(noteTitle, noteId, noteText) {
@@ -5799,8 +5805,7 @@ function launchQuiz() {
   showQuizSettings(noteTitle, noteId, noteText);
 }
 
-quizBtn.addEventListener('click', launchQuiz);
-document.getElementById('splitQuizBtn').addEventListener('click', launchQuiz);
+document.getElementById('splitQuizBtn').addEventListener('click', () => switchSplitTab('quiz'));
 
 splitViewBtn.addEventListener('click', async () => {
   const splitViewer = document.getElementById('splitViewer');
@@ -5869,16 +5874,21 @@ document.getElementById('splitCloseBtn').addEventListener('click', () => {
 
 
 function switchSplitTab(tab) {
+  // Quiz tab: only activate if notes are available
+  if (tab === 'quiz' && !storedNotesText) return;
+
   document.querySelectorAll('#splitTabs .split-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
   const notesEl      = document.getElementById('splitNotes');
   const transcriptEl = document.getElementById('splitTranscript');
   const accordionEl  = document.getElementById('splitAccordion');
+  const quizAreaEl   = document.getElementById('quizInlineArea');
 
-  notesEl.style.display      = tab === 'notes'      ? 'flex' : 'none';
-  transcriptEl.style.display = tab === 'transcript' ? 'flex' : 'none';
+  notesEl.style.display      = tab === 'notes'      ? 'flex'  : 'none';
+  transcriptEl.style.display = tab === 'transcript' ? 'flex'  : 'none';
   accordionEl.style.display  = tab === 'accordion'  ? 'block' : 'none';
+  quizAreaEl.style.display   = tab === 'quiz'       ? 'flex'  : 'none';
 
   if (tab === 'transcript' && !transcriptEl.innerHTML.trim()) {
     if (storedHighlightedTranscript) {
@@ -5913,7 +5923,10 @@ function switchSplitTab(tab) {
     }
   }
 
-
+  // Launch quiz settings when switching to quiz tab (only if area is empty)
+  if (tab === 'quiz' && !quizAreaEl.innerHTML.trim()) {
+    launchQuiz();
+  }
 }
 
 function buildAccordionView(sourceEl) {
@@ -6806,7 +6819,6 @@ ${recText}`;
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
     document.getElementById('collapseBtn').classList.add('visible');
-    quizBtn.style.display = '';
     document.getElementById('dotNotes').className = 'status-dot done';
   }
 
@@ -6889,7 +6901,6 @@ ${critiqueText}`;
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
     document.getElementById('collapseBtn').classList.add('visible');
-    quizBtn.style.display = '';
     document.getElementById('dotNotes').className = 'status-dot done';
   }
 
@@ -7983,7 +7994,6 @@ async function openSavedNote(id) {
   if (_dbgBtnRestore) _dbgBtnRestore.style.display = '';
   document.getElementById('notesActions')?.classList.add('visible');
   document.getElementById('collapseBtn')?.classList.add('visible');
-  quizBtn.style.display = '';
 
   // Auto-open split viewer
   setTimeout(() => {
@@ -8475,7 +8485,6 @@ function switchView(view) {
     [quizBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
     document.getElementById('notesActions')?.classList.remove('visible');
     document.getElementById('collapseBtn')?.classList.remove('visible');
-    quizBtn.style.display = 'none';
     clearQuizInlineArea();
   }
 }
