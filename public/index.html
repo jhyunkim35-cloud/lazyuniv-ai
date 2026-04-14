@@ -2142,6 +2142,20 @@
     #bulkDeleteBar.visible { display:flex; }
     #bulkSelectToggleBtn.active { border-color:var(--primary); color:var(--primary); background:var(--primary-dim); }
 
+    /* ── Folder Cards ────────────────────────────── */
+    .folder-card { background:var(--surface); border:2px dashed var(--border-bright); border-radius:10px; padding:1rem; cursor:pointer; transition:all 0.15s; position:relative; display:flex; align-items:center; gap:0.75rem; }
+    .folder-card:hover { border-color:var(--primary); transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.15); background:var(--surface2); }
+    .folder-card-icon { font-size:2rem; flex-shrink:0; line-height:1; }
+    .folder-card-info { flex:1; min-width:0; }
+    .folder-card-name { font-size:0.95rem; font-weight:700; color:var(--text); margin-bottom:0.25rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .folder-card-count { font-size:0.78rem; color:var(--text-muted); }
+    .folder-card-actions { display:flex; gap:0.2rem; opacity:0; transition:opacity 0.15s; position:absolute; top:0.5rem; right:0.5rem; }
+    .folder-card:hover .folder-card-actions { opacity:1; }
+    .folder-card-actions button { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; color:var(--text-muted); }
+    .folder-card-actions button:hover { background:var(--surface3); color:var(--text); }
+    #folderBackBtn { background:none; border:none; cursor:pointer; font-size:0.88rem; color:var(--primary); padding:0 0.3rem 0 0; font-weight:600; }
+    #folderBackBtn:hover { text-decoration:underline; }
+
     /* ── Settings Panel ──────────────────────────── */
     #settingsPanel { position:fixed; top:52px; right:1rem; width:320px; max-height:calc(100vh - 60px); background:var(--surface); border:1px solid var(--border); border-radius:10px; z-index:10001; overflow-y:auto; padding:1rem; flex-direction:column; gap:0.8rem; box-shadow:0 8px 32px rgba(0,0,0,0.3); display:none; }
     #settingsPanel.open { display:flex; }
@@ -2292,13 +2306,16 @@
 
   <!-- ═══ HOME VIEW ═══ -->
   <div id="homeView">
-    <div style="margin-bottom:1.5rem;">
+    <div id="recentSection" style="margin-bottom:1.5rem;">
       <h2 style="font-size:1.1rem; font-weight:700; color:var(--text); margin-bottom:0.8rem;">최근 노트</h2>
       <div id="recentNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
     </div>
     <div>
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
-        <h2 style="font-size:1.1rem; font-weight:700; color:var(--text);">모든 노트</h2>
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <button id="folderBackBtn" style="display:none;" onclick="filterByFolder(null)">← 뒤로</button>
+          <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text);">모든 노트</h2>
+        </div>
         <div style="display:flex;gap:0.4rem;">
           <button id="bulkSelectToggleBtn" class="action-btn" onclick="toggleBulkSelectMode()">선택</button>
           <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
@@ -7213,6 +7230,7 @@ async function moveSavedNote(id) {
       overlay.remove();
       showSuccessToast(`📁 "${note.title || '노트'}" 이동 완료`);
       renderSavedNotes();
+      renderHomeView();
     };
     listEl.appendChild(row);
   }
@@ -7360,6 +7378,9 @@ async function deleteFolderConfirm(id) {
   await deleteFolderFS(id);
   await refreshFolderManagerList();
   renderSavedNotes();
+  // If viewing the deleted folder, return to home
+  if (_activeFolderId === id) _activeFolderId = null;
+  renderHomeView();
 }
 
 /* ═══════════════════════════════════════════════
@@ -7484,11 +7505,40 @@ function switchView(view) {
 /* ═══════════════════════════════════════════════
    Home view — note card grid
 ═══════════════════════════════════════════════ */
+function buildFolderCard(folder, noteCount) {
+  const card = document.createElement('div');
+  card.className = 'folder-card';
+  card.dataset.folderId = folder.id;
+  const colorDot = folder.color
+    ? `<span class="folder-color-dot" style="background:${folder.color};width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:0.3rem;vertical-align:middle;"></span>`
+    : '';
+  card.innerHTML = `
+    <div class="folder-card-icon">📁</div>
+    <div class="folder-card-info">
+      <div class="folder-card-name">${colorDot}${escHtml(folder.name)}</div>
+      <div class="folder-card-count">${noteCount}개의 노트</div>
+    </div>
+    <div class="folder-card-actions">
+      <button title="이름 변경">✏️</button>
+      <button title="삭제">🗑</button>
+    </div>`;
+  const [renameBtn, deleteBtn] = card.querySelectorAll('.folder-card-actions button');
+  renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderEditModal(folder.id, folder.name, folder.color || null); });
+  deleteBtn.addEventListener('click', async e => {
+    e.stopPropagation();
+    if (!confirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)')) return;
+    await deleteFolderFS(folder.id);
+    renderHomeView();
+  });
+  card.addEventListener('click', () => filterByFolder(folder.id));
+  return card;
+}
+
 async function renderHomeView(filteredNotes, activeQuery = '') {
   // Show skeleton while loading
   const allGrid    = document.getElementById('allNotesGrid');
   const recentGrid = document.getElementById('recentNotesGrid');
-  if (allGrid && !allGrid.querySelector('.note-card')) {
+  if (allGrid && !allGrid.querySelector('.note-card,.folder-card')) {
     allGrid.innerHTML = Array(4).fill(
       '<div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line medium"></div><div class="skeleton-line long"></div><div class="skeleton-line short"></div></div>'
     ).join('');
@@ -7498,18 +7548,44 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const folderMap      = Object.fromEntries(folders.map(f => [f.id, f.name]));
   const folderColorMap = Object.fromEntries(folders.map(f => [f.id, f.color || null]));
 
+  // Determine which notes to show
   let displayNotes = filteredNotes !== undefined ? filteredNotes : notes;
+  const isHomeView   = !_activeFolderId;             // null → home (unfiled + folder cards)
+  const isFolderView = _activeFolderId && _activeFolderId !== 'none'; // specific folder UUID
+
   if (_activeFolderId === 'none') {
     displayNotes = displayNotes.filter(n => !n.folderId);
-  } else if (_activeFolderId) {
+  } else if (isFolderView) {
     displayNotes = displayNotes.filter(n => n.folderId === _activeFolderId);
+  } else {
+    // Home view: show only unfiled notes (filed notes live inside folder cards)
+    displayNotes = displayNotes.filter(n => !n.folderId);
+  }
+
+  // Show/hide recent section and update title/back button
+  const recentSection = document.getElementById('recentSection');
+  const folderBackBtn = document.getElementById('folderBackBtn');
+  const allNotesTitle = document.getElementById('allNotesTitle');
+  if (recentSection) recentSection.style.display = isFolderView ? 'none' : '';
+  if (folderBackBtn) folderBackBtn.style.display  = isFolderView ? ''     : 'none';
+  if (allNotesTitle) {
+    if (isFolderView) {
+      const folderName = folderMap[_activeFolderId] || '폴더';
+      allNotesTitle.textContent = '📁 ' + folderName;
+    } else {
+      allNotesTitle.textContent = '모든 노트';
+    }
   }
 
   const emptyMsg  = document.getElementById('emptyHomeMsg');
   if (!recentGrid || !allGrid) return;
 
+  // Recent grid: only unfiled notes in home view; hidden in folder view
   recentGrid.innerHTML = '';
-  notes.slice(0, 4).forEach(note => recentGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
+  if (!isFolderView) {
+    notes.filter(n => !n.folderId).slice(0, 4).forEach(note =>
+      recentGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
+  }
 
   allGrid.innerHTML = '';
   if (_bulkSelectMode) {
@@ -7520,7 +7596,13 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     if (allChk) { allChk.checked = false; allChk.indeterminate = false; }
     _updateBulkBar();
   }
-  if (!displayNotes.length) {
+
+  // Count notes per folder for folder cards
+  const folderCountMap = {};
+  notes.forEach(n => { if (n.folderId) folderCountMap[n.folderId] = (folderCountMap[n.folderId] || 0) + 1; });
+
+  const hasContent = isHomeView ? (folders.length > 0 || displayNotes.length > 0) : displayNotes.length > 0;
+  if (!hasContent) {
     emptyMsg.style.display = '';
     const icon = document.getElementById('emptyHomeIcon');
     const text = document.getElementById('emptyHomeMsgText');
@@ -7544,6 +7626,10 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     }
   } else {
     emptyMsg.style.display = 'none';
+    // In home view: prepend folder cards, then unfiled note cards
+    if (isHomeView) {
+      folders.forEach(f => allGrid.appendChild(buildFolderCard(f, folderCountMap[f.id] || 0)));
+    }
     const sorted = [...displayNotes].sort((a, b) => (a.sortOrder ?? Infinity) - (b.sortOrder ?? Infinity));
     sorted.forEach(note => allGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
   }
