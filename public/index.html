@@ -1782,24 +1782,39 @@
     #notionReorderModal .db-modal { max-width:520px; max-height:85vh; }
     #notionReorderModal .db-modal-footer { justify-content:flex-end; }
     #notionReorderCopyBtn:hover { background:#6d28d9 !important; }
-    /* ── Quiz Modal ── */
-    #quizModal .db-modal { max-width:640px; max-height:90vh; display:flex; flex-direction:column; }
-    .quiz-spinner { display:inline-block; width:18px; height:18px; border:2px solid var(--border-bright); border-top-color:var(--primary); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:0.5rem; }
+    /* ── Quiz Inline ── */
     @keyframes spin { to { transform:rotate(360deg); } }
-    .quiz-progress { font-size:0.82rem; color:var(--text-muted); font-weight:600; margin-bottom:0.5rem; }
-    .quiz-question { font-size:1.05rem; font-weight:600; color:var(--text); line-height:1.6; margin-bottom:1rem; }
-    .quiz-choices { display:flex; flex-direction:column; gap:0.45rem; }
-    .quiz-choice { width:100%; text-align:left; padding:0.7rem 1rem; border:1px solid var(--border); border-radius:8px; background:var(--surface2); color:var(--text); font-size:0.9rem; cursor:pointer; transition:border-color 0.15s, background 0.15s; line-height:1.5; }
-    .quiz-choice:hover:not(:disabled) { border-color:var(--primary); background:var(--primary-dim); }
-    .quiz-choice:disabled { cursor:default; }
-    .quiz-choice.correct { border-color:#22c55e !important; background:rgba(34,197,94,0.1) !important; color:#22c55e; }
-    .quiz-choice.wrong   { border-color:#ef4444 !important; background:rgba(239,68,68,0.1) !important; color:#ef4444; }
-    .quiz-explanation { margin-top:0.8rem; padding:0.8rem 1rem; background:var(--surface3); border-radius:8px; border-left:3px solid var(--primary); font-size:0.85rem; color:var(--text-muted); line-height:1.6; }
-    .quiz-next-btn { margin-top:0.8rem; padding:0.55rem 1.2rem; border-radius:6px; border:none; background:var(--primary); color:#fff; font-size:0.9rem; cursor:pointer; align-self:flex-end; }
-    .quiz-next-btn:hover { filter:brightness(1.1); }
-    .quiz-results-score { font-size:1.6rem; font-weight:800; color:var(--text); text-align:center; margin-bottom:0.3rem; }
-    .quiz-results-time  { font-size:0.82rem; color:var(--text-muted); text-align:center; margin-bottom:1rem; }
-    .quiz-wrong-list { display:flex; flex-direction:column; gap:0.7rem; overflow-y:auto; flex:1; }
+    .quiz-settings-panel { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem; display:flex; flex-direction:column; gap:0.75rem; }
+    .quiz-settings-title { font-size:0.95rem; font-weight:700; color:var(--text); }
+    .quiz-setting-row { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+    .quiz-setting-label { font-size:0.82rem; color:var(--text-muted); min-width:68px; }
+    .quiz-seg-group { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+    .quiz-seg-btn { padding:0.3rem 0.75rem; background:var(--surface3); border:none; border-right:1px solid var(--border); color:var(--text-muted); font-size:0.82rem; cursor:pointer; transition:all 0.12s; white-space:nowrap; }
+    .quiz-seg-btn:last-child { border-right:none; }
+    .quiz-seg-btn.active { background:#7c3aed; color:#fff; font-weight:600; }
+    .quiz-seg-btn:hover:not(.active) { background:var(--surface); color:var(--text); }
+    .quiz-inline-loading { display:flex; align-items:center; gap:0.7rem; padding:1.5rem 0; color:var(--text-muted); font-size:0.9rem; }
+    .qi-spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border-bright); border-top-color:#7c3aed; border-radius:50%; animation:spin 0.7s linear infinite; flex-shrink:0; }
+    .quiz-dot-anim::after { content:''; animation:quiz-dots 1.4s steps(4,end) infinite; }
+    @keyframes quiz-dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
+    .quiz-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem; display:flex; flex-direction:column; gap:0.55rem; }
+    .quiz-card-num { font-size:0.75rem; font-weight:700; color:var(--text-muted); letter-spacing:0.04em; }
+    .quiz-card-q { font-size:0.95rem; font-weight:600; color:var(--text); line-height:1.65; }
+    .quiz-card-choices { display:flex; flex-direction:column; gap:0.38rem; }
+    .qi-choice { width:100%; text-align:left; padding:0.6rem 0.9rem; border:1px solid var(--border); border-radius:7px; background:var(--surface3); color:var(--text); font-size:0.88rem; cursor:pointer; transition:border-color 0.12s, background 0.12s; line-height:1.5; }
+    .qi-choice:hover:not(:disabled) { border-color:#7c3aed; background:rgba(124,58,237,0.08); }
+    .qi-choice:disabled { cursor:default; }
+    .qi-choice.qi-selected { border-color:#7c3aed; background:rgba(124,58,237,0.1); font-weight:600; }
+    .qi-choice.qi-correct { border-color:#22c55e !important; background:rgba(34,197,94,0.1) !important; color:#22c55e; font-weight:600; }
+    .qi-choice.qi-wrong   { border-color:#ef4444 !important; background:rgba(239,68,68,0.08) !important; color:#ef4444; }
+    .qi-explanation { padding:0.65rem 0.9rem; background:var(--surface); border-radius:7px; border-left:3px solid #7c3aed; font-size:0.83rem; color:var(--text-muted); line-height:1.6; display:none; }
+    .quiz-grade-btn { padding:0.6rem 1.5rem; border-radius:7px; border:none; background:#7c3aed; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer; transition:filter 0.15s; }
+    .quiz-grade-btn:hover:not(:disabled) { filter:brightness(1.1); }
+    .quiz-grade-btn:disabled { opacity:0.38; cursor:default; }
+    .quiz-results-banner { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; display:flex; flex-direction:column; gap:0.5rem; }
+    .quiz-result-score { font-size:1.5rem; font-weight:800; color:var(--text); text-align:center; }
+    .quiz-result-time  { font-size:0.82rem; color:var(--text-muted); text-align:center; margin-bottom:0.3rem; }
+    .quiz-wrong-list { display:flex; flex-direction:column; gap:0.7rem; }
     .quiz-wrong-item { padding:0.8rem 1rem; background:var(--surface2); border-radius:8px; border:1px solid var(--border); font-size:0.85rem; }
     .quiz-wrong-item .qwi-q { font-weight:600; color:var(--text); margin-bottom:0.3rem; }
     .quiz-wrong-item .qwi-ans { color:#22c55e; margin-bottom:0.2rem; }
@@ -2519,6 +2534,7 @@
       <div class="result-body notes-hero-body" id="finalNotesBody">
         <span class="placeholder-msg">분석을 시작하면 통합 학습 노트가 여기에 표시됩니다.</span>
       </div>
+      <div id="quizInlineArea" style="display:none; padding:0 1.75rem 1.5rem; flex-direction:column; gap:0.75rem;"></div>
     </div>
 
     <!-- Image Gallery (populated on analysis start, recommendations shown after Agent 1) -->
@@ -4938,6 +4954,7 @@ analyzeBtn.addEventListener('click', async () => {
   collapseBtnEl.textContent = '▲ 접기';
   collapseBtnEl.classList.remove('visible');
   document.getElementById('quizBtn')?.classList.remove('visible');
+  clearQuizInlineArea();
 
   // scroll results into view
   setTimeout(() => resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
@@ -5385,8 +5402,23 @@ dlPdfBtn.addEventListener('click', () => {
 ═══════════════════════════════════════════════ */
 const QUIZ_CHOICES_PREFIX = ['①', '②', '③', '④', '⑤'];
 
-async function generateQuiz(noteText) {
-  const systemPrompt = `You are a quiz generator for Korean university exam preparation. Generate exactly 10 five-choice multiple choice questions from the provided study notes. Rules: 1) Test understanding and application, not just definition recall. 2) Include comparison, example-based, and scenario questions. 3) Cover different sections of the notes evenly. 4) All content in Korean. 5) Output ONLY a valid JSON array, no markdown, no preamble, no backticks. Each element: {"q": "question", "choices": ["A","B","C","D","E"], "answer": 0, "explanation": "why correct + why key wrong answers are wrong", "section": "h2 section title the question is from"}`;
+async function generateQuiz(noteText, settings = {}) {
+  const count      = settings.count      || 10;
+  const style      = settings.style      || 'mixed';
+  const difficulty = settings.difficulty || 'medium';
+
+  const styleDesc = {
+    mixed:       '개념 이해, 적용/예시, 비교 문제를 골고루 섞어서',
+    concept:     '핵심 개념 정의와 이해 중심으로',
+    application: '응용, 사례, 예시 기반 문제 위주로',
+  }[style] || '골고루';
+  const diffDesc = {
+    easy:   '기본 개념 확인 수준으로 쉽게',
+    medium: '이해와 적용을 요하는 중간 난이도로',
+    hard:   '심화 이해와 복합 추론이 필요한 어렵게',
+  }[difficulty] || '중간 난이도로';
+
+  const systemPrompt = `You are a quiz generator for Korean university exam preparation. Generate exactly ${count} five-choice multiple choice questions from the provided study notes. Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. 3) Cover different sections of the notes evenly. 4) All content in Korean. 5) Output ONLY a valid JSON array, no markdown, no preamble, no backticks. Each element: {"q": "question", "choices": ["A","B","C","D","E"], "answer": 0, "explanation": "why correct + why key wrong answers are wrong", "section": "h2 section title the question is from"}`;
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -5403,7 +5435,7 @@ async function generateQuiz(noteText) {
   }
   const data = await res.json();
   const raw  = data.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
-  const cleaned = raw.replace(/^```[a-z]*\n?/i, '').replace(/```$/,'').trim();
+  const cleaned = raw.replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
   let questions;
   try { questions = JSON.parse(cleaned); } catch(e) { throw new Error('JSON 파싱 실패: ' + e.message); }
   if (!Array.isArray(questions) || questions.length < 5)
@@ -5413,178 +5445,209 @@ async function generateQuiz(noteText) {
         typeof q.answer !== 'number' || q.answer < 0 || q.answer > 4 || !q.explanation)
       throw new Error(`문제 ${i+1} 형식 오류`);
   });
-  return questions.slice(0, 10);
+  return questions.slice(0, count);
 }
 
-function showQuizModal(noteTitle) {
-  const existing = document.getElementById('quizModal');
-  if (existing) existing.remove();
+function clearQuizInlineArea() {
+  const area = document.getElementById('quizInlineArea');
+  if (area) { area.innerHTML = ''; area.style.display = 'none'; }
+}
 
-  const overlay = document.createElement('div');
-  overlay.id = 'quizModal';
-  overlay.className = 'db-modal-overlay';
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+function showQuizSettings(noteTitle, noteId, noteText) {
+  const area = document.getElementById('quizInlineArea');
+  area.style.display = 'flex';
 
-  overlay.innerHTML = `
-    <div class="db-modal" style="max-width:640px;max-height:90vh;display:flex;flex-direction:column;gap:0.8rem;">
-      <h3 style="flex-shrink:0;">🧪 퀴즈 — ${escHtml(noteTitle)}</h3>
-      <div id="quizLoadingState" style="display:flex;align-items:center;color:var(--text-muted);font-size:0.9rem;padding:1rem 0;">
-        <span class="quiz-spinner"></span>문제 생성 중...
-      </div>
-      <div id="quizQuestionState" style="display:none;flex-direction:column;flex:1;overflow-y:auto;gap:0;min-height:0;">
-        <div class="quiz-progress" id="quizProgress">1/10</div>
-        <div class="quiz-question" id="quizQuestionText"></div>
-        <div class="quiz-choices" id="quizChoices"></div>
-        <div class="quiz-explanation" id="quizExplanation" style="display:none;"></div>
-        <div style="display:flex;justify-content:flex-end;">
-          <button class="quiz-next-btn" id="quizNextBtn" style="display:none;" onclick="_quizNext()">다음 문제 →</button>
+  const settings = { count: 10, style: 'mixed', difficulty: 'medium' };
+
+  area.innerHTML = `
+    <div class="quiz-settings-panel">
+      <div class="quiz-settings-title">🧪 퀴즈 설정 — ${escHtml(noteTitle)}</div>
+      <div class="quiz-setting-row">
+        <span class="quiz-setting-label">문제 수</span>
+        <div class="quiz-seg-group" id="qsCount">
+          <button class="quiz-seg-btn" data-val="5">5문제</button>
+          <button class="quiz-seg-btn active" data-val="10">10문제</button>
+          <button class="quiz-seg-btn" data-val="15">15문제</button>
         </div>
       </div>
-      <div id="quizResultsState" style="display:none;flex-direction:column;flex:1;overflow-y:auto;gap:0.6rem;min-height:0;">
-        <div class="quiz-results-score" id="quizScore"></div>
-        <div class="quiz-results-time"  id="quizTime"></div>
-        <div id="quizWeakness" style="flex-shrink:0;"></div>
-        <div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);flex-shrink:0;">오답 목록</div>
-        <div class="quiz-wrong-list" id="quizWrongList" style="overflow-y:visible;flex:none;"></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;padding-top:0.4rem;">
-          <button id="quizHistoryBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;">📊 퀴즈 이력</button>
-          <button onclick="document.getElementById('quizModal').remove()" style="padding:0.5rem 1.2rem;border-radius:6px;border:none;background:var(--surface3);color:var(--text);cursor:pointer;">닫기</button>
+      <div class="quiz-setting-row">
+        <span class="quiz-setting-label">유형</span>
+        <div class="quiz-seg-group" id="qsStyle">
+          <button class="quiz-seg-btn active" data-val="mixed">혼합</button>
+          <button class="quiz-seg-btn" data-val="concept">개념</button>
+          <button class="quiz-seg-btn" data-val="application">응용</button>
         </div>
+      </div>
+      <div class="quiz-setting-row">
+        <span class="quiz-setting-label">난이도</span>
+        <div class="quiz-seg-group" id="qsDiff">
+          <button class="quiz-seg-btn" data-val="easy">쉬움</button>
+          <button class="quiz-seg-btn active" data-val="medium">보통</button>
+          <button class="quiz-seg-btn" data-val="hard">어려움</button>
+        </div>
+      </div>
+      <div class="quiz-setting-row" style="justify-content:flex-end;gap:0.5rem;padding-top:0.25rem;">
+        <button id="qsCloseBtn" style="padding:0.5rem 1rem;border-radius:7px;border:1px solid var(--border);background:var(--surface3);color:var(--text);font-size:0.88rem;cursor:pointer;">닫기</button>
+        <button id="qsStartBtn" class="quiz-grade-btn">퀴즈 시작</button>
       </div>
     </div>`;
 
-  document.body.appendChild(overlay);
-  return overlay;
+  area.querySelectorAll('.quiz-seg-group').forEach(group => {
+    group.addEventListener('click', e => {
+      const btn = e.target.closest('.quiz-seg-btn');
+      if (!btn) return;
+      group.querySelectorAll('.quiz-seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const key = { qsCount: 'count', qsStyle: 'style', qsDiff: 'difficulty' }[group.id];
+      const val = btn.dataset.val;
+      settings[key] = key === 'count' ? Number(val) : val;
+    });
+  });
+
+  area.querySelector('#qsCloseBtn').addEventListener('click', clearQuizInlineArea);
+  area.querySelector('#qsStartBtn').addEventListener('click', async () => {
+    area.innerHTML = `<div class="quiz-inline-loading"><span class="qi-spinner"></span><span class="quiz-dot-anim">문제 생성 중</span></div>`;
+    try {
+      const questions = await generateQuiz(noteText, settings);
+      runInlineQuiz(questions, area, noteId, noteTitle, noteText);
+    } catch(e) {
+      showToast('❌ 퀴즈 생성 실패: ' + e.message);
+      clearQuizInlineArea();
+    }
+  });
+
+  area.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function startQuiz(questions, overlay, noteId, noteTitle) {
-  const loadingEl    = overlay.querySelector('#quizLoadingState');
-  const questionEl   = overlay.querySelector('#quizQuestionState');
-  const resultsEl    = overlay.querySelector('#quizResultsState');
-  const progressEl   = overlay.querySelector('#quizProgress');
-  const qTextEl      = overlay.querySelector('#quizQuestionText');
-  const choicesEl    = overlay.querySelector('#quizChoices');
-  const explanEl     = overlay.querySelector('#quizExplanation');
-  const nextBtn      = overlay.querySelector('#quizNextBtn');
+function runInlineQuiz(questions, container, noteId, noteTitle, noteText) {
+  const startTime = Date.now();
 
-  loadingEl.style.display = 'none';
-  questionEl.style.display = 'flex';
+  let html = '';
+  questions.forEach((q, idx) => {
+    html += `<div class="quiz-card" data-qi="${idx}">
+      <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}</div>
+      <div class="quiz-card-q">${escHtml(q.q)}</div>
+      <div class="quiz-card-choices">
+        ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
+      </div>
+      <div class="qi-explanation"></div>
+    </div>`;
+  });
+  html += `<div style="display:flex;justify-content:center;padding-top:0.25rem;">
+    <button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>
+  </div>`;
 
-  let currentIndex = 0;
-  const answers    = [];
-  const startTime  = Date.now();
+  container.innerHTML = html;
 
-  function renderQuestion(idx) {
-    const q = questions[idx];
-    progressEl.textContent = `${idx + 1} / ${questions.length}`;
-    qTextEl.textContent    = q.q;
-    choicesEl.innerHTML    = '';
-    explanEl.style.display = 'none';
-    nextBtn.style.display  = 'none';
+  const answers  = new Array(questions.length).fill(null);
+  const gradeBtn = container.querySelector('#quizGradeBtn');
 
-    q.choices.forEach((choice, ci) => {
-      const btn = document.createElement('button');
-      btn.className   = 'quiz-choice';
-      btn.textContent = `${QUIZ_CHOICES_PREFIX[ci]} ${choice}`;
-      btn.addEventListener('click', () => onAnswer(idx, ci));
-      choicesEl.appendChild(btn);
+  container.addEventListener('click', e => {
+    const btn = e.target.closest('.qi-choice');
+    if (!btn || btn.disabled) return;
+    const qi   = Number(btn.dataset.qi);
+    const ci   = Number(btn.dataset.ci);
+    const card = container.querySelector(`.quiz-card[data-qi="${qi}"]`);
+    card.querySelectorAll('.qi-choice').forEach(b => b.classList.remove('qi-selected'));
+    btn.classList.add('qi-selected');
+    answers[qi] = ci;
+    if (answers.every(a => a !== null)) gradeBtn.disabled = false;
+  });
+
+  gradeBtn.addEventListener('click', async () => {
+    gradeBtn.disabled = true;
+
+    questions.forEach((q, idx) => {
+      const card   = container.querySelector(`.quiz-card[data-qi="${idx}"]`);
+      const chosen  = answers[idx];
+      const correct = q.answer;
+      card.querySelectorAll('.qi-choice').forEach(b => {
+        b.disabled = true;
+        b.classList.remove('qi-selected');
+        const ci = Number(b.dataset.ci);
+        if (ci === correct) b.classList.add('qi-correct');
+        else if (ci === chosen && chosen !== correct) b.classList.add('qi-wrong');
+      });
+      const expEl = card.querySelector('.qi-explanation');
+      expEl.textContent   = q.explanation;
+      expEl.style.display = 'block';
     });
-  }
 
-  function onAnswer(qIdx, choiceIdx) {
-    const q       = questions[qIdx];
-    const correct = q.answer;
-    const btns    = [...choicesEl.querySelectorAll('.quiz-choice')];
-    btns.forEach(b => b.disabled = true);
-    btns[correct].classList.add('correct');
-    if (choiceIdx !== correct) btns[choiceIdx].classList.add('wrong');
-
-    explanEl.textContent   = q.explanation;
-    explanEl.style.display = 'block';
-    nextBtn.style.display  = 'inline-block';
-    nextBtn.textContent    = currentIndex < questions.length - 1 ? '다음 문제 →' : '결과 보기';
-
-    answers.push({ qIdx, chosen: choiceIdx, correct: choiceIdx === correct });
-    // Scroll explanation into view
-    explanEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  window._quizNext = function() {
-    currentIndex++;
-    if (currentIndex < questions.length) {
-      renderQuestion(currentIndex);
-    } else {
-      showResults();
-    }
-  };
-
-  async function showResults() {
-    questionEl.style.display = 'none';
-    resultsEl.style.display  = 'flex';
-
-    const score   = answers.filter(a => a.correct).length;
+    const score   = answers.filter((a, i) => a === questions[i].answer).length;
     const total   = questions.length;
     const pct     = Math.round(score / total * 100);
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     const mins    = Math.floor(elapsed / 60);
     const secs    = elapsed % 60;
 
-    overlay.querySelector('#quizScore').textContent = `${score} / ${total}  (${pct}%)`;
-    overlay.querySelector('#quizTime').textContent  = `소요 시간: ${mins > 0 ? mins + '분 ' : ''}${secs}초`;
-
-    const wrongList = overlay.querySelector('#quizWrongList');
-    const wrongs    = answers.filter(a => !a.correct);
-    if (wrongs.length === 0) {
-      wrongList.innerHTML = '<div style="color:var(--text-muted);font-size:0.88rem;padding:0.5rem 0;">모두 정답입니다! 🎉</div>';
-    } else {
-      wrongList.innerHTML = wrongs.map(a => {
-        const q = questions[a.qIdx];
-        return `<div class="quiz-wrong-item">
-          <div class="qwi-q">Q. ${escHtml(q.q)}</div>
-          <div class="qwi-ans">✅ 정답: ${escHtml(QUIZ_CHOICES_PREFIX[q.answer])} ${escHtml(q.choices[q.answer])}</div>
-          <div style="color:#ef4444;margin-bottom:0.2rem;">❌ 내 답: ${escHtml(QUIZ_CHOICES_PREFIX[a.chosen])} ${escHtml(q.choices[a.chosen])}</div>
+    const wrongs = questions.reduce((acc, q, i) => {
+      if (answers[i] !== q.answer) acc.push({ q, chosen: answers[i], i });
+      return acc;
+    }, []);
+    const wrongHtml = wrongs.length === 0
+      ? '<div style="color:var(--text-muted);font-size:0.88rem;padding:0.25rem 0;">모두 정답입니다! 🎉</div>'
+      : wrongs.map(({ q, chosen, i }) => `<div class="quiz-wrong-item">
+          <div class="qwi-q">Q${i+1}. ${escHtml(q.q)}</div>
+          <div class="qwi-ans">✅ 정답: ${QUIZ_CHOICES_PREFIX[q.answer]} ${escHtml(q.choices[q.answer])}</div>
+          <div style="color:#ef4444;margin-bottom:0.2rem;">❌ 내 답: ${chosen !== null ? QUIZ_CHOICES_PREFIX[chosen] + ' ' + escHtml(q.choices[chosen]) : '(미응답)'}</div>
           <div class="qwi-exp">${escHtml(q.explanation)}</div>
-        </div>`;
-      }).join('');
-    }
+        </div>`).join('');
 
-    // Save result to IndexedDB
+    const banner = document.createElement('div');
+    banner.className = 'quiz-results-banner';
+    banner.innerHTML = `
+      <div class="quiz-result-score">${score} / ${total} (${pct}%)</div>
+      <div class="quiz-result-time">소요 시간: ${mins > 0 ? mins + '분 ' : ''}${secs}초</div>
+      <div id="quizWeaknessInline"></div>
+      ${wrongs.length > 0 ? '<div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-top:0.25rem;">오답 목록</div>' : ''}
+      <div class="quiz-wrong-list">${wrongHtml}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-top:0.4rem;">
+        <button id="quizHistInlineBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;">📊 퀴즈 이력</button>
+        <div style="display:flex;gap:0.5rem;margin-left:auto;">
+          <button id="quizRetryBtn" class="quiz-grade-btn">다시 풀기</button>
+          <button id="quizCloseInlineBtn" style="padding:0.6rem 1rem;border-radius:7px;border:1px solid var(--border);background:var(--surface3);color:var(--text);font-size:0.88rem;cursor:pointer;">닫기</button>
+        </div>
+      </div>`;
+
+    container.querySelector('#quizGradeBtn').replaceWith(banner);
+    banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
     if (noteId) {
       const record = {
         id:        uuidv4(),
         noteId,
         noteTitle: noteTitle || '',
         timestamp: new Date().toISOString(),
-        score,
-        total,
-        timeTaken: elapsed,
+        score, total, timeTaken: elapsed,
         questions: questions.map((q, i) => ({
           section: q.section || '',
-          correct: answers[i]?.correct ?? false,
+          correct: answers[i] === q.answer,
         })),
       };
       await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
 
-      // Wire history button now that we have noteId
-      const histBtn = overlay.querySelector('#quizHistoryBtn');
+      const histBtn = banner.querySelector('#quizHistInlineBtn');
       if (histBtn) {
         histBtn.style.display = 'inline-block';
-        histBtn.addEventListener('click', () => showQuizHistory(overlay, noteId, noteTitle));
+        histBtn.addEventListener('click', () => showQuizHistory(null, noteId, noteTitle));
       }
-
-      // Weakness analysis (includes the just-saved result)
-      const weaknessEl = overlay.querySelector('#quizWeakness');
+      const weaknessEl = banner.querySelector('#quizWeaknessInline');
       if (weaknessEl) {
         try {
           const allResults = await getQuizResultsByNote(noteId);
           const report     = await getWeaknessReport(noteId);
           renderWeaknessReport(weaknessEl, report, allResults.length);
-        } catch(e) { /* non-critical */ }
+        } catch(_) { /* non-critical */ }
       }
     }
-  }
 
-  renderQuestion(0);
+    banner.querySelector('#quizRetryBtn').addEventListener('click', () => {
+      const noteText2 = storedNotesText;
+      showQuizSettings(noteTitle, noteId, noteText2);
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    banner.querySelector('#quizCloseInlineBtn').addEventListener('click', clearQuizInlineArea);
+  });
 }
 
 async function getWeaknessReport(noteId) {
@@ -5674,24 +5737,20 @@ async function showQuizHistory(parentOverlay, noteId, noteTitle) {
   }
 }
 
-async function launchQuiz() {
+function launchQuiz() {
   const noteText  = storedNotesText;
   const noteTitle = document.getElementById('notesCardTitle').textContent.replace(/^📚\s*/, '').trim() || '노트';
   const noteId    = currentNoteId || null;
   if (!noteText) { showToast('먼저 AI 분석을 실행해주세요.'); return; }
-
-  const overlay = showQuizModal(noteTitle);
-  try {
-    const questions = await generateQuiz(noteText);
-    startQuiz(questions, overlay, noteId, noteTitle);
-  } catch(e) {
-    showToast('❌ 퀴즈 생성 실패: ' + e.message);
-    overlay.remove();
-  }
+  showQuizSettings(noteTitle, noteId, noteText);
 }
 
 quizBtn.addEventListener('click', launchQuiz);
-document.getElementById('splitQuizBtn').addEventListener('click', launchQuiz);
+document.getElementById('splitQuizBtn').addEventListener('click', () => {
+  document.getElementById('splitViewer').style.display = 'none';
+  document.body.style.overflow = '';
+  launchQuiz();
+});
 
 splitViewBtn.addEventListener('click', async () => {
   const splitViewer = document.getElementById('splitViewer');
@@ -7843,6 +7902,7 @@ async function openSavedNote(id) {
     note.notesHtml = renderMarkdown(note.notesText);
   }
 
+  clearQuizInlineArea();
   storedNotesText            = note.notesText            || '';
   storedPptText              = note.pptText              || '';
   storedFilteredText         = note.filteredText         || '';
@@ -8366,6 +8426,7 @@ function switchView(view) {
     document.getElementById('notesActions')?.classList.remove('visible');
     document.getElementById('collapseBtn')?.classList.remove('visible');
     document.getElementById('quizBtn')?.classList.remove('visible');
+    clearQuizInlineArea();
   }
 }
 
