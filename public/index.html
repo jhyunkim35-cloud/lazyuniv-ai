@@ -5018,19 +5018,78 @@ async function copyDebugReport() {
 /* ═══════════════════════════════════════════════
    Notion clipboard helper
 ═══════════════════════════════════════════════ */
-async function copyToNotionClipboard(htmlContent, plainText) {
+function transformToNotionToggles(htmlString) {
+  const root = document.createElement('div');
+  root.innerHTML = htmlString;
+
+  function wrapSection(container) {
+    const children = [...container.childNodes];
+    const out = document.createElement('div');
+    let i = 0;
+
+    while (i < children.length) {
+      const node = children[i];
+      const tag = node.nodeName;
+
+      if (tag === 'H1' || tag === 'HR') {
+        out.appendChild(node.cloneNode(true));
+        i++;
+        continue;
+      }
+
+      if (tag === 'H2' || tag === 'H3') {
+        const details  = document.createElement('details');
+        details.open   = true;
+        const summary  = document.createElement('summary');
+        summary.innerHTML = node.innerHTML;
+        details.appendChild(summary);
+
+        i++;
+        // Collect siblings until next heading at same or higher level, or HR, or end
+        const stopTags = tag === 'H2' ? ['H1', 'H2', 'HR'] : ['H1', 'H2', 'H3', 'HR'];
+        while (i < children.length && !stopTags.includes(children[i].nodeName)) {
+          details.appendChild(children[i].cloneNode(true));
+          i++;
+        }
+
+        // Recursively handle nested H3s inside an H2 block
+        if (tag === 'H2') {
+          const inner = document.createElement('div');
+          [...details.childNodes].slice(1).forEach(n => inner.appendChild(n.cloneNode(true)));
+          const transformed = wrapSection(inner);
+          // Replace detail content after summary with transformed content
+          while (details.childNodes.length > 1) details.removeChild(details.lastChild);
+          [...transformed.childNodes].forEach(n => details.appendChild(n));
+        }
+
+        out.appendChild(details);
+        continue;
+      }
+
+      out.appendChild(node.cloneNode(true));
+      i++;
+    }
+    return out;
+  }
+
+  return wrapSection(root).innerHTML;
+}
+
+async function copyToNotionClipboard(htmlContent, plainText, useToggles = true) {
+  const finalHtml = useToggles ? transformToNotionToggles(htmlContent) : htmlContent;
+  const toastMsg  = useToggles ? '📋 토글 형식으로 복사됨' : '📋 일반 형식으로 복사됨';
   try {
     if (navigator.clipboard && window.ClipboardItem) {
       await navigator.clipboard.write([new ClipboardItem({
-        'text/html':  new Blob([htmlContent], { type: 'text/html' }),
-        'text/plain': new Blob([plainText],   { type: 'text/plain' }),
+        'text/html':  new Blob([finalHtml],  { type: 'text/html' }),
+        'text/plain': new Blob([plainText],  { type: 'text/plain' }),
       })]);
     } else {
       // Fallback: contenteditable selection + execCommand
       const div = document.createElement('div');
       div.contentEditable = 'true';
       div.style.cssText = 'position:fixed;left:-9999px;opacity:0;pointer-events:none;';
-      div.innerHTML = htmlContent;
+      div.innerHTML = finalHtml;
       document.body.appendChild(div);
       const sel = window.getSelection();
       const range = document.createRange();
@@ -5041,7 +5100,7 @@ async function copyToNotionClipboard(htmlContent, plainText) {
       sel.removeAllRanges();
       document.body.removeChild(div);
     }
-    showToast('📋 클립보드에 복사됨 — 노션에 붙여넣기하세요');
+    showToast(toastMsg + ' — 노션에 붙여넣기하세요');
   } catch(e) {
     showToast('❌ 복사 실패: ' + e.message);
   }
@@ -5074,18 +5133,19 @@ copyNotesBtn.addEventListener('click', async () => {
   setTimeout(() => { copyNotesBtn.textContent = '📋 복사'; }, 2000);
 });
 
-notionCopyBtn.addEventListener('click', async () => {
-  const bodyEl = document.getElementById('finalNotesBody');
-  const html   = (bodyEl.querySelector('.md-content') || bodyEl).innerHTML;
-  await copyToNotionClipboard(html, storedNotesText || '');
+notionCopyBtn.addEventListener('click', async (e) => {
+  const bodyEl     = document.getElementById('finalNotesBody');
+  const html       = (bodyEl.querySelector('.md-content') || bodyEl).innerHTML;
+  const useToggles = !e.shiftKey;
+  await copyToNotionClipboard(html, storedNotesText || '', useToggles);
   notionCopyBtn.textContent = '✅ 복사됨!';
   setTimeout(() => { notionCopyBtn.textContent = '📋 노션'; }, 2000);
 });
 
-document.getElementById('splitNotionBtn').addEventListener('click', async () => {
-  const splitEl = document.getElementById('splitNotes');
-  const html    = splitEl ? (splitEl.querySelector('.md-content') || splitEl).innerHTML : '';
-  await copyToNotionClipboard(html, storedNotesText || '');
+document.getElementById('splitNotionBtn').addEventListener('click', async (e) => {
+  const splitEl    = document.getElementById('splitNotes');
+  const html       = splitEl ? (splitEl.querySelector('.md-content') || splitEl).innerHTML : '';
+  await copyToNotionClipboard(html, storedNotesText || '', !e.shiftKey);
 });
 
 dlTxtBtn.addEventListener('click', () => {
