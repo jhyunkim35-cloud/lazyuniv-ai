@@ -1769,6 +1769,20 @@
     .db-modal-footer { display:flex; gap:0.5rem; }
     .db-modal-footer input { flex:1; padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.85rem; }
     .db-modal-footer button { padding:0.5rem 1rem; min-width:60px; white-space:nowrap; border-radius:6px; border:none; background:var(--primary); color:#fff; font-size:0.85rem; cursor:pointer; flex-shrink:0; }
+    .reorder-row { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0.7rem; background:var(--surface2); border-radius:6px; border:1px solid var(--border); cursor:default; user-select:none; transition:background 0.15s; }
+    .reorder-row.drag-over { background:var(--surface3); border-color:var(--primary); }
+    .reorder-row.dragging { opacity:0.4; }
+    .reorder-drag-handle { color:var(--text-muted); font-size:1rem; cursor:grab; padding:0 0.2rem; line-height:1; }
+    .reorder-drag-handle:active { cursor:grabbing; }
+    .reorder-row-title { flex:1; font-size:0.88rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .reorder-row-idx { font-size:0.75rem; color:var(--text-muted); min-width:1.4rem; text-align:center; }
+    .reorder-updown { display:flex; flex-direction:column; gap:1px; }
+    .reorder-updown button { background:transparent; border:none; cursor:pointer; font-size:0.7rem; padding:1px 4px; border-radius:3px; color:var(--text-muted); line-height:1.3; }
+    .reorder-updown button:hover { background:var(--surface3); color:var(--text); }
+    #notionReorderModal .db-modal { max-width:520px; max-height:85vh; }
+    #notionReorderModal .db-modal-footer { justify-content:flex-end; }
+    #notionReorderModal .copy-btn { background:#7c3aed; }
+    #notionReorderModal .copy-btn:hover { background:#6d28d9; }
     .inserted-slide-img {
       width: 100%;
       max-width: 100%;
@@ -5113,13 +5127,137 @@ async function copyToNotionClipboard(htmlContent, plainText, useToggles = true) 
 async function bulkNotionCopy() {
   if (!_selectedNoteIds.size) return;
   const ids = [..._selectedNoteIds];
-  showToast(`📋 ${ids.length}개 노트 복사 중...`);
+  showToast(`📋 노트 불러오는 중...`);
   const notes = await Promise.all(ids.map(id => getNoteFS(id)));
   const valid = notes.filter(Boolean);
   if (!valid.length) return;
-  const html  = valid.map(n => `<h1>${escHtml(n.title || '제목없음')}</h1>${n.notesHtml || renderMarkdown(n.notesText || '')}`).join('\n<hr>\n');
-  const plain = valid.map(n => `# ${n.title || '제목없음'}\n\n${n.notesText || ''}`).join('\n\n---\n\n');
-  await copyToNotionClipboard(html, plain);
+  showNotionReorderModal(valid);
+}
+
+function showNotionReorderModal(notes) {
+  // orderedNotes is a mutable array that reflects the current row order
+  const orderedNotes = [...notes];
+
+  const overlay = document.createElement('div');
+  overlay.id = 'notionReorderModal';
+  overlay.className = 'db-modal-overlay';
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  function buildRows() {
+    list.innerHTML = '';
+    orderedNotes.forEach((note, idx) => {
+      const row = document.createElement('div');
+      row.className = 'reorder-row';
+      row.draggable = true;
+      row.dataset.idx = idx;
+
+      row.innerHTML = `
+        <span class="reorder-drag-handle">☰</span>
+        <span class="reorder-row-idx">${idx + 1}</span>
+        <span class="reorder-row-title">${escHtml(note.title || '제목없음')}</span>
+        <div class="reorder-updown">
+          <button title="위로" ${idx === 0 ? 'disabled' : ''}>▲</button>
+          <button title="아래로" ${idx === orderedNotes.length - 1 ? 'disabled' : ''}>▼</button>
+        </div>`;
+
+      const [upBtn, downBtn] = row.querySelectorAll('.reorder-updown button');
+      upBtn.addEventListener('click', () => {
+        if (idx === 0) return;
+        [orderedNotes[idx - 1], orderedNotes[idx]] = [orderedNotes[idx], orderedNotes[idx - 1]];
+        buildRows();
+      });
+      downBtn.addEventListener('click', () => {
+        if (idx === orderedNotes.length - 1) return;
+        [orderedNotes[idx], orderedNotes[idx + 1]] = [orderedNotes[idx + 1], orderedNotes[idx]];
+        buildRows();
+      });
+
+      // Drag-and-drop reorder
+      row.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', String(idx));
+        e.dataTransfer.effectAllowed = 'move';
+        row.classList.add('dragging');
+      });
+      row.addEventListener('dragend', () => row.classList.remove('dragging'));
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        row.classList.add('drag-over');
+      });
+      row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        row.classList.remove('drag-over');
+        const src = parseInt(e.dataTransfer.getData('text/plain'));
+        const dst = idx;
+        if (isNaN(src) || src === dst) return;
+        const [moved] = orderedNotes.splice(src, 1);
+        orderedNotes.splice(dst, 0, moved);
+        buildRows();
+      });
+
+      list.appendChild(row);
+    });
+  }
+
+  overlay.innerHTML = `
+    <div class="db-modal" style="max-width:520px;">
+      <h3>📋 노트 순서 지정</h3>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin:0;">드래그하거나 ▲▼ 버튼으로 순서를 바꾸세요. 각 노트는 노션에서 접기 가능한 토글 블록으로 붙여넣어집니다.</p>
+      <div class="db-modal-list" id="notionReorderList"></div>
+      <div class="db-modal-footer">
+        <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">취소</button>
+        <button id="notionReorderCopyBtn" class="copy-btn">📋 복사 (${notes.length}개)</button>
+      </div>
+    </div>`;
+
+  const list = overlay.querySelector('#notionReorderList');
+  buildRows();
+
+  overlay.querySelector('#notionReorderCopyBtn').addEventListener('click', async () => {
+    overlay.remove();
+    await executeNotionBulkCopy(orderedNotes);
+  });
+
+  document.body.appendChild(overlay);
+}
+
+async function executeNotionBulkCopy(orderedNotes) {
+  // Each note becomes a top-level <details open><summary>title</summary>…content…</details>
+  // The inner content goes through transformToNotionToggles so h2/h3 become nested toggles
+  const htmlParts = orderedNotes.map(n => {
+    const rawHtml = n.notesHtml || renderMarkdown(n.notesText || '');
+    const innerHtml = transformToNotionToggles(rawHtml);
+    return `<details open><summary>${escHtml(n.title || '제목없음')}</summary>${innerHtml}</details>`;
+  });
+  const finalHtml = htmlParts.join('\n');
+  const plainText = orderedNotes.map(n => `# ${n.title || '제목없음'}\n\n${n.notesText || ''}`).join('\n\n---\n\n');
+
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':  new Blob([finalHtml],  { type: 'text/html' }),
+        'text/plain': new Blob([plainText],  { type: 'text/plain' }),
+      })]);
+    } else {
+      const div = document.createElement('div');
+      div.contentEditable = 'true';
+      div.style.cssText = 'position:fixed;left:-9999px;opacity:0;pointer-events:none;';
+      div.innerHTML = finalHtml;
+      document.body.appendChild(div);
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(div);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+      document.body.removeChild(div);
+    }
+    showToast(`📋 ${orderedNotes.length}개 노트 복사됨 — 노션에 붙여넣기하세요`);
+  } catch(e) {
+    showToast('❌ 복사 실패: ' + e.message);
+  }
 }
 
 /* ═══════════════════════════════════════════════
