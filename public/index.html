@@ -2153,6 +2153,7 @@
     .folder-card:hover .folder-card-actions { opacity:1; }
     .folder-card-actions button { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; color:var(--text-muted); }
     .folder-card-actions button:hover { background:var(--surface3); color:var(--text); }
+    .folder-card.folder-drag-over { border-color:var(--primary); background:var(--primary-dim); }
     #folderBackBtn { background:none; border:none; cursor:pointer; font-size:0.88rem; color:var(--primary); padding:0 0.3rem 0 0; font-weight:600; }
     #folderBackBtn:hover { text-decoration:underline; }
 
@@ -7530,8 +7531,33 @@ function buildFolderCard(folder, noteCount) {
     await deleteFolderFS(folder.id);
     renderHomeView();
   });
+
+  // ── Accept note drops ──────────────────────────────────────────
+  card.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+  card.addEventListener('dragenter', e => { e.preventDefault(); card.classList.add('folder-drag-over'); });
+  card.addEventListener('dragleave', e => {
+    if (!card.contains(e.relatedTarget)) card.classList.remove('folder-drag-over');
+  });
+  card.addEventListener('drop', async e => {
+    e.preventDefault();
+    card.classList.remove('folder-drag-over');
+    const noteId = e.dataTransfer.getData('text/plain');
+    if (!noteId) return;
+    await moveNoteToFolder(noteId, folder.id);
+    renderHomeView();
+  });
+
   card.addEventListener('click', () => filterByFolder(folder.id));
   return card;
+}
+
+async function moveNoteToFolder(noteId, folderId) {
+  const note = await getNoteFS(noteId);
+  if (!note) return;
+  const newSortOrder = await getNextSortOrder(folderId, noteId);
+  const updated = Object.assign({}, note, { folderId, sortOrder: newSortOrder });
+  await saveNoteFS(updated);
+  showToast(`📁 노트를 폴더로 이동했습니다`);
 }
 
 async function renderHomeView(filteredNotes, activeQuery = '') {
