@@ -3158,6 +3158,9 @@ async function uploadSlideImages(noteId, slideImages) {
       } else {
         urls.push(null); continue;
       }
+      // Convert base64url → standard base64 before upload
+      data = data.replace(/-/g, '+').replace(/_/g, '/');
+      if (data.length % 4) data += '='.repeat(4 - (data.length % 4));
       await ref.putString(data, 'base64', { contentType });
       const url = await ref.getDownloadURL();
       urls.push(url);
