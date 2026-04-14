@@ -1781,8 +1781,7 @@
     .reorder-updown button:hover { background:var(--surface3); color:var(--text); }
     #notionReorderModal .db-modal { max-width:520px; max-height:85vh; }
     #notionReorderModal .db-modal-footer { justify-content:flex-end; }
-    #notionReorderModal .copy-btn { background:#7c3aed; }
-    #notionReorderModal .copy-btn:hover { background:#6d28d9; }
+    #notionReorderCopyBtn:hover { background:#6d28d9 !important; }
     .inserted-slide-img {
       width: 100%;
       max-width: 100%;
@@ -5207,7 +5206,7 @@ function showNotionReorderModal(notes) {
       <div class="db-modal-list" id="notionReorderList" style="overflow-y:auto;max-height:50vh;flex:1;"></div>
       <div class="db-modal-footer">
         <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">취소</button>
-        <button id="notionReorderCopyBtn" class="copy-btn">📋 복사 (${notes.length}개)</button>
+        <button id="notionReorderCopyBtn" style="padding:0.5rem 1rem;border-radius:6px;border:none;background:#7c3aed;color:#fff;font-size:0.85rem;cursor:pointer;white-space:nowrap;">📋 복사 (${notes.length}개)</button>
       </div>
     </div>`;
 
