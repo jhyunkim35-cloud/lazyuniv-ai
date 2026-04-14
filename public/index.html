@@ -2154,6 +2154,10 @@
     .folder-card-actions button { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; color:var(--text-muted); }
     .folder-card-actions button:hover { background:var(--surface3); color:var(--text); }
     .folder-card.folder-drag-over { border-color:var(--primary); background:var(--primary-dim); }
+    .note-eject-btn { position:absolute; top:0.5rem; right:0.5rem; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; opacity:0; transition:opacity 0.15s; z-index:2; }
+    .note-card:hover .note-eject-btn { opacity:1; }
+    #ejectDropZone { display:none; border:2px dashed var(--border-bright); border-radius:8px; padding:0.55rem; text-align:center; color:var(--text-muted); font-size:0.8rem; margin-bottom:0.75rem; transition:border-color 0.15s, background 0.15s; }
+    #ejectDropZone.eject-drag-over { border-color:var(--primary); background:var(--primary-dim); color:var(--primary); }
     #folderBackBtn { background:none; border:none; cursor:pointer; font-size:0.88rem; color:var(--primary); padding:0 0.3rem 0 0; font-weight:600; }
     #folderBackBtn:hover { text-decoration:underline; }
 
@@ -2322,6 +2326,7 @@
           <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
         </div>
       </div>
+      <div id="ejectDropZone">📤 홈으로 드래그하여 내보내기</div>
       <div id="allNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
       <div id="emptyHomeMsg" style="display:none; text-align:center; padding:3rem; color:var(--text-muted);">
         <div id="emptyHomeIcon" style="font-size:3.5rem; margin-bottom:0.8rem;">📝</div>
@@ -7594,6 +7599,30 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const allNotesTitle = document.getElementById('allNotesTitle');
   if (recentSection) recentSection.style.display = isFolderView ? 'none' : '';
   if (folderBackBtn) folderBackBtn.style.display  = isFolderView ? ''     : 'none';
+
+  // Eject drop zone — visible only in folder view
+  const ejectDropZone = document.getElementById('ejectDropZone');
+  if (ejectDropZone) {
+    ejectDropZone.style.display = isFolderView ? '' : 'none';
+    // Re-attach listeners (replace element clone to avoid duplicate handlers)
+    const fresh = ejectDropZone.cloneNode(true);
+    ejectDropZone.replaceWith(fresh);
+    fresh.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    fresh.addEventListener('dragenter', e => { e.preventDefault(); fresh.classList.add('eject-drag-over'); });
+    fresh.addEventListener('dragleave', e => { if (!fresh.contains(e.relatedTarget)) fresh.classList.remove('eject-drag-over'); });
+    fresh.addEventListener('drop', async e => {
+      e.preventDefault();
+      fresh.classList.remove('eject-drag-over');
+      const noteId = e.dataTransfer.getData('text/plain');
+      if (!noteId) return;
+      const n = await getNoteFS(noteId);
+      if (!n) return;
+      await saveNoteFS(Object.assign({}, n, { folderId: null }));
+      showToast('📤 홈으로 이동했습니다');
+      await renderHomeView();
+    });
+  }
+
   if (allNotesTitle) {
     if (isFolderView) {
       const folderName = folderMap[_activeFolderId] || '폴더';
@@ -7718,6 +7747,21 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
   renameBtn.addEventListener('click', e => { e.stopPropagation(); renameSavedNote(note.id); });
   moveBtn.addEventListener('click',   e => { e.stopPropagation(); moveSavedNote(note.id); });
   deleteBtn.addEventListener('click', e => { e.stopPropagation(); confirmDeleteNote(note.id); });
+
+  // Eject button — shown only when viewing inside the note's own folder
+  if (note.folderId && _activeFolderId === note.folderId) {
+    const ejectBtn = document.createElement('button');
+    ejectBtn.className = 'note-eject-btn';
+    ejectBtn.title = '폴더에서 내보내기';
+    ejectBtn.textContent = '📤';
+    ejectBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await saveNoteFS(Object.assign({}, note, { folderId: null }));
+      showToast('📤 홈으로 이동했습니다');
+      await renderHomeView();
+    });
+    card.appendChild(ejectBtn);
+  }
 
   // ── Drag-and-drop reordering (allNotesGrid only) ──────────────
   card.addEventListener('dragstart', e => {
