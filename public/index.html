@@ -1809,6 +1809,13 @@
     .qi-choice.qi-correct { border-color:#22c55e !important; background:rgba(34,197,94,0.1) !important; color:#22c55e; font-weight:600; }
     .qi-choice.qi-wrong   { border-color:#ef4444 !important; background:rgba(239,68,68,0.08) !important; color:#ef4444; }
     .qi-explanation { padding:0.65rem 0.9rem; background:var(--surface); border-radius:7px; border-left:3px solid #7c3aed; font-size:0.83rem; color:var(--text-muted); line-height:1.6; display:none; }
+    .quiz-card-open { display:flex; flex-direction:column; }
+    .qi-text-input { padding:0.6rem 0.9rem; border:1px solid var(--border); border-radius:7px; background:var(--surface3); color:var(--text); font-size:0.88rem; outline:none; transition:border-color 0.12s; }
+    .qi-text-input:focus { border-color:#7c3aed; }
+    .qi-text-input:disabled { opacity:0.6; cursor:default; }
+    .qi-essay-input { padding:0.6rem 0.9rem; border:1px solid var(--border); border-radius:7px; background:var(--surface3); color:var(--text); font-size:0.88rem; resize:vertical; outline:none; font-family:inherit; line-height:1.6; transition:border-color 0.12s; }
+    .qi-essay-input:focus { border-color:#7c3aed; }
+    .qi-essay-input:disabled { opacity:0.6; cursor:default; }
     .quiz-grade-btn { padding:0.6rem 1.5rem; border-radius:7px; border:none; background:#7c3aed; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer; transition:filter 0.15s; }
     .quiz-grade-btn:hover:not(:disabled) { filter:brightness(1.1); }
     .quiz-grade-btn:disabled { opacity:0.38; cursor:default; }
@@ -5622,17 +5629,68 @@ function showQuizSettings(noteTitle, noteId, noteText) {
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// Grade an essay question via Claude Haiku — returns {score, feedback, rubricResults}
+async function gradeEssay(q, userAnswer) {
+  const systemPrompt = `You are a grading assistant. Grade this student answer against the rubric. Output ONLY valid JSON: {"score":0,"feedback":"1-2 sentences","rubricResults":[{"criterion":"...","met":true}]}`;
+  const userMsg = `Question: ${q.q}\nRubric: ${JSON.stringify(q.rubric)}\nModel answer: ${q.modelAnswer}\nStudent answer: ${userAnswer}`;
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 500,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMsg }],
+    }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  const data = await res.json();
+  const raw = (data.content?.[0]?.text || data.content || '').replace(/```json\n?/g, '').replace(/```/g, '').trim();
+  return JSON.parse(raw);
+}
+
+// Normalize text for short-answer keyword matching
+function normalizeAnswer(s) { return (s || '').trim().toLowerCase().replace(/\s+/g, ''); }
+
+// Check if a short-answer response matches any keyword
+function matchesKeywords(userVal, keywords) {
+  const u = normalizeAnswer(userVal);
+  if (u.length < 2) return false;
+  return (keywords || []).some(kw => {
+    const k = normalizeAnswer(kw);
+    if (k.length < 2) return false;
+    return u.includes(k) || k.includes(u);
+  });
+}
+
 function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settings = {}, debugInfo = {}) {
   const startTime = Date.now();
 
+  // answers[i]: Number for mc (choice index), String for short/essay, null = unanswered
+  const answers = questions.map(q => (q.type && q.type !== 'mc') ? '' : null);
+
   let html = '';
   questions.forEach((q, idx) => {
-    html += `<div class="quiz-card" data-qi="${idx}">
-      <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}</div>
-      <div class="quiz-card-q">${escHtml(q.q)}</div>
-      <div class="quiz-card-choices">
+    const type = q.type || 'mc';
+    const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
+    let inputHtml = '';
+    if (type === 'mc') {
+      inputHtml = `<div class="quiz-card-choices">
         ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
-      </div>
+      </div>`;
+    } else if (type === 'short') {
+      inputHtml = `<div class="quiz-card-open">
+        <input class="qi-text-input" data-qi="${idx}" type="text" placeholder="답을 입력하세요" autocomplete="off">
+      </div>`;
+    } else if (type === 'essay') {
+      inputHtml = `<div class="quiz-card-open">
+        <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
+      </div>`;
+    }
+    html += `<div class="quiz-card" data-qi="${idx}" data-type="${type}">
+      <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
+      <div class="quiz-card-q">${escHtml(q.q)}</div>
+      ${inputHtml}
       <div class="qi-explanation"></div>
     </div>`;
   });
@@ -5663,9 +5721,19 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     </div>`;
   container.appendChild(debugEl);
 
-  const answers  = new Array(questions.length).fill(null);
   const gradeBtn = container.querySelector('#quizGradeBtn');
 
+  // Check if all questions have been answered to enable grade button
+  function checkGradeReady() {
+    const ready = questions.every((q, i) => {
+      const type = q.type || 'mc';
+      if (type === 'mc') return answers[i] !== null;
+      return (answers[i] || '').trim().length > 0;
+    });
+    gradeBtn.disabled = !ready;
+  }
+
+  // mc: click on choice button
   container.addEventListener('click', e => {
     const btn = e.target.closest('.qi-choice');
     if (!btn || btn.disabled) return;
@@ -5675,52 +5743,154 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     card.querySelectorAll('.qi-choice').forEach(b => b.classList.remove('qi-selected'));
     btn.classList.add('qi-selected');
     answers[qi] = ci;
-    if (answers.every(a => a !== null)) gradeBtn.disabled = false;
+    checkGradeReady();
+  });
+
+  // short/essay: update answers on input
+  container.addEventListener('input', e => {
+    const el = e.target.closest('.qi-text-input, .qi-essay-input');
+    if (!el) return;
+    answers[Number(el.dataset.qi)] = el.value;
+    checkGradeReady();
   });
 
   gradeBtn.addEventListener('click', async () => {
     gradeBtn.disabled = true;
+    gradeBtn.textContent = '채점 중...';
+
+    // Fire all essay grading calls in parallel
+    const essayIndices = questions.reduce((acc, q, i) => {
+      if ((q.type || 'mc') === 'essay') acc.push(i);
+      return acc;
+    }, []);
+
+    const essayGradeResults = {};
+    if (essayIndices.length > 0) {
+      const settled = await Promise.all(
+        essayIndices.map(i =>
+          gradeEssay(questions[i], answers[i] || '')
+            .then(r  => ({ i, r }))
+            .catch(e => ({ i, r: { score: 0, feedback: '채점 오류: ' + e.message, rubricResults: [] } }))
+        )
+      );
+      settled.forEach(({ i, r }) => { essayGradeResults[i] = r; });
+    }
+
+    // Render per-question results and accumulate stats
+    let mcCorrect = 0, mcTotal = 0;
+    let shortCorrect = 0, shortTotal = 0;
+    let essayScoreSum = 0, essayTotal = 0;
 
     questions.forEach((q, idx) => {
-      const card   = container.querySelector(`.quiz-card[data-qi="${idx}"]`);
-      const chosen  = answers[idx];
-      const correct = q.answer;
-      card.querySelectorAll('.qi-choice').forEach(b => {
-        b.disabled = true;
-        b.classList.remove('qi-selected');
-        const ci = Number(b.dataset.ci);
-        if (ci === correct) b.classList.add('qi-correct');
-        else if (ci === chosen && chosen !== correct) b.classList.add('qi-wrong');
-      });
+      const type  = q.type || 'mc';
+      const card  = container.querySelector(`.quiz-card[data-qi="${idx}"]`);
       const expEl = card.querySelector('.qi-explanation');
-      expEl.textContent   = q.explanation;
-      expEl.style.display = 'block';
+
+      if (type === 'mc') {
+        mcTotal++;
+        const chosen  = answers[idx];
+        const correct = q.answer;
+        card.querySelectorAll('.qi-choice').forEach(b => {
+          b.disabled = true;
+          b.classList.remove('qi-selected');
+          const ci = Number(b.dataset.ci);
+          if (ci === correct) b.classList.add('qi-correct');
+          else if (ci === chosen && chosen !== correct) b.classList.add('qi-wrong');
+        });
+        expEl.textContent   = q.explanation;
+        expEl.style.display = 'block';
+        if (chosen === correct) mcCorrect++;
+
+      } else if (type === 'short') {
+        shortTotal++;
+        const inputEl = card.querySelector('.qi-text-input');
+        if (inputEl) inputEl.disabled = true;
+        const matched = matchesKeywords(answers[idx], q.keywords);
+        if (matched) {
+          shortCorrect++;
+          expEl.innerHTML = `<span style="color:#22c55e;font-weight:700;">✅ 정답</span><div style="margin-top:0.4rem;font-size:0.88rem;">${escHtml(q.fullAnswer)}</div>`;
+        } else {
+          expEl.innerHTML = `<span style="color:#ef4444;font-weight:700;">❌ 오답</span><div style="margin-top:0.4rem;font-size:0.88rem;">${escHtml(q.fullAnswer)}</div>`;
+        }
+        expEl.style.display = 'block';
+
+      } else if (type === 'essay') {
+        essayTotal++;
+        const textareaEl = card.querySelector('.qi-essay-input');
+        if (textareaEl) textareaEl.disabled = true;
+        const gr = essayGradeResults[idx] || { score: 0, feedback: '채점 실패', rubricResults: [] };
+        essayScoreSum += gr.score;
+        const scoreColor = gr.score >= 80 ? '#22c55e' : gr.score >= 50 ? '#f59e0b' : '#ef4444';
+        const rubricHtml = (gr.rubricResults || []).map(r =>
+          `<div style="font-size:0.82rem;margin:0.15rem 0;">${r.met ? '✅' : '❌'} ${escHtml(r.criterion)}</div>`
+        ).join('');
+        expEl.innerHTML = `
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;flex-wrap:wrap;">
+            <span style="font-size:1.05rem;font-weight:800;color:${scoreColor};background:${scoreColor}22;padding:0.2rem 0.6rem;border-radius:6px;">${gr.score}점</span>
+            <span style="font-size:0.85rem;color:var(--text-muted);">${escHtml(gr.feedback)}</span>
+          </div>
+          ${rubricHtml}
+          <details style="margin-top:0.5rem;">
+            <summary style="font-size:0.82rem;color:var(--text-muted);cursor:pointer;">모범 답안 보기</summary>
+            <div style="font-size:0.85rem;margin-top:0.3rem;padding:0.5rem;background:var(--surface2);border-radius:6px;">${escHtml(q.modelAnswer)}</div>
+          </details>`;
+        expEl.style.display = 'block';
+      }
     });
 
-    const score   = answers.filter((a, i) => a === questions[i].answer).length;
-    const total   = questions.length;
-    const pct     = Math.round(score / total * 100);
+    // Build result banner score lines
     const elapsed = Math.round((Date.now() - startTime) / 1000);
     const mins    = Math.floor(elapsed / 60);
     const secs    = elapsed % 60;
 
+    let scoreLines = '';
+    if (mcTotal + shortTotal > 0) {
+      const objCorrect = mcCorrect + shortCorrect;
+      const objTotal   = mcTotal + shortTotal;
+      const pct        = Math.round(objCorrect / objTotal * 100);
+      scoreLines += `<div class="quiz-result-score">${objCorrect} / ${objTotal} (${pct}%)</div>`;
+    }
+    if (essayTotal > 0) {
+      const avgScore = Math.round(essayScoreSum / essayTotal);
+      const avgColor = avgScore >= 80 ? '#22c55e' : avgScore >= 50 ? '#f59e0b' : '#ef4444';
+      scoreLines += `<div style="font-size:1rem;font-weight:700;color:${avgColor};margin-top:0.15rem;">서술형 평균: ${avgScore}/100</div>`;
+    }
+
+    // Wrong list for mc and short only
     const wrongs = questions.reduce((acc, q, i) => {
-      if (answers[i] !== q.answer) acc.push({ q, chosen: answers[i], i });
+      const type = q.type || 'mc';
+      if (type === 'mc' && answers[i] !== q.answer) {
+        acc.push({ q, chosen: answers[i], i, type });
+      } else if (type === 'short' && !matchesKeywords(answers[i], q.keywords)) {
+        acc.push({ q, chosen: answers[i], i, type });
+      }
       return acc;
     }, []);
-    const wrongHtml = wrongs.length === 0
+
+    const wrongHtml = (wrongs.length === 0 && essayTotal === 0)
       ? '<div style="color:var(--text-muted);font-size:0.88rem;padding:0.25rem 0;">모두 정답입니다! 🎉</div>'
-      : wrongs.map(({ q, chosen, i }) => `<div class="quiz-wrong-item">
-          <div class="qwi-q">Q${i+1}. ${escHtml(q.q)}</div>
-          <div class="qwi-ans">✅ 정답: ${QUIZ_CHOICES_PREFIX[q.answer]} ${escHtml(q.choices[q.answer])}</div>
-          <div style="color:#ef4444;margin-bottom:0.2rem;">❌ 내 답: ${chosen !== null ? QUIZ_CHOICES_PREFIX[chosen] + ' ' + escHtml(q.choices[chosen]) : '(미응답)'}</div>
-          <div class="qwi-exp">${escHtml(q.explanation)}</div>
-        </div>`).join('');
+      : wrongs.map(({ q, chosen, i, type }) => {
+          if (type === 'mc') {
+            return `<div class="quiz-wrong-item">
+              <div class="qwi-q">Q${i+1}. ${escHtml(q.q)}</div>
+              <div class="qwi-ans">✅ 정답: ${QUIZ_CHOICES_PREFIX[q.answer]} ${escHtml(q.choices[q.answer])}</div>
+              <div style="color:#ef4444;margin-bottom:0.2rem;">❌ 내 답: ${chosen !== null ? QUIZ_CHOICES_PREFIX[chosen] + ' ' + escHtml(q.choices[chosen]) : '(미응답)'}</div>
+              <div class="qwi-exp">${escHtml(q.explanation)}</div>
+            </div>`;
+          } else {
+            return `<div class="quiz-wrong-item">
+              <div class="qwi-q">Q${i+1}. ${escHtml(q.q)}</div>
+              <div class="qwi-ans">✅ 키워드: ${escHtml((q.keywords || []).join(', '))}</div>
+              <div style="color:#ef4444;margin-bottom:0.2rem;">❌ 내 답: ${escHtml(chosen || '(미응답)')}</div>
+              <div class="qwi-exp">${escHtml(q.fullAnswer)}</div>
+            </div>`;
+          }
+        }).join('');
 
     const banner = document.createElement('div');
     banner.className = 'quiz-results-banner';
     banner.innerHTML = `
-      <div class="quiz-result-score">${score} / ${total} (${pct}%)</div>
+      ${scoreLines}
       <div class="quiz-result-time">소요 시간: ${mins > 0 ? mins + '분 ' : ''}${secs}초</div>
       <div id="quizWeaknessInline"></div>
       ${wrongs.length > 0 ? '<div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-top:0.25rem;">오답 목록</div>' : ''}
@@ -5737,17 +5907,32 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     if (noteId) {
+      // For score persistence: mc+short count as objective; essay ≥60 counts as correct
+      const totalObjective = questions.length; // keep total as full count for history
+      const correctCount   = questions.reduce((sum, q, i) => {
+        const type = q.type || 'mc';
+        if (type === 'mc')    return sum + (answers[i] === q.answer ? 1 : 0);
+        if (type === 'short') return sum + (matchesKeywords(answers[i], q.keywords) ? 1 : 0);
+        if (type === 'essay') return sum + ((essayGradeResults[i]?.score || 0) >= 60 ? 1 : 0);
+        return sum;
+      }, 0);
+
       const record = {
         id:        uuidv4(),
         noteId,
         noteTitle: noteTitle || '',
         timestamp: new Date().toISOString(),
-        score, total, timeTaken: elapsed,
-        questions: questions.map((q, i) => ({
-          section:      q.section || '',
-          correct:      answers[i] === q.answer,
-          questionText: q.q || '',
-        })),
+        score:     correctCount,
+        total:     totalObjective,
+        timeTaken: elapsed,
+        questions: questions.map((q, i) => {
+          const type    = q.type || 'mc';
+          let   correct = false;
+          if (type === 'mc')    correct = answers[i] === q.answer;
+          if (type === 'short') correct = matchesKeywords(answers[i], q.keywords);
+          if (type === 'essay') correct = (essayGradeResults[i]?.score || 0) >= 60;
+          return { section: q.section || '', correct, questionText: q.q || '' };
+        }),
       };
       await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
 
@@ -5767,8 +5952,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     }
 
     banner.querySelector('#quizRetryBtn').addEventListener('click', () => {
-      const noteText2 = storedNotesText;
-      showQuizSettings(noteTitle, noteId, noteText2);
+      showQuizSettings(noteTitle, noteId, storedNotesText);
       container.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     banner.querySelector('#quizCloseInlineBtn').addEventListener('click', clearQuizInlineArea);
