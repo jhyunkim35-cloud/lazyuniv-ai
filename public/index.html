@@ -2668,7 +2668,6 @@
     <span style="font-size:0.9rem; font-weight:600; color:var(--text);">📖 슬라이드 + 학습 노트</span>
     <div style="display:flex; gap:0.5rem; align-items:center;">
       <button id="splitDebugBtn" class="action-btn" title="디버그 리포트 복사" style="display:none; font-size:0.85rem; padding:0.25rem 0.5rem;" onclick="copyDebugReport()">📋</button>
-      <button id="splitQuizBtn" class="action-btn">🧪 퀴즈</button>
       <button id="splitNotionBtn" class="action-btn">📋 노션</button>
       <button id="splitPdfBtn" class="action-btn">⬇ PDF</button>
       <button id="splitCloseBtn" class="action-btn">✕ 닫기</button>
@@ -5805,7 +5804,6 @@ function launchQuiz() {
   showQuizSettings(noteTitle, noteId, noteText);
 }
 
-document.getElementById('splitQuizBtn').addEventListener('click', () => switchSplitTab('quiz'));
 
 splitViewBtn.addEventListener('click', async () => {
   const splitViewer = document.getElementById('splitViewer');
