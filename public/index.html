@@ -5201,10 +5201,10 @@ function showNotionReorderModal(notes) {
   }
 
   overlay.innerHTML = `
-    <div class="db-modal" style="max-width:520px;">
+    <div class="db-modal" style="max-width:520px;display:flex;flex-direction:column;max-height:85vh;">
       <h3>📋 노트 순서 지정</h3>
       <p style="font-size:0.82rem;color:var(--text-muted);margin:0;">드래그하거나 ▲▼ 버튼으로 순서를 바꾸세요. 각 노트는 노션에서 접기 가능한 토글 블록으로 붙여넣어집니다.</p>
-      <div class="db-modal-list" id="notionReorderList"></div>
+      <div class="db-modal-list" id="notionReorderList" style="overflow-y:auto;max-height:50vh;flex:1;"></div>
       <div class="db-modal-footer">
         <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">취소</button>
         <button id="notionReorderCopyBtn" class="copy-btn">📋 복사 (${notes.length}개)</button>
