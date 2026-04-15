@@ -772,6 +772,29 @@
 
     .progress-wrap.visible { transform: translateY(0); }
 
+    /* ── Batch background progress bar (fixed, below top bar) ── */
+    #batchProgressBar {
+      position: fixed;
+      top: 48px;
+      left: 240px;
+      right: 0;
+      height: 36px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      display: none;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0 1rem;
+      z-index: 9990;
+      cursor: pointer;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    #batchProgressBar:hover { background: var(--surface3); }
+    #batchProgressBar .bp-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; max-width: 160px; }
+    #batchProgressBar .bp-fill  { height: 100%; background: var(--primary); border-radius: 2px; transition: width 0.3s ease; }
+    @media (max-width: 768px) { #batchProgressBar { left: 0; } }
+
     .progress-label {
       font-size: 0.83rem;
       font-weight: 500;
@@ -2385,6 +2408,12 @@
   <span class="progress-pct" id="progressPct">0%</span>
 </div>
 
+<!-- Batch background progress indicator — visible when batch runs while user navigates away -->
+<div id="batchProgressBar" onclick="switchView('new')">
+  <span id="batchProgressBarLabel">📝 노트 생성 중: 0/0 완료</span>
+  <div class="bp-track"><div class="bp-fill" id="batchProgressBarFill" style="width:0%"></div></div>
+</div>
+
 <!-- Main Content -->
 <div id="mainContent" style="margin-left:240px; margin-top:48px; padding:1.5rem; min-height:calc(100vh - 48px);">
 
@@ -2523,6 +2552,11 @@
     <div class="analyze-row">
       <button class="analyze-btn" id="batchStartBtn" disabled>🚀 배치 처리 시작</button>
       <button class="cancel-btn" id="batchCancelBtn">✕ 배치 취소</button>
+    </div>
+
+    <!-- Go-home button — shown while batch runs so user can navigate away -->
+    <div id="batchGoHomeRow" style="display:none; padding:0.5rem 0;">
+      <button id="batchGoHomeBtn" onclick="switchView('home')" style="background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:0.84rem; padding:0.4rem 1rem; cursor:pointer;">🏠 홈으로 돌아가기</button>
     </div>
 
   </div><!-- /batchSection -->
@@ -7697,6 +7731,8 @@ ${notesText}`;
 let isBatchMode = false;
 let batchQueue  = [];   // [{id, pptFile, txtFile, status}]
 let batchIdCounter = 0;
+let _batchRunning  = false;
+let _batchProgress = { done: 0, total: 0 };
 let batchPptStaging = null;
 let batchSessionStaging = []; // [{id, txtFile, professorNum}]
 let batchSessionIdCounter = 0;
@@ -7900,15 +7936,65 @@ function updateBatchItemName(id, value) {
 }
 
 function updateBatchProgress(current, total) {
+  _batchRunning  = true;
+  _batchProgress = { done: current - 1, total };
+
   const banner = document.getElementById('batchOverallBanner');
   banner.className = 'batch-overall-banner visible';
   banner.innerHTML = `<div class="spinner"></div><span>${total}개 중 ${current}번째 처리 중…</span>`;
+
+  // Show the "go home" button once batch is underway
+  const goHomeRow = document.getElementById('batchGoHomeRow');
+  if (goHomeRow) goHomeRow.style.display = '';
+
+  updateBatchProgressBar();
+}
+
+function updateBatchProgressBar() {
+  const bar   = document.getElementById('batchProgressBar');
+  const label = document.getElementById('batchProgressBarLabel');
+  const fill  = document.getElementById('batchProgressBarFill');
+  if (!bar) return;
+
+  if (!_batchRunning) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  // Only show the floating bar when the user is NOT on the batch (new-note) view
+  if (_currentView === 'new') {
+    bar.style.display = 'none';
+    return;
+  }
+
+  const { done, total } = _batchProgress;
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  if (label) label.textContent = `📝 노트 생성 중: ${done}/${total} 완료`;
+  if (fill)  fill.style.width  = pct + '%';
+  bar.style.display = 'flex';
 }
 
 function finalizeBatchProgress(total, failed) {
+  _batchRunning = false;
+
+  // Hide floating progress bar
+  const bar = document.getElementById('batchProgressBar');
+  if (bar) bar.style.display = 'none';
+
+  // Hide "go home" button
+  const goHomeRow = document.getElementById('batchGoHomeRow');
+  if (goHomeRow) goHomeRow.style.display = 'none';
+
+  // Update in-page banner
   const banner = document.getElementById('batchOverallBanner');
   banner.className = 'batch-overall-banner visible done';
   banner.innerHTML = `✅ ${total}개 중 ${total - failed}개 완료${failed > 0 ? ` (${failed}개 오류)` : ''}`;
+
+  // If user navigated to home while batch ran, show toast and refresh home grid
+  if (_currentView === 'home') {
+    showToast(`✅ 배치 완료! ${total - failed}개 노트 생성됨`);
+    renderHomeView();
+  }
 }
 
 /* Auto-download PDF via html2pdf.js */
@@ -8189,6 +8275,9 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
             extractedImages: [...(extractedImages || [])],
           };
         }
+        // Update background progress bar after successful completion
+        _batchProgress.done = i + 1;
+        updateBatchProgressBar();
       } catch (err) {
         if (err.name === 'AbortError') throw err;
         item.status = 'error';
@@ -8201,6 +8290,9 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         errorCard(item, err.message);
         showToast(`❌ ${i + 1}번째 오류: ${err.message}`);
         agentLog(0, `오류: ${err.message}`);
+        // Update background progress bar after error too
+        _batchProgress.done = i + 1;
+        updateBatchProgressBar();
       }
 
       renderBatchQueue();
@@ -8244,8 +8336,14 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
     }
   } finally {
     isRunning = false;
+    _batchRunning = false;
     abortController = null;
     batchCancelBtn.classList.remove('visible');
+    // Hide floating bar and go-home button on any exit path
+    const _bar = document.getElementById('batchProgressBar');
+    if (_bar) _bar.style.display = 'none';
+    const _goHomeRow = document.getElementById('batchGoHomeRow');
+    if (_goHomeRow) _goHomeRow.style.display = 'none';
     checkBatchReady();
   }
 });
@@ -9202,8 +9300,9 @@ let _currentView = 'home';
 let _activeFolderId = null; // null=all, 'none'=uncategorized, uuid=folder
 
 function switchView(view) {
-  if (isRunning && !confirm('AI 분석이 진행 중입니다. 이동하면 분석이 중단됩니다. 계속하시겠습니까?')) return;
-  if (isRunning) {
+  // Batch runs in the background — allow free navigation without aborting
+  if (isRunning && !_batchRunning) {
+    if (!confirm('AI 분석이 진행 중입니다. 이동하면 분석이 중단됩니다. 계속하시겠습니까?')) return;
     abortController?.abort();
     setProgress(null);
   }
@@ -9222,6 +9321,8 @@ function switchView(view) {
     document.getElementById('collapseBtn')?.classList.remove('visible');
     clearQuizInlineArea();
   }
+  // Show/hide floating batch bar based on new view
+  updateBatchProgressBar();
 }
 
 /* ═══════════════════════════════════════════════
