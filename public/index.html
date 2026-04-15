@@ -2695,11 +2695,13 @@
         <button class="split-tab" data-tab="transcript" onclick="switchSplitTab('transcript')">🎙 녹취록</button>
         <button class="split-tab" data-tab="accordion" onclick="switchSplitTab('accordion')">📑 아코디언</button>
         <button id="quizBtn" class="split-tab" data-tab="quiz" onclick="switchSplitTab('quiz')" disabled>🧪 퀴즈</button>
+        <button id="classifyBtn" class="split-tab" data-tab="classify" onclick="switchSplitTab('classify')" disabled>📂 분류</button>
       </div>
       <div id="splitNotes" style="flex:1; min-height:0; overflow-y:auto; padding:1.5rem;"></div>
       <div id="splitTranscript" style="flex:1; min-height:0; overflow-y:auto; padding:1.5rem; display:none;"></div>
       <div id="splitAccordion" style="flex:1; min-height:0; overflow-y:auto; display:none;"></div>
       <div id="quizInlineArea" style="display:none; flex-direction:column; gap:0.75rem; flex:1; min-height:0; overflow-y:auto; padding:0 1rem 1rem;"></div>
+      <div id="classifyArea" style="display:none; flex-direction:column; gap:0.75rem; flex:1; min-height:0; overflow-y:auto; padding:1rem;"></div>
       <div id="splitImagePanel" style="border-top:2px solid var(--border-bright); background:var(--surface2); flex-shrink:0; display:none;">
         <div id="splitImageHeader" style="display:flex; align-items:center; justify-content:space-between; padding:0.5rem 1rem; cursor:pointer;">
           <span style="font-size:0.85rem; font-weight:600; color:var(--text-muted);">📷 슬라이드 이미지 선택</span>
@@ -4966,7 +4968,7 @@ analyzeBtn.addEventListener('click', async () => {
   cancelBtn.classList.add('visible');
 
   // disable download buttons until notes are ready
-  [quizBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+  [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
   const _dbgBtnReset = document.getElementById('splitDebugBtn');
   if (_dbgBtnReset) _dbgBtnReset.style.display = 'none';
   _lastGenerationError = '';
@@ -6377,6 +6379,77 @@ async function showQuizHistory(parentOverlay, noteId, noteTitle) {
   }
 }
 
+// ── Classify tab ────────────────────────────────────────────────────────────
+
+// Cache: { noteId, items } — cleared when a different note is loaded
+let _classifyCache = null;
+
+async function classifyNoteContent(noteText) {
+  const systemPrompt =
+    'You are an academic content classifier. Classify each paragraph/section of the study notes into exactly one category: theory (이론), research (연구), case (사례), or other (기타). ' +
+    'Output ONLY a valid JSON array. Each element: {"category":"theory|research|case|other","title":"short descriptive title","content":"the original text of that section"}. ' +
+    'Keep the original text intact. Merge consecutive paragraphs of the same category into one element. All output in Korean.';
+
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: noteText }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API 오류 (${res.status})`);
+  }
+
+  const data = await res.json();
+  const raw  = data?.content?.[0]?.text ?? '';
+  const match = raw.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('분류 결과를 파싱할 수 없습니다.');
+  const items = JSON.parse(match[0]);
+  if (!Array.isArray(items)) throw new Error('분류 결과가 배열이 아닙니다.');
+  return items;
+}
+
+const CLASSIFY_LABELS = { theory: '이론', research: '연구', case: '사례', other: '기타' };
+const CLASSIFY_COLORS = { theory: '#7c3aed', research: '#0ea5e9', case: '#10b981', other: '#6b7280' };
+
+function renderClassifyArea(items) {
+  const area = document.getElementById('classifyArea');
+  if (!items.length) {
+    area.innerHTML = '<span class="placeholder-msg">분류 결과가 없습니다.</span>';
+    return;
+  }
+
+  // Group items by category for the summary header
+  const counts = {};
+  items.forEach(item => { counts[item.category] = (counts[item.category] || 0) + 1; });
+  const summaryHtml = Object.entries(counts).map(([cat, n]) =>
+    `<span style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.6rem;border-radius:12px;background:${CLASSIFY_COLORS[cat]}22;color:${CLASSIFY_COLORS[cat]};font-size:0.78rem;font-weight:700;">${CLASSIFY_LABELS[cat] || cat} ${n}</span>`
+  ).join(' ');
+
+  const cardsHtml = items.map(item => {
+    const label = CLASSIFY_LABELS[item.category] || item.category;
+    const color = CLASSIFY_COLORS[item.category] || '#6b7280';
+    return `
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.55rem 0.9rem;background:var(--surface2);border-bottom:1px solid var(--border);">
+          <span style="padding:0.15rem 0.55rem;border-radius:10px;background:${color}22;color:${color};font-size:0.75rem;font-weight:700;">${label}</span>
+          <span style="font-size:0.88rem;font-weight:600;color:var(--text);">${escHtml(item.title)}</span>
+        </div>
+        <div style="padding:0.75rem 0.9rem;font-size:0.84rem;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:keep-all;">${escHtml(item.content)}</div>
+      </div>`;
+  }).join('');
+
+  area.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.25rem 0 0.5rem;">${summaryHtml}</div>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;">${cardsHtml}</div>`;
+}
+
 function launchQuiz() {
   const noteText  = storedNotesText;
   const noteTitle = document.getElementById('notesCardTitle').textContent.replace(/^📚\s*/, '').trim() || '노트';
@@ -6395,6 +6468,8 @@ splitViewBtn.addEventListener('click', async () => {
   // Clear stale secondary-tab content so each re-open re-populates from fresh stored data
   document.getElementById('splitTranscript').innerHTML = '';
   document.getElementById('splitAccordion').innerHTML = '';
+  document.getElementById('classifyArea').innerHTML = '';
+  _classifyCache = null;
 
   splitSlides.innerHTML = '';
   if (extractedImages.length) {
@@ -6453,8 +6528,8 @@ document.getElementById('splitCloseBtn').addEventListener('click', () => {
 
 
 function switchSplitTab(tab) {
-  // Quiz tab: only activate if notes are available
-  if (tab === 'quiz' && !storedNotesText) return;
+  // Quiz/classify tabs: only activate if notes are available
+  if ((tab === 'quiz' || tab === 'classify') && !storedNotesText) return;
 
   document.querySelectorAll('#splitTabs .split-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
@@ -6463,11 +6538,13 @@ function switchSplitTab(tab) {
   const transcriptEl = document.getElementById('splitTranscript');
   const accordionEl  = document.getElementById('splitAccordion');
   const quizAreaEl   = document.getElementById('quizInlineArea');
+  const classifyEl   = document.getElementById('classifyArea');
 
   notesEl.style.display      = tab === 'notes'      ? 'flex'  : 'none';
   transcriptEl.style.display = tab === 'transcript' ? 'flex'  : 'none';
   accordionEl.style.display  = tab === 'accordion'  ? 'block' : 'none';
   quizAreaEl.style.display   = tab === 'quiz'       ? 'flex'  : 'none';
+  classifyEl.style.display   = tab === 'classify'   ? 'flex'  : 'none';
 
   if (tab === 'transcript' && !transcriptEl.innerHTML.trim()) {
     if (storedHighlightedTranscript) {
@@ -6505,6 +6582,34 @@ function switchSplitTab(tab) {
   // Launch quiz settings when switching to quiz tab (only if area is empty)
   if (tab === 'quiz' && !quizAreaEl.innerHTML.trim()) {
     launchQuiz();
+  }
+
+  // Classify tab: use cache or fetch from API
+  if (tab === 'classify') {
+    const noteId = currentNoteId;
+    // Invalidate cache when a different note is active
+    if (_classifyCache && _classifyCache.noteId !== noteId) {
+      _classifyCache = null;
+      classifyEl.innerHTML = '';
+    }
+    if (_classifyCache) {
+      // Already rendered — nothing to do (content persists in the DOM)
+      return;
+    }
+    if (classifyEl.innerHTML.trim()) return; // currently loading, don't re-trigger
+
+    // Show loading spinner
+    classifyEl.innerHTML = `<div class="quiz-inline-loading"><span class="qi-spinner"></span><span>분류 분석 중…</span></div>`;
+
+    classifyNoteContent(storedNotesText)
+      .then(items => {
+        _classifyCache = { noteId, items };
+        renderClassifyArea(items);
+      })
+      .catch(err => {
+        classifyEl.innerHTML = `<span class="placeholder-msg" style="color:#ef4444;">오류: ${escHtml(err.message)}</span>`;
+        _classifyCache = null;
+      });
   }
 }
 
@@ -7393,7 +7498,7 @@ ${recText}`;
 
   /* enable download buttons — single mode only */
   if (!targetBodyEl) {
-    [quizBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -7475,7 +7580,7 @@ ${critiqueText}`;
   storedNotesText = patched;
 
   if (!targetBodyEl) {
-    [quizBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -8588,9 +8693,12 @@ async function openSavedNote(id) {
   if (splitNotes)      splitNotes.innerHTML      = '';
   if (splitTranscript) splitTranscript.innerHTML = '';
   if (splitAccordion)  splitAccordion.innerHTML  = '';
+  const splitClassify = document.getElementById('classifyArea');
+  if (splitClassify)   splitClassify.innerHTML   = '';
+  _classifyCache = null;
 
   // Enable action buttons (they start disabled until a pipeline runs)
-  [quizBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+  [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
   const _dbgBtnRestore = document.getElementById('splitDebugBtn');
   if (_dbgBtnRestore) _dbgBtnRestore.style.display = '';
   document.getElementById('notesActions')?.classList.add('visible');
@@ -9083,7 +9191,7 @@ function switchView(view) {
   if (view === 'home') renderHomeView();
   if (view === 'new') {
     // Clear stale action-button state from any previously loaded note
-    [quizBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
+    [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
     document.getElementById('notesActions')?.classList.remove('visible');
     document.getElementById('collapseBtn')?.classList.remove('visible');
     clearQuizInlineArea();
