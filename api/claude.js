@@ -49,17 +49,25 @@ module.exports = async (req, res) => {
 
   try {
     const isStream = req.body?.stream === true;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 2000;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'prompt-caching-2024-07-31,advisor-tool-2026-03-01',
-      },
-      body: JSON.stringify(req.body),
-    });
+    let response;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'prompt-caching-2024-07-31,advisor-tool-2026-03-01',
+        },
+        body: JSON.stringify(req.body),
+      });
+
+      if (response.status !== 529 || attempt === MAX_RETRIES) break;
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+    }
 
     if (isStream) {
       res.setHeader('Content-Type', 'text/event-stream');
