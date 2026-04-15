@@ -6425,18 +6425,23 @@ function renderClassifyArea(items) {
     return;
   }
 
-  // Group items by category for the summary header
+  // Count items per category
   const counts = {};
   items.forEach(item => { counts[item.category] = (counts[item.category] || 0) + 1; });
-  const summaryHtml = Object.entries(counts).map(([cat, n]) =>
-    `<span style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.2rem 0.6rem;border-radius:12px;background:${CLASSIFY_COLORS[cat]}22;color:${CLASSIFY_COLORS[cat]};font-size:0.78rem;font-weight:700;">${CLASSIFY_LABELS[cat] || cat} ${n}</span>`
-  ).join(' ');
 
+  // Render filter toggle buttons — only for categories that appear in results
+  const filterBtnsHtml = Object.entries(counts).map(([cat, n]) => {
+    const label = CLASSIFY_LABELS[cat] || cat;
+    const color = CLASSIFY_COLORS[cat] || '#6b7280';
+    return `<button data-filter-cat="${cat}" onclick="toggleClassifyFilter(this)" style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.25rem 0.75rem;border-radius:14px;border:1.5px solid ${color};background:${color}22;color:${color};font-size:0.8rem;font-weight:700;cursor:pointer;transition:opacity 0.15s;">${label}<span style="background:${color};color:#fff;border-radius:8px;padding:0.05rem 0.4rem;font-size:0.72rem;">${n}</span></button>`;
+  }).join('');
+
+  // Render cards — each card tagged with data-cat for filter targeting
   const cardsHtml = items.map(item => {
     const label = CLASSIFY_LABELS[item.category] || item.category;
     const color = CLASSIFY_COLORS[item.category] || '#6b7280';
     return `
-      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div data-cat="${item.category}" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;">
         <div style="display:flex;align-items:center;gap:0.5rem;padding:0.55rem 0.9rem;background:var(--surface2);border-bottom:1px solid var(--border);">
           <span style="padding:0.15rem 0.55rem;border-radius:10px;background:${color}22;color:${color};font-size:0.75rem;font-weight:700;">${label}</span>
           <span style="font-size:0.88rem;font-weight:600;color:var(--text);">${escHtml(item.title)}</span>
@@ -6446,8 +6451,29 @@ function renderClassifyArea(items) {
   }).join('');
 
   area.innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.25rem 0 0.5rem;">${summaryHtml}</div>
-    <div style="display:flex;flex-direction:column;gap:0.6rem;">${cardsHtml}</div>`;
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.25rem 0 0.5rem;" id="classifyFilters">${filterBtnsHtml}</div>
+    <div style="display:flex;flex-direction:column;gap:0.6rem;" id="classifyCards">${cardsHtml}</div>`;
+}
+
+function toggleClassifyFilter(btn) {
+  const cat = btn.dataset.filterCat;
+  const filters = document.querySelectorAll('#classifyFilters [data-filter-cat]');
+
+  // Count currently active buttons excluding this one
+  const activeOthers = Array.from(filters).filter(b => b !== btn && b.style.opacity !== '0.4');
+
+  // Prevent turning off the last active filter
+  const isCurrentlyActive = btn.style.opacity !== '0.4';
+  if (isCurrentlyActive && activeOthers.length === 0) return;
+
+  // Toggle this button's active state
+  btn.style.opacity = isCurrentlyActive ? '0.4' : '1';
+
+  // Show/hide matching cards — no re-render
+  document.querySelectorAll('#classifyCards [data-cat]').forEach(card => {
+    if (card.dataset.cat !== cat) return;
+    card.style.display = isCurrentlyActive ? 'none' : '';
+  });
 }
 
 function launchQuiz() {
