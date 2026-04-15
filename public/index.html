@@ -1953,6 +1953,14 @@
     .quiz-debug-full-toggle { font-family:monospace; font-size:0.75rem; color:#7c3aed; cursor:pointer; list-style:none; padding:0.2rem 0; }
     .weakness-section-row { display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; }
     .weakness-label { font-size:0.82rem; color:var(--text); min-width:120px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .weakness-label-link { cursor:pointer; color:var(--primary) !important; }
+    .weakness-label-link:hover { text-decoration:underline; }
+    .weakness-badge { font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:8px; margin-left:0.5rem; font-weight:600; vertical-align:middle; display:inline-block; }
+    .weakness-badge.green  { background:rgba(34,197,94,0.15);  color:#16a34a; }
+    .weakness-badge.yellow { background:rgba(234,179,8,0.15);  color:#ca8a04; }
+    .weakness-badge.red    { background:rgba(239,68,68,0.15);  color:#ef4444; }
+    @keyframes sectionHighlight { 0%,20% { background:#fef08a; border-radius:4px; } 100% { background:transparent; } }
+    .section-highlight-flash { animation:sectionHighlight 1.5s ease; }
     .weakness-bar-bg { flex:1; height:8px; background:var(--surface3); border-radius:4px; overflow:hidden; }
     .weakness-bar-fill { height:100%; border-radius:4px; transition:width 0.4s; }
     .weakness-red    { background:#ef4444; }
@@ -6572,6 +6580,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
         }),
       };
       await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
+      if (noteId) updateNoteWeaknessBadges(noteId).catch(() => {}); // refresh h2 accuracy badges
 
       const histBtn = banner.querySelector('#quizHistInlineBtn');
       if (histBtn) {
@@ -6633,12 +6642,61 @@ function renderWeaknessReport(containerEl, report, quizCount) {
     <div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;">📊 약점 분석 (퀴즈 ${report.totalQuizzes}회 기준)</div>
     ${report.sections.map(s => `
       <div class="weakness-section-row">
-        <span class="weakness-label" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+        <span class="weakness-label weakness-label-link" title="${escHtml(s.name)}" data-section="${escHtml(s.name)}">${escHtml(s.name)}</span>
         <div class="weakness-bar-bg"><div class="weakness-bar-fill ${colorClass(s)}" style="width:${s.accuracy}%;"></div></div>
         <span class="weakness-pct ${colorClass(s)}">${s.accuracy}%</span>
       </div>`).join('')}
     <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">총 ${report.totalQuizzes}회 퀴즈, ${report.totalQuestions}문제 풀이</div>
     ${weakNames ? `<div style="font-size:0.8rem;color:#ef4444;margin-top:0.2rem;">💡 약점 섹션에 집중해서 복습하세요: ${weakNames}</div>` : ''}`;
+
+  // Attach click handlers to section labels — scroll to matching h2 in splitNotes
+  containerEl.querySelectorAll('.weakness-label-link[data-section]').forEach(el => {
+    el.addEventListener('click', () => scrollToNoteSection(el.dataset.section));
+  });
+}
+
+function scrollToNoteSection(sectionName) {
+  switchSplitTab('notes');
+  const splitNotes = document.getElementById('splitNotes');
+  if (!splitNotes) return;
+  // Find matching h2 by exact text or partial match
+  const h2s = Array.from(splitNotes.querySelectorAll('h2'));
+  const target = h2s.find(h => h.textContent.trim() === sectionName)
+               || h2s.find(h => h.textContent.trim().includes(sectionName) || sectionName.includes(h.textContent.trim()));
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.add('section-highlight-flash');
+  target.addEventListener('animationend', () => target.classList.remove('section-highlight-flash'), { once: true });
+}
+
+async function updateNoteWeaknessBadges(noteId) {
+  if (!noteId) return;
+  const splitNotes = document.getElementById('splitNotes');
+  if (!splitNotes) return;
+  const h2s = Array.from(splitNotes.querySelectorAll('h2'));
+  if (!h2s.length) return;
+
+  const report = await getWeaknessReport(noteId).catch(() => null);
+  if (!report || !report.sections.length) return;
+
+  const sectionMap = new Map(report.sections.map(s => [s.name, s]));
+
+  h2s.forEach(h2 => {
+    // Remove any existing badge from a previous call
+    h2.querySelector('.weakness-badge')?.remove();
+
+    const text = h2.textContent.trim();
+    // Exact match first, then partial
+    const sec = sectionMap.get(text)
+      || [...sectionMap.values()].find(s => text.includes(s.name) || s.name.includes(text));
+    if (!sec) return;
+
+    const cls = sec.accuracy >= 80 ? 'green' : sec.accuracy >= 50 ? 'yellow' : 'red';
+    const badge = document.createElement('span');
+    badge.className = `weakness-badge ${cls}`;
+    badge.textContent = sec.accuracy + '%';
+    h2.appendChild(badge);
+  });
 }
 
 async function showQuizHistory(parentOverlay, noteId, noteTitle) {
@@ -6911,6 +6969,11 @@ function switchSplitTab(tab) {
         }
       });
     }
+  }
+
+  // Refresh weakness badges whenever notes tab is shown
+  if (tab === 'notes' && currentNoteId) {
+    updateNoteWeaknessBadges(currentNoteId).catch(() => {});
   }
 
   // Launch quiz settings when switching to quiz tab (only if area is empty)
