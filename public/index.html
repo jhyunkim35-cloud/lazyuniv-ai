@@ -3142,8 +3142,10 @@ async function renameFolderFS(id, newName, color) {
   return updated;
 }
 async function updateNoteOrderFS(orderedIds) {
+  // Always update IndexedDB so renderHomeView() (which reads IDB) sees the new order
+  await updateNoteOrder(orderedIds);
   const ref = userNotesRef();
-  if (!ref) return updateNoteOrder(orderedIds);
+  if (!ref) return;
   const batch = db.batch();
   orderedIds.forEach((id, sortIndex) => {
     batch.update(ref.doc(id), { sortOrder: sortIndex });
@@ -9156,6 +9158,7 @@ async function confirmDeleteNote(id) {
   if (currentNoteId === id) currentNoteId = null;
   showToast('🗑 노트 삭제 완료');
   renderSavedNotes();
+  await renderHomeView(); // refresh grid and folder note counts
 }
 
 /* ═══════════════════════════════════════════════
@@ -9501,7 +9504,7 @@ async function renameSavedNote(id) {
   if (!newTitle || newTitle.trim() === note.title) return;
   await saveNoteFS(Object.assign({}, note, { title: newTitle.trim() }));
   renderSavedNotes();
-  renderHomeView();
+  await renderHomeView();
 }
 
 async function deleteFolderConfirm(id) {
