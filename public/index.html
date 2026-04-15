@@ -9929,7 +9929,7 @@ function attachNoteDrag(card, noteId) {
   const handle = card.querySelector('.note-card-drag-handle');
   if (!handle) return;
 
-  let startX, startY, activePointerId;
+  let startX, startY, docMoveHandler, docUpHandler;
 
   handle.addEventListener('pointerdown', e => {
     if (_bulkSelectMode) return;
@@ -9938,11 +9938,17 @@ function attachNoteDrag(card, noteId) {
     e.stopPropagation();
     startX = e.clientX;
     startY = e.clientY;
-    activePointerId = e.pointerId;
     _noteDrag = { card, noteId, dragging: false, insertIndex: -1 };
+
+    // Attach to document so events keep firing even when card has pointer-events:none
+    docMoveHandler = onMove;
+    docUpHandler   = onUp;
+    document.addEventListener('pointermove',   docMoveHandler);
+    document.addEventListener('pointerup',     docUpHandler);
+    document.addEventListener('pointercancel', docUpHandler);
   });
 
-  handle.addEventListener('pointermove', e => {
+  function onMove(e) {
     if (!_noteDrag || _noteDrag.card !== card) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
@@ -9951,8 +9957,7 @@ function attachNoteDrag(card, noteId) {
       if (Math.hypot(dx, dy) < 6) return; // ignore micro-movement
       // -- Drag starts --
       const grid = card.closest('#allNotesGrid');
-      if (!grid) { _noteDrag = null; return; }
-      handle.setPointerCapture(activePointerId);
+      if (!grid) { cleanupDocListeners(); _noteDrag = null; return; }
       const rect = card.getBoundingClientRect();
       _noteDrag.dragging   = true;
       _noteDrag.grid       = grid;
@@ -10024,9 +10029,20 @@ function attachNoteDrag(card, noteId) {
         });
       });
     }
-  });
+  }
 
-  const commitDrag = () => {
+  function onUp() {
+    cleanupDocListeners();
+    commitDrag();
+  }
+
+  function cleanupDocListeners() {
+    document.removeEventListener('pointermove',   docMoveHandler);
+    document.removeEventListener('pointerup',     docUpHandler);
+    document.removeEventListener('pointercancel', docUpHandler);
+  }
+
+  function commitDrag() {
     if (!_noteDrag || _noteDrag.card !== card) return;
     const { dragging, clone, grid } = _noteDrag;
     _noteDrag = null;
@@ -10049,10 +10065,7 @@ function attachNoteDrag(card, noteId) {
         .map(c => c.dataset.noteId).filter(Boolean);
       updateNoteOrderFS(orderedIds).catch(err => console.warn('reorder save:', err));
     }
-  };
-
-  handle.addEventListener('pointerup',     commitDrag);
-  handle.addEventListener('pointercancel', commitDrag);
+  }
 }
 
 /* ═══════════════════════════════════════════════
