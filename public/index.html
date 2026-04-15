@@ -5547,7 +5547,7 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
     }),
@@ -5665,7 +5665,7 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 8192,
       stream: true,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
