@@ -2327,10 +2327,10 @@
     .note-card:hover .note-card-actions { opacity:1; }
     .note-card-actions button { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; color:var(--text-muted); }
     .note-card-actions button:hover { background:var(--surface3); color:var(--text); }
-    .note-card[draggable] { cursor:grab; }
-    .note-card.dragging { opacity:0.4; transform:none !important; box-shadow:none !important; }
-    .note-card.drag-over-top { border-top:2px solid var(--primary); }
-    .note-card.drag-over-bottom { border-bottom:2px solid var(--primary); }
+    .note-card-dragging { transform:scale(1.04) !important; box-shadow:0 8px 24px rgba(0,0,0,0.22) !important; opacity:0.9 !important; z-index:9999 !important; pointer-events:none !important; transition:box-shadow 0.1s,opacity 0.1s,transform 0.1s !important; }
+    .note-card-placeholder { opacity:0 !important; pointer-events:none !important; box-shadow:none !important; border-color:transparent !important; background:transparent !important; transition:none !important; }
+    .note-card-settling { animation:noteSettle 0.22s ease; }
+    @keyframes noteSettle { from { transform:scale(1.04); } to { transform:scale(1); } }
     .note-card-drag-handle { opacity:0; transition:opacity 0.15s; cursor:grab; font-size:1.1rem; color:var(--text-muted); padding:0 0.1rem; user-select:none; flex-shrink:0; margin-top:0.1rem; }
     .note-card:hover .note-card-drag-handle { opacity:1; }
     .note-card-checkbox { position:absolute; top:0.55rem; left:0.55rem; width:17px; height:17px; cursor:pointer; z-index:2; accent-color:var(--primary); display:none; }
@@ -3528,7 +3528,8 @@ let isRunning      = false;      // double-click guard
 let abortController = null;      // cancel support
 let currentNoteId  = null;       // id of the note currently loaded
 let _accordionOpenLabels = new Set(); // persists accordion open state across tab switches
-let draggedNoteId  = null;       // id of the note being dragged
+let draggedNoteId  = null;       // id of the note being dragged (legacy, kept for safety)
+let _noteDrag      = null;       // active pointer-drag state object
 let _lastGenerationError = '';   // last pipeline error message for debug report
 
 /* Sleep that rejects immediately when the user clicks cancel.
@@ -9848,7 +9849,6 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
 function buildNoteCard(note, folderMap, folderColorMap = {}) {
   const card = document.createElement('div');
   card.className = 'note-card';
-  card.setAttribute('draggable', 'true');
   card.dataset.noteId = note.id;
   const folderName  = note.folderId ? (folderMap[note.folderId] || '알 수 없음') : '';
   const folderColor = note.folderId ? (folderColorMap[note.folderId] || null) : null;
@@ -9916,57 +9916,143 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
     card.appendChild(ejectBtn);
   }
 
-  // ── Drag-and-drop reordering (allNotesGrid only) ──────────────
-  card.addEventListener('dragstart', e => {
-    draggedNoteId = note.id;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', note.id);
-    setTimeout(() => card.classList.add('dragging'), 0);
-  });
-
-  card.addEventListener('dragend', () => {
-    card.classList.remove('dragging');
-    draggedNoteId = null;
-    document.querySelectorAll('.note-card').forEach(c =>
-      c.classList.remove('drag-over-top', 'drag-over-bottom'));
-  });
-
-  card.addEventListener('dragover', e => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (!draggedNoteId || draggedNoteId === note.id) return;
-    if (!card.closest('#allNotesGrid')) return;
-    const grid = card.closest('#allNotesGrid');
-    grid.querySelectorAll('.note-card').forEach(c =>
-      c.classList.remove('drag-over-top', 'drag-over-bottom'));
-    const rect = card.getBoundingClientRect();
-    card.classList.add(e.clientY < rect.top + rect.height / 2 ? 'drag-over-top' : 'drag-over-bottom');
-  });
-
-  card.addEventListener('dragleave', e => {
-    if (!card.contains(e.relatedTarget))
-      card.classList.remove('drag-over-top', 'drag-over-bottom');
-  });
-
-  card.addEventListener('drop', async e => {
-    e.preventDefault();
-    if (!draggedNoteId || draggedNoteId === note.id) return;
-    const grid = card.closest('#allNotesGrid');
-    if (!grid) return;
-    const rect = card.getBoundingClientRect();
-    const insertBefore = e.clientY < rect.top + rect.height / 2;
-    card.classList.remove('drag-over-top', 'drag-over-bottom');
-
-    const cards = [...grid.querySelectorAll('.note-card[data-note-id]')];
-    const orderedIds = cards.map(c => c.dataset.noteId).filter(id => id !== draggedNoteId);
-    const targetIdx  = orderedIds.indexOf(note.id);
-    orderedIds.splice(insertBefore ? targetIdx : targetIdx + 1, 0, draggedNoteId);
-
-    await updateNoteOrderFS(orderedIds);
-    renderHomeView();
-  });
+  // ── Pointer-based smooth drag reorder ────────────────────────
+  attachNoteDrag(card, note.id);
 
   return card;
+}
+
+/* ═══════════════════════════════════════════════
+   Pointer-drag reorder for note cards
+═══════════════════════════════════════════════ */
+function attachNoteDrag(card, noteId) {
+  const handle = card.querySelector('.note-card-drag-handle');
+  if (!handle) return;
+
+  let startX, startY, activePointerId;
+
+  handle.addEventListener('pointerdown', e => {
+    if (_bulkSelectMode) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    startX = e.clientX;
+    startY = e.clientY;
+    activePointerId = e.pointerId;
+    _noteDrag = { card, noteId, dragging: false, insertIndex: -1 };
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!_noteDrag || _noteDrag.card !== card) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    if (!_noteDrag.dragging) {
+      if (Math.hypot(dx, dy) < 6) return; // ignore micro-movement
+      // -- Drag starts --
+      const grid = card.closest('#allNotesGrid');
+      if (!grid) { _noteDrag = null; return; }
+      handle.setPointerCapture(activePointerId);
+      const rect = card.getBoundingClientRect();
+      _noteDrag.dragging   = true;
+      _noteDrag.grid       = grid;
+      _noteDrag.offsetX    = startX - rect.left;
+      _noteDrag.offsetY    = startY - rect.top;
+      _noteDrag.cardH      = rect.height;
+
+      // Original card becomes invisible placeholder (keeps its space in flow)
+      card.classList.add('note-card-placeholder');
+      card.style.minHeight = rect.height + 'px';
+
+      // Floating clone follows the cursor
+      const clone = card.cloneNode(true);
+      clone.className = 'note-card note-card-dragging';
+      clone.style.cssText =
+        `position:fixed;width:${rect.width}px;height:${rect.height}px;` +
+        `left:${rect.left}px;top:${rect.top}px;margin:0;`;
+      document.body.appendChild(clone);
+      _noteDrag.clone = clone;
+
+      document.body.style.userSelect  = 'none';
+      document.body.style.touchAction = 'none';
+      return;
+    }
+
+    // -- Move clone --
+    const { clone, offsetX, offsetY, cardH, grid } = _noteDrag;
+    const cloneLeft = e.clientX - offsetX;
+    const cloneTop  = e.clientY - offsetY;
+    clone.style.left = cloneLeft + 'px';
+    clone.style.top  = cloneTop  + 'px';
+
+    // Determine insert position from clone center Y
+    const cloneCenterY = cloneTop + cardH / 2;
+    const otherCards = [...grid.querySelectorAll('.note-card[data-note-id]')]
+      .filter(c => c !== card);
+
+    let newIdx = otherCards.length;
+    for (let i = 0; i < otherCards.length; i++) {
+      const r = otherCards[i].getBoundingClientRect();
+      if (cloneCenterY < r.top + r.height / 2) { newIdx = i; break; }
+    }
+
+    if (newIdx !== _noteDrag.insertIndex) {
+      _noteDrag.insertIndex = newIdx;
+
+      // FLIP: record positions before DOM change
+      const snapshots = otherCards.map(c => ({ c, top: c.getBoundingClientRect().top }));
+
+      // Move placeholder in DOM
+      if (newIdx >= otherCards.length) {
+        otherCards[otherCards.length - 1]?.after(card) ?? grid.appendChild(card);
+      } else {
+        otherCards[newIdx].before(card);
+      }
+
+      // FLIP: animate other cards from old → new position
+      requestAnimationFrame(() => {
+        snapshots.forEach(({ c, top: oldTop }) => {
+          const newTop = c.getBoundingClientRect().top;
+          const delta  = oldTop - newTop;
+          if (Math.abs(delta) < 1) return;
+          c.style.transition = 'none';
+          c.style.transform  = `translateY(${delta}px)`;
+          requestAnimationFrame(() => {
+            c.style.transition = 'transform 0.2s ease';
+            c.style.transform  = '';
+          });
+        });
+      });
+    }
+  });
+
+  const commitDrag = () => {
+    if (!_noteDrag || _noteDrag.card !== card) return;
+    const { dragging, clone, grid } = _noteDrag;
+    _noteDrag = null;
+    document.body.style.userSelect  = '';
+    document.body.style.touchAction = '';
+
+    if (!dragging || !clone) return;
+
+    // Clean up transform residue from FLIP on all cards
+    if (grid) grid.querySelectorAll('.note-card').forEach(c => { c.style.transition = ''; c.style.transform = ''; });
+
+    clone.remove();
+    card.classList.remove('note-card-placeholder');
+    card.style.minHeight = '';
+    card.classList.add('note-card-settling');
+    card.addEventListener('animationend', () => card.classList.remove('note-card-settling'), { once: true });
+
+    if (grid) {
+      const orderedIds = [...grid.querySelectorAll('.note-card[data-note-id]')]
+        .map(c => c.dataset.noteId).filter(Boolean);
+      updateNoteOrderFS(orderedIds).catch(err => console.warn('reorder save:', err));
+    }
+  };
+
+  handle.addEventListener('pointerup',     commitDrag);
+  handle.addEventListener('pointercancel', commitDrag);
 }
 
 /* ═══════════════════════════════════════════════
