@@ -6429,7 +6429,7 @@ async function classifyNoteContent(noteText) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
     }),
@@ -6442,7 +6442,8 @@ async function classifyNoteContent(noteText) {
 
   const data = await res.json();
   const raw  = data?.content?.[0]?.text ?? '';
-  const match = raw.match(/\[[\s\S]*\]/);
+  const cleaned = raw.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+  const match = cleaned.match(/\[[\s\S]*\]/);
   if (!match) throw new Error('분류 결과를 파싱할 수 없습니다.');
   const items = JSON.parse(match[0]);
   if (!Array.isArray(items)) throw new Error('분류 결과가 배열이 아닙니다.');
