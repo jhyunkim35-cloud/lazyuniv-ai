@@ -2660,6 +2660,7 @@
           <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text);">모든 노트</h2>
         </div>
         <div style="display:flex;gap:0.4rem;">
+          <button id="examReviewBtn" class="action-btn" style="display:none;" onclick="launchExamReview()">📋 시험 대비 요약</button>
           <button id="bulkSelectToggleBtn" class="action-btn" onclick="toggleBulkSelectMode()">선택</button>
           <button class="action-btn" onclick="showImportNoteModal()">📥 가져오기</button>
           <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
@@ -6625,6 +6626,103 @@ async function getWeaknessReport(noteId) {
   return { totalQuizzes: results.length, totalQuestions: allQs.length, sections };
 }
 
+/* ═══════════════════════════════════════════════
+   Exam Review — data collection (Part 1)
+═══════════════════════════════════════════════ */
+
+// Parse notesText into a map of { h2Title → sectionText }
+function parseNoteSections(notesText) {
+  const sections = new Map();
+  if (!notesText) return sections;
+  // Split on lines that start with ## (h2), keeping the header line
+  const parts = notesText.split(/(?=^## .+)/m);
+  for (const part of parts) {
+    const firstLine = part.split('\n')[0].replace(/^##\s*/, '').trim();
+    if (firstLine) sections.set(firstLine, part.trim());
+  }
+  return sections;
+}
+
+async function examReviewData(folderId) {
+  const [allNotes, allFolders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
+  const folderNotes = allNotes.filter(n => n.folderId === folderId);
+  const folder      = allFolders.find(f => f.id === folderId);
+
+  // Aggregate per-section stats across all notes in the folder
+  // sectionKey = "noteId::sectionName" to keep sections from different notes separate
+  const sectionStats = new Map(); // sectionKey → { sectionName, noteTitle, noteId, correct, total, content }
+
+  for (const note of folderNotes) {
+    const results    = await getQuizResultsByNote(note.id);
+    const sectionMap = parseNoteSections(note.notesText || '');
+
+    for (const result of results) {
+      for (const q of (result.questions || [])) {
+        const secName = q.section || '기타';
+        const key     = note.id + '::' + secName;
+        if (!sectionStats.has(key)) {
+          sectionStats.set(key, {
+            sectionName:    secName,
+            noteTitle:      note.title || '제목없음',
+            noteId:         note.id,
+            correct:        0,
+            total:          0,
+            content:        sectionMap.get(secName) || '',
+          });
+        }
+        const entry = sectionStats.get(key);
+        entry.total++;
+        if (q.correct) entry.correct++;
+      }
+    }
+  }
+
+  // Build enriched section objects with accuracy
+  const allSectionList = [...sectionStats.values()].map(s => ({
+    ...s,
+    accuracy:      s.total ? Math.round(s.correct / s.total * 100) : null,
+    questionCount: s.total,
+  }));
+
+  // Sort by accuracy ascending (weakest first); sections with no quiz data go last
+  allSectionList.sort((a, b) => {
+    if (a.accuracy === null && b.accuracy === null) return 0;
+    if (a.accuracy === null) return 1;
+    if (b.accuracy === null) return -1;
+    return a.accuracy - b.accuracy;
+  });
+
+  const weakSections      = allSectionList.filter(s => s.accuracy !== null && s.accuracy < 70);
+  const importantSections = [...allSectionList]
+    .filter(s => s.questionCount > 0)
+    .sort((a, b) => b.questionCount - a.questionCount)
+    .slice(0, 10); // top 10 most-quizzed sections
+
+  const totalQuizQuestions = allSectionList.reduce((sum, s) => sum + s.questionCount, 0);
+
+  return {
+    folderName:         folder?.name || '폴더',
+    totalNotes:         folderNotes.length,
+    totalQuizQuestions,
+    weakSections,
+    importantSections,
+    allSections:        allSectionList,
+  };
+}
+
+// Placeholder — Part 2 will render the review UI
+function launchExamReview() {
+  if (!_activeFolderId) return;
+  showToast('📋 시험 대비 요약 데이터 수집 중…');
+  examReviewData(_activeFolderId).then(data => {
+    console.log('[ExamReview] data ready:', data);
+    showToast(`✅ ${data.totalNotes}개 노트, ${data.totalQuizQuestions}문제 분석 완료 (UI는 Part 2에서 추가됩니다)`);
+  }).catch(e => {
+    console.error('[ExamReview] data error:', e);
+    showToast('❌ 데이터 수집 중 오류가 발생했습니다');
+  });
+}
+
 function renderWeaknessReport(containerEl, report, quizCount) {
   const minQuestions  = 30;
   const totalAnswered = report ? report.totalQuestions : 0;
@@ -9802,6 +9900,15 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const allNotesTitle = document.getElementById('allNotesTitle');
   if (recentSection) recentSection.style.display = isFolderView ? 'none' : '';
   if (folderBackBtn) folderBackBtn.style.display  = isFolderView ? ''     : 'none';
+
+  // Show exam-review button only in folder view with 2+ notes
+  const examReviewBtn = document.getElementById('examReviewBtn');
+  if (examReviewBtn) {
+    const folderNoteCount = isFolderView
+      ? notes.filter(n => n.folderId === _activeFolderId).length
+      : 0;
+    examReviewBtn.style.display = (isFolderView && folderNoteCount >= 2) ? '' : 'none';
+  }
 
   // Eject drop zone — visible only in folder view
   const ejectDropZone = document.getElementById('ejectDropZone');
