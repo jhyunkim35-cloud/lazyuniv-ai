@@ -2613,9 +2613,10 @@
     }
   });
 
-  // Double-click: navigate to batch view (only if no drag happened)
+  // Double-click: navigate back to batch view (only if no drag happened)
   buddy.addEventListener('dblclick', e => {
     if (didDrag) return;
+    _batchBuddyVisible = false;
     if (typeof switchView === 'function') switchView('new');
   });
 })();
@@ -2763,7 +2764,7 @@
 
     <!-- Go-home button — shown while batch runs so user can navigate away -->
     <div id="batchGoHomeRow" style="display:none; padding:0.5rem 0;">
-      <button id="batchGoHomeBtn" onclick="switchView('home')" style="background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:0.84rem; padding:0.4rem 1rem; cursor:pointer;">🏠 홈으로 돌아가기</button>
+      <button id="batchGoHomeBtn" onclick="_batchBuddyVisible=true; switchView('home')" style="background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:0.84rem; padding:0.4rem 1rem; cursor:pointer;">🏠 홈으로 돌아가기</button>
     </div>
 
   </div><!-- /batchSection -->
@@ -7939,8 +7940,9 @@ ${notesText}`;
 let isBatchMode = false;
 let batchQueue  = [];   // [{id, pptFile, txtFile, status}]
 let batchIdCounter = 0;
-let _batchRunning  = false;
-let _batchProgress = { done: 0, total: 0 };
+let _batchRunning      = false;
+let _batchProgress     = { done: 0, total: 0 };
+let _batchBuddyVisible = false; // true while buddy should float over non-batch views
 let batchPptStaging = null;
 let batchSessionStaging = []; // [{id, txtFile, professorNum}]
 let batchSessionIdCounter = 0;
@@ -8164,8 +8166,8 @@ function updateBatchBuddy() {
   const char   = document.getElementById('batchBuddyChar');
   if (!buddy) return;
 
-  // Hide when not running or when on the batch view itself
-  if (!_batchRunning || _currentView === 'new') {
+  // Hide when not running or when buddy hasn't been sent home yet
+  if (!_batchRunning || !_batchBuddyVisible) {
     buddy.style.display = 'none';
     return;
   }
@@ -8195,7 +8197,7 @@ function finalizeBatchProgress(total, failed) {
   if (buddy && buddy.style.display !== 'none') {
     if (speech) speech.textContent = '✅ 완료!';
     if (char)   { char.classList.remove('working'); char.classList.add('done'); }
-    setTimeout(() => { if (buddy) buddy.style.display = 'none'; }, 3000);
+    setTimeout(() => { if (buddy) buddy.style.display = 'none'; _batchBuddyVisible = false; }, 3000);
   }
 
   // If user navigated to home while batch ran, show toast and refresh home grid
