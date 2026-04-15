@@ -3265,7 +3265,34 @@ async function syncNotesOnLogin() {
       }
     }
 
-    // 5. Convert slideImageUrls for any local note missing extractedImages
+    // 5. Sync quiz results from Firestore → IndexedDB (merge only, never delete)
+    try {
+      const qrSnap = await firebase.firestore()
+        .collection('users').doc(currentUser.uid)
+        .collection('quizResults').get();
+      const idbQr = await openDB();
+      for (const doc of qrSnap.docs) {
+        const fsQr = doc.data();
+        await new Promise((res, rej) => {
+          const tx  = idbQr.transaction('quizResults', 'readwrite');
+          const req = tx.objectStore('quizResults').get(fsQr.id);
+          req.onsuccess = e => {
+            const local = e.target.result;
+            // Add if absent; keep the newer record if both exist
+            if (!local || (fsQr.timestamp && local.timestamp && fsQr.timestamp > local.timestamp)) {
+              tx.objectStore('quizResults').put(fsQr);
+            }
+            tx.oncomplete = () => res();
+            tx.onerror    = ev => rej(ev.target.error);
+          };
+          req.onerror = ev => rej(ev.target.error);
+        }).catch(e => console.warn('quizResult IDB merge failed:', fsQr.id, e));
+      }
+    } catch (e) {
+      console.warn('Quiz results sync failed (non-critical):', e);
+    }
+
+    // 6. Convert slideImageUrls for any local note missing extractedImages
     const allLocal = await getAllNotes();
     for (const note of allLocal) {
       if (note.slideImageUrls && !note.extractedImages) {
@@ -8679,7 +8706,18 @@ async function saveQuizResult(result) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('quizResults', 'readwrite');
     tx.objectStore('quizResults').put(result);
-    tx.oncomplete = () => resolve(result);
+    tx.oncomplete = () => {
+      resolve(result);
+      // Fire-and-forget Firestore write — don't block quiz flow
+      const user = firebase.auth().currentUser;
+      if (user) {
+        firebase.firestore()
+          .collection('users').doc(user.uid)
+          .collection('quizResults').doc(result.id)
+          .set(result, { merge: true })
+          .catch(e => console.warn('Firestore quizResult save failed:', e));
+      }
+    };
     tx.onerror    = e => reject(e.target.error);
     tx.onabort    = e => reject(e.target.error);
   });
@@ -8778,14 +8816,17 @@ async function deleteNote(id) {
     tx.objectStore('notes').delete(id);
     tx.oncomplete = () => {
       resolve();
-      // Also delete from Firestore — fire-and-forget safety net
+      // Fire-and-forget Firestore cleanup — note + all its quiz results
       const user = firebase.auth().currentUser;
       if (user) {
-        firebase.firestore()
-          .collection('users').doc(user.uid)
-          .collection('notes').doc(id)
+        const userFs = firebase.firestore().collection('users').doc(user.uid);
+        userFs.collection('notes').doc(id)
           .delete()
           .catch(e => console.warn('Firestore note delete failed:', e));
+        // Delete quiz results whose noteId matches the deleted note
+        userFs.collection('quizResults').where('noteId', '==', id).get()
+          .then(snap => snap.forEach(doc => doc.ref.delete()))
+          .catch(e => console.warn('Firestore quizResults cleanup failed:', e));
       }
     };
     tx.onerror    = e => reject(e.target.error);
