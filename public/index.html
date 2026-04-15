@@ -5230,6 +5230,13 @@ analyzeBtn.addEventListener('click', async () => {
   isRunning = true;
   abortController = new AbortController();
 
+  // Reuse buddy system so user can navigate away freely
+  _batchRunning      = true;
+  _batchProgress     = { done: 0, total: 1 };
+  _batchBuddyVisible = false;
+  const _singleGoHomeRow = document.getElementById('batchGoHomeRow');
+  if (_singleGoHomeRow) _singleGoHomeRow.style.display = '';
+
   analyzeBtn.disabled = true;
   analyzeBtn.textContent = '⏳ 파일 처리 중…';
 
@@ -5309,6 +5316,21 @@ analyzeBtn.addEventListener('click', async () => {
     setProgress(100, '완료!');
     setTimeout(() => setProgress(null), 800);
 
+    // Single note done — celebrate on buddy if user navigated away, then clean up
+    _batchRunning = false;
+    const _sBuddy  = document.getElementById('batchBuddy');
+    const _sSpeech = document.getElementById('batchBuddySpeech');
+    const _sChar   = document.getElementById('batchBuddyChar');
+    if (_batchBuddyVisible && _sBuddy) {
+      if (_sSpeech) _sSpeech.textContent = '✅ 완료!';
+      if (_sChar)   { _sChar.classList.remove('working'); _sChar.classList.add('done'); }
+      setTimeout(() => { _sBuddy.style.display = 'none'; _batchBuddyVisible = false; }, 3000);
+      if (_currentView === 'home') showToast('✅ 노트 생성 완료!');
+    } else {
+      _batchBuddyVisible = false;
+      updateBatchBuddy();
+    }
+
     // Auto-save to IndexedDB
     autoSaveNote().catch(e => { console.error('autoSaveNote:', e); showToast(`❌ 자동 저장 실패: ${e.message}`); });
     await incrementUsage();
@@ -5331,6 +5353,14 @@ analyzeBtn.addEventListener('click', async () => {
   } finally {
     isRunning = false;
     abortController = null;
+    // Clean up buddy state on error/abort (success path already cleared _batchRunning)
+    if (_batchRunning) {
+      _batchRunning      = false;
+      _batchBuddyVisible = false;
+      updateBatchBuddy();
+    }
+    const _fGoHomeRow = document.getElementById('batchGoHomeRow');
+    if (_fGoHomeRow) _fGoHomeRow.style.display = 'none';
     analyzeBtn.textContent = '✨ AI 분석 시작';
     cancelBtn.classList.remove('visible');
     checkReady();
@@ -8230,7 +8260,7 @@ function updateBatchBuddy() {
   }
 
   const { done, total } = _batchProgress;
-  if (speech) speech.textContent = `📝 ${done}/${total} 완료!`;
+  if (speech) speech.textContent = total === 1 ? '📝 노트 생성 중…' : `📝 ${done}/${total} 완료!`;
   if (char)   { char.classList.add('working'); char.classList.remove('done'); }
   buddy.style.display = 'flex';
 }
@@ -9582,13 +9612,8 @@ let _currentView = 'home';
 let _activeFolderId = null; // null=all, 'none'=uncategorized, uuid=folder
 
 function switchView(view) {
-  // Batch runs in the background — allow free navigation without aborting
-  if (isRunning && !_batchRunning) {
-    if (!confirm('AI 분석이 진행 중입니다. 이동하면 분석이 중단됩니다. 계속하시겠습니까?')) return;
-    abortController?.abort();
-    setProgress(null);
-  }
-  // When leaving the batch view while batch runs, hide the top progress bar visually
+  // All pipelines (batch and single note) run in the background — free navigation allowed
+  // When leaving the note view while a pipeline runs, hide the top progress bar visually
   if (_batchRunning && _currentView === 'new' && view !== 'new') {
     document.querySelector('.progress-wrap')?.classList.remove('visible');
   }
