@@ -7335,6 +7335,18 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
         analyzeBtn.textContent = `⏳ Agent 2: ${iter}차 검토 중…`;
         setProgress(45, `Agent 2: ${iter}차 검토 중…`);
         critiqueText = await agent2_critiqueNotes(apiKey, notesText, storedPptText, storedFilteredText, iter);
+
+        // Guard: if Agent2 returned a meta-report instead of a real critique, keep Agent1 notes as-is
+        const CRITIC_META_MARKERS = ['검토 보고서', '제출된 학습 노트', '요청사항', '수정 불가'];
+        const criticIsMeta = CRITIC_META_MARKERS.some(m => critiqueText.includes(m));
+        if (criticIsMeta) {
+          console.warn('Agent2 returned meta-report instead of critique — using Agent1 notes as-is');
+          agentLog(0, '⚠️ Agent2가 메타 보고서를 반환 — Agent1 노트를 최종 결과로 사용');
+          updateIterCounter('done', iter);
+          addIterChip(iter, true);
+          break;
+        }
+
         const isDone = critiqueText.includes(DONE_SIGNAL);
         debugLog('PIPE', `Iter ${iter} — Agent2 done, isDone=${isDone}, critique=${critiqueText.length}chars`);
 
@@ -7371,8 +7383,21 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
         }
         analyzeBtn.textContent = `⏳ Haiku: ${iter}차 핵심 수정 중…`;
         setProgress(65, `Haiku: ${iter}차 핵심 수정 중…`);
+        const prePatchNotes = notesText;
         notesText = await agent1_patchNotes(apiKey, notesText, critiqueText, targetBodyEl);
         debugLog('PIPE', `Iter ${iter} — Haiku patch done, notes=${notesText.length}chars`);
+
+        // Guard: if Haiku patch produced meta-content, revert to pre-patch notes
+        const PATCH_META_MARKERS = ['검토 보고서', '요청사항', '[CRITICAL]'];
+        const patchIsMeta = PATCH_META_MARKERS.some(m => notesText.includes(m));
+        if (patchIsMeta) {
+          console.warn('Haiku patch produced meta-content — reverting to pre-patch notes');
+          agentLog(1, '⚠️ Haiku 패치 결과에 메타 콘텐츠 감지 — 패치 전 노트로 복원');
+          notesText = prePatchNotes;
+          const iterTargetEl2 = targetBodyEl || document.getElementById('finalNotesBody');
+          iterTargetEl2.innerHTML = renderMarkdown(notesText);
+          storedNotesText = notesText;
+        }
         if (!targetBodyEl) document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
 
         const iterDuration = Date.now() - iterStart;
