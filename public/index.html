@@ -5785,13 +5785,14 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
     formatInstruction +
     dedupClause;
 
+  const maxTokens = Math.max(8192, count * 800); // scale with question count
   const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
     }),
@@ -5903,13 +5904,14 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
     formatInstruction +
     dedupClause;
 
+  const maxTokens = Math.max(8192, count * 800); // scale with question count
   const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: maxTokens,
       stream: true,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
@@ -6555,8 +6557,11 @@ async function getWeaknessReport(noteId) {
 }
 
 function renderWeaknessReport(containerEl, report, quizCount) {
-  if (quizCount < 3) {
-    containerEl.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.4rem 0;">📊 약점 분석은 3회 이상 퀴즈 후 제공됩니다 (${quizCount}/3)</div>`;
+  const minQuestions  = 30;
+  const totalAnswered = report ? report.totalQuestions : 0;
+  const hasEnough     = totalAnswered >= minQuestions;
+  if (!hasEnough) {
+    containerEl.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.4rem 0;">📊 약점 분석은 누적 ${minQuestions}문제 이상 풀면 제공됩니다 (${totalAnswered}/${minQuestions})</div>`;
     return;
   }
   if (!report || !report.sections.length) return;
