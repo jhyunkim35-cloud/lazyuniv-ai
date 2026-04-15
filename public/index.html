@@ -8511,6 +8511,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         }
 
         storedFilteredText = separatedText;
+        storedNotesText    = ''; // reset so previous item's notes don't leak into this pipeline
 
         // Full agent loop streams into this lecture's card body
         await runAgentPipeline(apiKey, cardBodyEl);
