@@ -9750,6 +9750,7 @@ function openNotionNote(note) {
   // Clear any previous quiz area
   const quizArea = document.getElementById('notionQuizArea');
   quizArea.innerHTML = '';
+  delete quizArea.dataset.noteId;
   quizArea.style.display = 'flex';
 
   // Wire up tab buttons
@@ -9798,11 +9799,16 @@ function _switchNotionTab(tab) {
 
   if (tab === 'quiz') {
     const quizArea = document.getElementById('notionQuizArea');
-    // Only launch settings if area is empty
-    if (!quizArea.innerHTML.trim() || quizArea.style.display === 'none') {
+    const needsFreshQuiz =
+      quizArea.dataset.noteId !== _currentNotionNoteId ||
+      !quizArea.innerHTML.trim() ||
+      quizArea.style.display === 'none';
+    if (needsFreshQuiz) {
       const note = { id: _currentNotionNoteId, title: document.getElementById('notionViewerTitle').textContent };
       const noteText = storedNotesText;
       if (!noteText) { showToast('노트 내용이 없습니다.'); return; }
+      quizArea.innerHTML = '';
+      quizArea.dataset.noteId = _currentNotionNoteId;
       quizArea.style.display = 'flex';
       showQuizSettings(note.title, note.id, noteText, quizArea);
     }
