@@ -3323,17 +3323,18 @@ async function syncNotesOnLogin() {
     }
 
     // 3. 로컬에 있는데 Firestore에 없으면 → Firestore에 업로드
-    for (const ln of localNotes) {
-      if (deletedSet.has(ln.id)) continue;
-      if (!fsNoteMap[ln.id]) {
-        try { await saveNoteFS(ln); } catch (e) { console.warn('Sync upload skip:', ln.id, e.message); }
-      }
-    }
-    for (const lf of localFolders) {
-      if (!fsFolderMap[lf.id]) {
-        try { await saveFolderFS(lf); } catch (e) { console.warn('Folder sync skip:', e.message); }
-      }
-    }
+    // HOTFIX: disabled to prevent ghost note resurrection
+    // for (const ln of localNotes) {
+    //   if (deletedSet.has(ln.id)) continue;
+    //   if (!fsNoteMap[ln.id]) {
+    //     try { await saveNoteFS(ln); } catch (e) { console.warn('Sync upload skip:', ln.id, e.message); }
+    //   }
+    // }
+    // for (const lf of localFolders) {
+    //   if (!fsFolderMap[lf.id]) {
+    //     try { await saveFolderFS(lf); } catch (e) { console.warn('Folder sync skip:', e.message); }
+    //   }
+    // }
 
     // 4. 둘 다 있으면 → updatedAt 비교
     for (const fsNote of fsNotes) {
@@ -3346,7 +3347,8 @@ async function syncNotesOnLogin() {
         const merged = Object.assign({}, fsNote, { slideImages: local.slideImages, notesHtml: local.notesHtml, extractedImages: local.extractedImages });
         await saveNote(merged);
       } else if (localTime > fsTime) {
-        try { await saveNoteFS(local); } catch (e) { console.warn('Sync push skip:', e.message); }
+        // HOTFIX: disabled to prevent ghost note resurrection
+        // try { await saveNoteFS(local); } catch (e) { console.warn('Sync push skip:', e.message); }
       }
     }
 
