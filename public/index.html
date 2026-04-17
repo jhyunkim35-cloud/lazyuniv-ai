@@ -5941,13 +5941,14 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
   const systemPrompt =
     `You are a quiz generator for Korean university exam preparation. ` +
     `Generate exactly ${count} questions from the provided study notes. ` +
+    `IMPORTANT: If you sense you're running low on output space, keep explanations SHORTER rather than leaving questions out. Completing all ${count} questions is more important than long explanations. Never emit an incomplete trailing question. ` +
     `Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. ` +
     `3) Cover different sections of the notes evenly. 4) All content in Korean. ` +
     `5) Output ONLY a valid JSON array — no markdown, no preamble, no backticks. ` +
     formatInstruction +
     dedupClause;
 
-  const maxTokens = Math.max(8192, count * 800); // scale with question count
+  const maxTokens = Math.max(8192, count * 1100); // scale with question count
   const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
@@ -6064,13 +6065,14 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
     `You are a quiz generator for Korean university exam preparation. ` +
     notionClause +
     `Generate exactly ${count} questions from the provided study notes. ` +
+    `IMPORTANT: If you sense you're running low on output space, keep explanations SHORTER rather than leaving questions out. Completing all ${count} questions is more important than long explanations. Never emit an incomplete trailing question. ` +
     `Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. ` +
     `3) Cover different sections of the notes evenly. 4) All content in Korean. ` +
     `5) Output ONLY a valid JSON array — no markdown, no preamble, no backticks. ` +
     formatInstruction +
     dedupClause;
 
-  const maxTokens = Math.max(8192, count * 800); // scale with question count
+  const maxTokens = Math.max(8192, count * 1100); // scale with question count
   const t0  = Date.now();
   const res = await fetch('/api/claude', {
     method: 'POST',
@@ -6380,6 +6382,10 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
 
       clearInterval(msgInterval);
       clearInterval(timerInterval);
+
+      if (streamedQuestions.length < totalExpected) {
+        console.warn(`[quiz] under-generation: expected ${totalExpected}, got ${streamedQuestions.length}`);
+      }
 
       if (!firstArrived) {
         // Nothing streamed — fall back to full batch render
