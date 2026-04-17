@@ -6470,6 +6470,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
         if (inp && inp.value.trim()) answers[i] = inp.value;
       }
     });
+    checkGradeReady();
   }
 
   if (!skipCardRender) {
