@@ -2383,6 +2383,38 @@
     .skeleton-line.medium { width:70%; }
     .skeleton-line.long { width:100%; }
 
+    /* ── Notion note badge ──────────────────────── */
+    .notion-type-badge { position:absolute; top:0.4rem; right:0.4rem; font-size:0.65rem; font-weight:700; padding:0.1rem 0.35rem; border-radius:5px; background:rgba(0,180,216,0.15); color:var(--secondary); border:1px solid rgba(0,180,216,0.3); pointer-events:none; }
+
+    /* ── Notion upload zone ─────────────────────── */
+    .notion-upload-section { margin-top:1.25rem; border:2px dashed var(--border); border-radius:var(--radius); padding:1.4rem 1.5rem; background:var(--surface); transition:all 0.25s; }
+    .notion-upload-section:hover { border-color:var(--secondary); }
+    .notion-upload-header { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.3rem; }
+    .notion-upload-icon { font-size:1.3rem; }
+    .notion-upload-title { font-size:0.95rem; font-weight:700; color:var(--text); }
+    .notion-upload-subtitle { font-size:0.82rem; color:var(--text-muted); margin-bottom:0.5rem; line-height:1.5; }
+    .notion-upload-help { font-size:0.76rem; color:var(--text-dim); background:var(--surface2); border-radius:6px; padding:0.3rem 0.6rem; margin-bottom:0.75rem; }
+    .notion-upload-btn-row { display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; }
+    .notion-upload-btn { position:relative; display:inline-flex; align-items:center; gap:0.4rem; padding:0.5rem 1.1rem; background:var(--secondary-dim); border:1px solid rgba(0,180,216,0.4); border-radius:8px; color:var(--secondary); font-size:0.88rem; font-weight:600; cursor:pointer; overflow:hidden; transition:background 0.15s; }
+    .notion-upload-btn:hover { background:rgba(0,180,216,0.22); }
+    .notion-upload-btn input[type="file"] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .notion-upload-tag { display:none; align-items:center; gap:0.4rem; padding:0.25rem 0.6rem; background:var(--success-dim); border:1px solid rgba(74,222,128,0.3); border-radius:99px; font-size:0.78rem; color:var(--success); font-weight:500; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .notion-upload-tag.visible { display:inline-flex; }
+    .notion-upload-process-btn { padding:0.5rem 1.2rem; background:linear-gradient(135deg,var(--secondary),#0077a8); border:none; border-radius:8px; color:#fff; font-size:0.88rem; font-weight:700; cursor:pointer; display:none; transition:opacity 0.15s; }
+    .notion-upload-process-btn:hover { opacity:0.85; }
+    .notion-upload-process-btn.visible { display:inline-block; }
+
+    /* ── Notion Viewer ──────────────────────────── */
+    #notionViewer { display:none; position:fixed; inset:0; z-index:10000; background:var(--bg); flex-direction:column; overflow:hidden; }
+    .notion-viewer-topbar { height:48px; display:flex; align-items:center; justify-content:space-between; padding:0 1rem; background:var(--surface2); border-bottom:1px solid var(--border); flex-shrink:0; gap:0.5rem; }
+    .notion-viewer-title { font-size:0.92rem; font-weight:700; color:var(--text); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .notion-viewer-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+    .notion-viewer-tab { padding:0.65rem 1.2rem; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.88rem; font-weight:600; cursor:pointer; transition:color 0.15s,border-color 0.15s; }
+    .notion-viewer-tab:hover { color:var(--text); }
+    .notion-viewer-tab.active { color:var(--text); border-bottom-color:var(--primary); }
+    .notion-viewer-body { font-size:0.92rem; color:var(--text); max-width:820px; margin:0 auto; padding:1.5rem; }
+    .notion-viewer-panel { flex:1; min-height:0; overflow-y:auto; }
+
     /* ── Folder colors ──────────────────────────── */
     .folder-color-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:0.3rem; flex-shrink:0; vertical-align:middle; }
     .folder-color-picker { display:flex; gap:0.4rem; flex-wrap:wrap; }
@@ -2723,6 +2755,24 @@
   </div>
 
 
+  <!-- Notion Upload Section -->
+  <div class="notion-upload-section" id="notionUploadSection">
+    <div class="notion-upload-header">
+      <span class="notion-upload-icon">📓</span>
+      <span class="notion-upload-title">노션에서 바로 퀴즈</span>
+    </div>
+    <p class="notion-upload-subtitle">노션 페이지를 마크다운으로 내보내서 업로드하면 바로 퀴즈 생성</p>
+    <div class="notion-upload-help">💡 노션 → ··· → 내보내기 → Markdown &amp; CSV (.zip) 또는 단일 .md</div>
+    <div class="notion-upload-btn-row">
+      <label class="notion-upload-btn">
+        <span>📁</span> 노션 파일 업로드
+        <input type="file" id="notionFileInput" accept=".md,.zip" />
+      </label>
+      <span class="notion-upload-tag" id="notionFileTag"><span>✓</span><span id="notionFileTagName"></span></span>
+      <button class="notion-upload-process-btn" id="notionProcessBtn">✨ 퀴즈 노트 생성</button>
+    </div>
+  </div>
+
   <!-- PPT-only notice -->
   <div class="ppt-only-notice" id="pptOnlyNotice">
     ℹ️ 녹취록 없이 PPT만으로 정리합니다
@@ -2967,6 +3017,28 @@
         <div id="splitImageGrid" style="display:flex; gap:0.5rem; padding:0.5rem 1rem; overflow-x:auto; max-height:130px;"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Notion Viewer (full-screen overlay) -->
+<div id="notionViewer">
+  <div class="notion-viewer-topbar">
+    <button id="notionViewerBackBtn" class="action-btn">← 뒤로</button>
+    <span id="notionViewerTitle" class="notion-viewer-title"></span>
+    <div style="display:flex;gap:0.4rem;align-items:center;flex-shrink:0;">
+      <button id="notionViewerRenameBtn" class="action-btn" title="이름 변경">✏️</button>
+      <button id="notionViewerDeleteBtn" class="action-btn" title="삭제">🗑</button>
+    </div>
+  </div>
+  <div class="notion-viewer-tabs">
+    <button class="notion-viewer-tab active" id="notionTabBody" data-tab="body">📄 본문</button>
+    <button class="notion-viewer-tab" id="notionTabQuiz" data-tab="quiz">🧪 퀴즈</button>
+  </div>
+  <div class="notion-viewer-panel" id="notionBodyPanel">
+    <div class="notion-viewer-body" id="notionBodyContent"></div>
+  </div>
+  <div class="notion-viewer-panel" id="notionQuizPanel" style="display:none;">
+    <div id="notionQuizArea" style="display:flex; flex-direction:column; gap:0.75rem; padding:1rem;"></div>
   </div>
 </div>
 
@@ -5896,7 +5968,7 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
 // Streaming variant of generateQuiz.
 // Calls onQuestion(questionObj, index) each time a complete question object is parsed from the stream.
 // Returns { questions, debugInfo } after the stream ends.
-async function generateQuizStream(noteText, settings = {}, prevQuestions = [], onQuestion) {
+async function generateQuizStream(noteText, settings = {}, prevQuestions = [], onQuestion, isNotion = false) {
   const count        = settings.count        || 10;
   const answerFormat = settings.answerFormat || 'mc';
   const style        = settings.style        || 'mixed';
@@ -5966,8 +6038,12 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
     ? `\n\nCRITICAL: The following questions have been asked in previous quizzes. Do NOT generate any question that is identical or nearly identical to these. Create NEW questions that test the same concepts from different angles:\n` +
       recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')
     : '';
+  const notionClause = isNotion
+    ? `This content is from a Notion page (markdown). Generate quiz questions based on the key concepts in this text. `
+    : '';
   const systemPrompt =
     `You are a quiz generator for Korean university exam preparation. ` +
+    notionClause +
     `Generate exactly ${count} questions from the provided study notes. ` +
     `Rules: 1) ${styleDesc} 문제를 출제하세요. 2) ${diffDesc} 출제하세요. ` +
     `3) Cover different sections of the notes evenly. 4) All content in Korean. ` +
@@ -6070,19 +6146,19 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
   };
 }
 
-function clearQuizInlineArea() {
-  const area = document.getElementById('quizInlineArea');
+function clearQuizInlineArea(containerEl) {
+  const area = containerEl || document.getElementById('quizInlineArea');
   if (!area) return;
   area.innerHTML = '';
   area.style.display = 'none';
-  // If quiz tab was active, switch back to notes tab
-  if (document.getElementById('quizBtn')?.classList.contains('active')) {
+  // If using the split viewer quiz area and quiz tab was active, switch back to notes tab
+  if (!containerEl && document.getElementById('quizBtn')?.classList.contains('active')) {
     switchSplitTab('notes');
   }
 }
 
-function showQuizSettings(noteTitle, noteId, noteText) {
-  const area = document.getElementById('quizInlineArea');
+function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
+  const area = containerEl || document.getElementById('quizInlineArea');
   area.style.display = 'flex';
 
   const settings = { count: 10, answerFormat: 'mc', style: 'mixed', difficulty: 'medium' };
@@ -6238,9 +6314,11 @@ function showQuizSettings(noteTitle, noteId, noteText) {
         .flatMap(r => (r.questions || []).map(q => q.questionText))
         .filter(Boolean);
 
+      const isNotionQuiz = area === document.getElementById('notionQuizArea');
       const { questions, debugInfo } = await generateQuizStream(
         noteText, settings, prevQuestions,
-        (q, idx) => { streamedQuestions.push(q); appendStreamCard(q, idx); }
+        (q, idx) => { streamedQuestions.push(q); appendStreamCard(q, idx); },
+        isNotionQuiz
       );
 
       clearInterval(msgInterval);
@@ -6601,10 +6679,14 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     }
 
     banner.querySelector('#quizRetryBtn').addEventListener('click', () => {
-      showQuizSettings(noteTitle, noteId, storedNotesText);
+      const isDefaultArea = container === document.getElementById('quizInlineArea');
+      const retryText = isDefaultArea ? storedNotesText : noteText;
+      showQuizSettings(noteTitle, noteId, retryText, isDefaultArea ? null : container);
       container.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-    banner.querySelector('#quizCloseInlineBtn').addEventListener('click', clearQuizInlineArea);
+    const defaultArea = document.getElementById('quizInlineArea');
+    banner.querySelector('#quizCloseInlineBtn').addEventListener('click', () =>
+      clearQuizInlineArea(container === defaultArea ? null : container));
   });
 }
 
@@ -9390,6 +9472,13 @@ async function renderSavedNotes(filteredNotes, activeQuery = '') {
 async function openSavedNote(id) {
   const note = await getNoteFS(id);
   if (!note) { showToast('노트를 찾을 수 없습니다.'); return; }
+
+  // Branch: notion notes use a dedicated viewer
+  if (note.type === 'notion') {
+    openNotionNote(note);
+    return;
+  }
+
   // Regenerate notesHtml from notesText if missing (Firestore excludes it to stay under 1MB)
   if (!note.notesHtml && note.notesText) {
     note.notesHtml = renderMarkdown(note.notesText);
@@ -9436,6 +9525,265 @@ async function openSavedNote(id) {
     if (splitBtn) splitBtn.click();
   }, 100);
 }
+
+/* ═══════════════════════════════════════════════
+   Notion file parser
+═══════════════════════════════════════════════ */
+async function parseNotionFile(file) {
+  let combinedMd = '';
+
+  if (file.name.toLowerCase().endsWith('.md')) {
+    combinedMd = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result);
+      reader.onerror = () => reject(new Error('파일 읽기 실패'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  } else if (file.name.toLowerCase().endsWith('.zip')) {
+    const zip = await JSZip.loadAsync(file);
+    const mdEntries = [];
+    zip.forEach((path, entry) => {
+      if (!entry.dir && path.toLowerCase().endsWith('.md')) {
+        mdEntries.push({ path, entry });
+      }
+    });
+    if (mdEntries.length === 0) {
+      alert('마크다운 파일이 없습니다');
+      return null;
+    }
+    mdEntries.sort((a, b) => a.path.localeCompare(b.path));
+    const parts = await Promise.all(mdEntries.map(({ entry }) => entry.async('string')));
+    combinedMd = parts.join('\n\n---\n\n');
+  } else {
+    alert('.md 또는 .zip 파일만 지원됩니다');
+    return null;
+  }
+
+  if (!combinedMd.trim()) {
+    alert('빈 파일입니다');
+    return null;
+  }
+
+  // Cleanup: remove Notion UUID suffixes from inline links
+  combinedMd = combinedMd.replace(/([^\s\(\)]+?)\s+[a-f0-9]{32}(\.md|\))/g, '$1$2');
+
+  // Extract title from first H1
+  let title = '';
+  const h1Match = combinedMd.match(/^#\s+(.+)$/m);
+  if (h1Match) {
+    title = h1Match[1].trim();
+    combinedMd = combinedMd.replace(/^#\s+.+\n?/m, '');
+  } else {
+    title = file.name.replace(/\.(md|zip)$/i, '');
+  }
+
+  // Strip Notion metadata block (lines after title removal like Created:, Last edited time:, etc.)
+  const metaPattern = /^(Created|Last edited time|Tags|Status|Owner|Type|Date|Priority):\s/i;
+  const lines = combinedMd.split('\n');
+  let i = 0;
+  // Skip leading blank lines then check up to 6 lines for metadata
+  while (i < lines.length && lines[i].trim() === '') i++;
+  const metaStart = i;
+  let metaEnd = i;
+  while (metaEnd < metaStart + 6 && metaEnd < lines.length && (lines[metaEnd].trim() === '' || metaPattern.test(lines[metaEnd]))) {
+    metaEnd++;
+  }
+  if (metaEnd > metaStart) {
+    lines.splice(metaStart, metaEnd - metaStart);
+    combinedMd = lines.join('\n');
+  }
+
+  combinedMd = combinedMd.trim();
+
+  if (!combinedMd) {
+    alert('빈 파일입니다');
+    return null;
+  }
+
+  if (combinedMd.length > 500000) {
+    const ok = confirm(`파일이 큽니다 (${combinedMd.length.toLocaleString()}자). 계속하시겠습니까?`);
+    if (!ok) return null;
+  }
+
+  return { title, markdown: combinedMd };
+}
+
+/* ═══════════════════════════════════════════════
+   Notion Note Viewer
+═══════════════════════════════════════════════ */
+let _currentNotionNoteId = null;
+
+function openNotionNote(note) {
+  _currentNotionNoteId = note.id;
+  currentNoteId = note.id;
+  storedNotesText = note.markdownContent || '';
+
+  const viewer = document.getElementById('notionViewer');
+  document.getElementById('notionViewerTitle').textContent = note.title || '제목없음';
+
+  // Render body
+  const bodyContent = document.getElementById('notionBodyContent');
+  bodyContent.innerHTML = renderMarkdown(note.markdownContent || '');
+
+  // Reset to body tab
+  _switchNotionTab('body');
+
+  // Clear any previous quiz area
+  const quizArea = document.getElementById('notionQuizArea');
+  quizArea.innerHTML = '';
+  quizArea.style.display = 'flex';
+
+  // Wire up tab buttons
+  document.getElementById('notionTabBody').onclick = () => _switchNotionTab('body');
+  document.getElementById('notionTabQuiz').onclick = () => _switchNotionTab('quiz');
+
+  // Wire up rename/delete
+  document.getElementById('notionViewerRenameBtn').onclick = async () => {
+    const newTitle = prompt('노트 이름:', note.title || '');
+    if (!newTitle || newTitle.trim() === note.title) return;
+    const updated = Object.assign({}, note, { title: newTitle.trim() });
+    await saveNoteFS(updated);
+    document.getElementById('notionViewerTitle').textContent = newTitle.trim();
+    note.title = newTitle.trim();
+    showToast('✏️ 이름 변경 완료');
+    renderHomeView();
+  };
+
+  document.getElementById('notionViewerDeleteBtn').onclick = async () => {
+    if (!confirm('이 노트를 삭제하시겠습니까?')) return;
+    await deleteNoteFS(note.id);
+    _closeNotionViewer();
+    showToast('🗑 노트 삭제 완료');
+    renderHomeView();
+  };
+
+  // Wire up back button
+  document.getElementById('notionViewerBackBtn').onclick = _closeNotionViewer;
+
+  viewer.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function _closeNotionViewer() {
+  const viewer = document.getElementById('notionViewer');
+  viewer.style.display = 'none';
+  document.body.style.overflow = '';
+  _currentNotionNoteId = null;
+}
+
+function _switchNotionTab(tab) {
+  document.getElementById('notionTabBody').classList.toggle('active', tab === 'body');
+  document.getElementById('notionTabQuiz').classList.toggle('active', tab === 'quiz');
+  document.getElementById('notionBodyPanel').style.display  = tab === 'body' ? '' : 'none';
+  document.getElementById('notionQuizPanel').style.display  = tab === 'quiz' ? '' : 'none';
+
+  if (tab === 'quiz') {
+    const quizArea = document.getElementById('notionQuizArea');
+    // Only launch settings if area is empty
+    if (!quizArea.innerHTML.trim() || quizArea.style.display === 'none') {
+      const note = { id: _currentNotionNoteId, title: document.getElementById('notionViewerTitle').textContent };
+      const noteText = storedNotesText;
+      if (!noteText) { showToast('노트 내용이 없습니다.'); return; }
+      quizArea.style.display = 'flex';
+      showQuizSettings(note.title, note.id, noteText, quizArea);
+    }
+  }
+
+  if (tab === 'body' && _currentNotionNoteId) {
+    updateNotionWeaknessBadges(_currentNotionNoteId).catch(() => {});
+  }
+}
+
+async function updateNotionWeaknessBadges(noteId) {
+  if (!noteId) return;
+  const bodyContent = document.getElementById('notionBodyContent');
+  if (!bodyContent) return;
+  const h2s = Array.from(bodyContent.querySelectorAll('h2'));
+  if (!h2s.length) return;
+
+  const report = await getWeaknessReport(noteId).catch(() => null);
+  if (!report || !report.sections.length) return;
+
+  const sectionMap = new Map(report.sections.map(s => [s.name, s]));
+  h2s.forEach(h2 => {
+    h2.querySelector('.weakness-badge')?.remove();
+    const text = h2.textContent.trim();
+    const sec  = sectionMap.get(text) || [...sectionMap.values()].find(s => text.includes(s.name) || s.name.includes(text));
+    if (!sec) return;
+    const cls   = sec.accuracy >= 80 ? 'green' : sec.accuracy >= 50 ? 'yellow' : 'red';
+    const badge = document.createElement('span');
+    badge.className  = `weakness-badge ${cls}`;
+    badge.textContent = sec.accuracy + '%';
+    h2.appendChild(badge);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   Notion upload handler
+═══════════════════════════════════════════════ */
+(function initNotionUpload() {
+  const fileInput  = document.getElementById('notionFileInput');
+  const fileTag    = document.getElementById('notionFileTag');
+  const fileTagName = document.getElementById('notionFileTagName');
+  const processBtn = document.getElementById('notionProcessBtn');
+  let _selectedNotionFile = null;
+
+  if (!fileInput) return;
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    _selectedNotionFile = file;
+    fileTagName.textContent = file.name;
+    fileTag.classList.add('visible');
+    processBtn.classList.add('visible');
+  });
+
+  processBtn.addEventListener('click', async () => {
+    if (!_selectedNotionFile) return;
+    processBtn.disabled   = true;
+    processBtn.textContent = '처리 중...';
+
+    try {
+      const result = await parseNotionFile(_selectedNotionFile);
+      if (!result) {
+        processBtn.disabled   = false;
+        processBtn.textContent = '✨ 퀴즈 노트 생성';
+        return;
+      }
+
+      const note = {
+        id:              uuidv4(),
+        title:           result.title,
+        type:            'notion',
+        markdownContent: result.markdown,
+        createdAt:       new Date().toISOString(),
+        folderId:        null,
+        quizHistory:     [],
+      };
+
+      await saveNoteFS(note);
+      showSuccessToast('📓 노션 노트 생성 완료');
+
+      // Reset upload UI
+      _selectedNotionFile  = null;
+      fileInput.value      = '';
+      fileTag.classList.remove('visible');
+      processBtn.classList.remove('visible');
+      processBtn.disabled   = false;
+      processBtn.textContent = '✨ 퀴즈 노트 생성';
+
+      // Open the viewer directly
+      openNotionNote(note);
+
+      renderHomeView();
+    } catch (e) {
+      showToast('❌ 노션 파일 처리 실패: ' + e.message);
+      processBtn.disabled   = false;
+      processBtn.textContent = '✨ 퀴즈 노트 생성';
+    }
+  });
+})();
 
 /* ═══════════════════════════════════════════════
    Delete note
@@ -10149,20 +10497,25 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
   const folderName  = note.folderId ? (folderMap[note.folderId] || '알 수 없음') : '';
   const folderColor = note.folderId ? (folderColorMap[note.folderId] || null) : null;
   const colorDot    = folderColor ? `<span class="folder-color-dot" style="background:${folderColor}"></span>` : '';
-  const preview = (note.notesText || '')
+  const isNotion    = note.type === 'notion';
+  const sourceText  = isNotion ? (note.markdownContent || '') : (note.notesText || '');
+  const preview = sourceText
     .replace(/^#+\s+.*/gm, '').replace(/\*\*/g, '').replace(/\n+/g, ' ').trim().slice(0, 100);
+  const displayTitle = isNotion ? '📓 ' + (note.title || '제목없음') : (note.title || '제목없음');
+  const notionBadge  = isNotion ? '<span class="notion-type-badge">노션</span>' : '';
   card.innerHTML = `
     <input type="checkbox" class="note-card-checkbox">
     <span class="note-card-drag-handle">⠿</span>
     <div class="note-card-content">
       <div class="note-card-folder">${folderName ? colorDot + '📁 ' + escHtml(folderName) : '📄 미분류'}</div>
-      <div class="note-card-title">${escHtml(note.title || '제목없음')}</div>
+      <div class="note-card-title">${escHtml(displayTitle)}</div>
       <div class="note-card-preview">${escHtml(preview)}</div>
       <div class="note-card-footer">
         <span>${fmtDate(note.updatedAt)}</span>
-        <span>${(note.notesText || '').length.toLocaleString()}자</span>
+        <span>${sourceText.length.toLocaleString()}자</span>
       </div>
     </div>
+    ${notionBadge}
     <div class="note-card-actions">
       <button title="이름 변경">✏️</button>
       <button title="폴더 이동">📁</button>
