@@ -9548,6 +9548,31 @@ async function openSavedNote(id) {
 /* ═══════════════════════════════════════════════
    Notion file parser
 ═══════════════════════════════════════════════ */
+async function collectMdFromZip(zip, pathPrefix = '', depth = 0) {
+  if (depth > 5) return []; // zip-bomb guard
+  const results = [];
+  const nestedZips = [];
+
+  zip.forEach((path, entry) => {
+    if (entry.dir) return;
+    const lp = path.toLowerCase();
+    if (lp.endsWith('.md')) {
+      results.push({ path: pathPrefix + path, getText: () => entry.async('string') });
+    } else if (lp.endsWith('.zip')) {
+      nestedZips.push({ path, entry });
+    }
+  });
+
+  for (const { path, entry } of nestedZips) {
+    const innerBlob = await entry.async('blob');
+    const innerZip  = await JSZip.loadAsync(innerBlob);
+    const inner     = await collectMdFromZip(innerZip, pathPrefix + path + '/', depth + 1);
+    results.push(...inner);
+  }
+
+  return results;
+}
+
 async function parseNotionFile(file) {
   let combinedMd = '';
 
@@ -9560,18 +9585,13 @@ async function parseNotionFile(file) {
     });
   } else if (file.name.toLowerCase().endsWith('.zip')) {
     const zip = await JSZip.loadAsync(file);
-    const mdEntries = [];
-    zip.forEach((path, entry) => {
-      if (!entry.dir && path.toLowerCase().endsWith('.md')) {
-        mdEntries.push({ path, entry });
-      }
-    });
+    const mdEntries = await collectMdFromZip(zip);
     if (mdEntries.length === 0) {
       alert('마크다운 파일이 없습니다');
       return null;
     }
     mdEntries.sort((a, b) => a.path.localeCompare(b.path));
-    const parts = await Promise.all(mdEntries.map(({ entry }) => entry.async('string')));
+    const parts = await Promise.all(mdEntries.map(m => m.getText()));
     combinedMd = parts.join('\n\n---\n\n');
   } else {
     alert('.md 또는 .zip 파일만 지원됩니다');
