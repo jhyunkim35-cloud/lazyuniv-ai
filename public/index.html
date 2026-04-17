@@ -3528,6 +3528,10 @@ async function uploadSlideImages(noteId, slideImages) {
     try {
       let data, contentType = 'image/png';
       if (typeof img === 'object' && img.imageBase64) {
+        if (img.mimeType === 'url' && typeof img.imageBase64 === 'string' && img.imageBase64.startsWith('https://')) {
+          urls.push(img.imageBase64);
+          continue;
+        }
         data = img.imageBase64;
         contentType = img.mimeType || 'image/png';
       } else if (typeof img === 'string' && img.includes('base64,')) {
