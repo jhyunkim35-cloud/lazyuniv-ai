@@ -3267,6 +3267,10 @@ async function migrateLocalToFirestore() {
       }
       let ok = 0;
       for (const note of localNotes) {
+        if (!note.title?.trim() || !(note.notesText || note.markdownContent)?.trim()) {
+          console.warn('[migrate] skipped empty legacy note', note.id);
+          continue;
+        }
         try { await saveNoteFS(note); ok++; } catch (e) { console.warn('Note migration skip:', note.id, e.message); }
       }
       showSuccessToast('☁️ ' + ok + '/' + localNotes.length + '개 노트 이전 완료');
@@ -9005,14 +9009,21 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         // Auto-save this item
         const itemName = item.notesName || (item.pptFile?.name || '항목').replace(/\.[^.]+$/, '');
         const batchBodyHtml = document.getElementById('batchBody_' + item.id)?.innerHTML || '';
-        saveNoteFS({
-          title: itemName,
-          notesText: storedNotesText,
-          notesHtml: batchBodyHtml,
-          pptText: storedPptText,
-          filteredText: storedFilteredText,
-          extractedImages: [...(extractedImages || [])],
-        }).then(() => renderSavedNotes()).catch(e => console.warn('Batch save:', e.message));
+        // GUARD: prevent ghost notes — skip if title or content is empty
+        const _t = itemName.trim();
+        const _c = (storedNotesText || '').trim();
+        if (!_t || !_c) {
+          console.warn('[batch] skipped empty note save for item', item?.notesName || '(no name)');
+        } else {
+          await saveNoteFS({
+            title: itemName,
+            notesText: storedNotesText,
+            notesHtml: batchBodyHtml,
+            pptText: storedPptText,
+            filteredText: storedFilteredText,
+            extractedImages: [...(extractedImages || [])],
+          }).then(() => renderSavedNotes()).catch(e => console.error('[batch] save failed:', e));
+        }
         await incrementUsage();
 
         // Track first success for split viewer
@@ -9441,6 +9452,13 @@ async function autoSaveNote() {
     const fileTitle        = pptFile?.name?.replace(/\.[^.]+$/, '') || document.getElementById('pptTagName')?.textContent || '새 노트';
     const autoTitle        = slide1Title || headingTitle || fileTitle;
     const title = await promptNoteName(autoTitle);
+    // GUARD: prevent ghost notes — both title and content must be non-empty
+    const _titleOk = title && title.trim();
+    const _contentOk = storedNotesText && storedNotesText.trim();
+    if (!_titleOk || !_contentOk) {
+      console.warn('[autoSaveNote] skipped empty note save', { titleOk: !!_titleOk, contentOk: !!_contentOk });
+      return;
+    }
     const notesHtml = document.getElementById('finalNotesBody')?.innerHTML || '';
     const record = await saveNoteFS({
       id:                   currentNoteId || undefined,
@@ -10076,6 +10094,10 @@ function showImportNoteModal() {
     try {
       const now = new Date().toISOString();
       for (const s of checked) {
+        if (!s.title?.trim() || !s.plainText?.trim()) {
+          console.warn('[import] skipped empty split');
+          continue;
+        }
         const id = uuidv4();
         const note = {
           id,
