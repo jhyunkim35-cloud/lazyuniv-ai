@@ -6282,6 +6282,22 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
     const streamedQuestions = [];
     const totalExpected = settings.count;
 
+    // Small non-blocking indicator shown while more questions are streaming
+    let streamIndicatorEl = null;
+    function upsertStreamIndicator(arrived) {
+      if (!streamIndicatorEl) {
+        streamIndicatorEl = document.createElement('div');
+        streamIndicatorEl.id = 'quizStreamIndicator';
+        streamIndicatorEl.style.cssText =
+          'text-align:center;font-size:0.82rem;color:var(--text-muted);padding:0.5rem 0 0.25rem;';
+        area.appendChild(streamIndicatorEl);
+      }
+      streamIndicatorEl.textContent = `문제 생성 중... (${arrived} / ${totalExpected})`;
+    }
+    function removeStreamIndicator() {
+      if (streamIndicatorEl) { streamIndicatorEl.remove(); streamIndicatorEl = null; }
+    }
+
     // Append one question card to the area as it streams in
     function appendStreamCard(q, idx) {
       if (!firstArrived) {
@@ -6313,13 +6329,35 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
         <div class="quiz-card-q">${escHtml(q.q)}</div>
         ${inputHtml}
         <div class="qi-explanation"></div>`;
-      area.appendChild(card);
+
+      // Wire immediate visual interaction so cards are usable before stream completes.
+      // runInlineQuiz adds its own delegated listener later; it reconciles answers from DOM.
+      if (type === 'mc') {
+        card.querySelectorAll('.qi-choice').forEach(btn => {
+          btn.addEventListener('click', () => {
+            if (btn.disabled) return;
+            card.querySelectorAll('.qi-choice').forEach(b => b.classList.remove('qi-selected'));
+            btn.classList.add('qi-selected');
+          });
+        });
+      }
+      // text/essay inputs are naturally interactive; no extra wiring needed
+
+      // Insert before the indicator so the indicator stays at the bottom
+      if (streamIndicatorEl) {
+        area.insertBefore(card, streamIndicatorEl);
+      } else {
+        area.appendChild(card);
+      }
       // Double rAF ensures the opacity:0 base state is painted before the transition fires
       requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('visible')));
+
+      upsertStreamIndicator(idx + 1);
     }
 
     // Add grade button and wire up all quiz behavior after cards are in the DOM
     function finalizeStreamedQuiz(questions, debugInfo) {
+      removeStreamIndicator();
       const gradeBtnDiv = document.createElement('div');
       gradeBtnDiv.style.cssText = 'display:flex;justify-content:center;padding-top:0.25rem;';
       gradeBtnDiv.innerHTML = '<button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>';
@@ -6406,6 +6444,23 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
 
   // answers[i]: Number for mc (choice index), String for short/essay, null = unanswered
   const answers = questions.map(q => (q.type && q.type !== 'mc') ? '' : null);
+
+  // When cards were streamed in, the user may have already answered some.
+  // Seed answers from the current DOM state so checkGradeReady() reflects them.
+  if (skipCardRender) {
+    questions.forEach((q, i) => {
+      const type = q.type || 'mc';
+      if (type === 'mc') {
+        const sel = container.querySelector(`.quiz-card[data-qi="${i}"] .qi-choice.qi-selected`);
+        if (sel) answers[i] = Number(sel.dataset.ci);
+      } else {
+        const inp = container.querySelector(
+          `.quiz-card[data-qi="${i}"] .qi-text-input, .quiz-card[data-qi="${i}"] .qi-essay-input`
+        );
+        if (inp && inp.value.trim()) answers[i] = inp.value;
+      }
+    });
+  }
 
   if (!skipCardRender) {
     let html = '';
