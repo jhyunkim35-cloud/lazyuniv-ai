@@ -3124,6 +3124,23 @@ function userFoldersRef() {
   return db.collection('users').doc(currentUser.uid).collection('folders');
 }
 async function saveNoteFS(note) {
+  // ───── GHOST NOTE DIAGNOSTIC (temp, remove after debugging) ─────
+  const _hasTitle = note && note.title && note.title.trim();
+  const _hasContent = note && (note.notesText || note.markdownContent) &&
+                      (note.notesText || note.markdownContent).trim();
+  if (!_hasTitle || !_hasContent) {
+    console.warn('🔴 GHOST CANDIDATE saveNoteFS called with empty data!', {
+      id: note?.id,
+      title: note?.title || '(empty)',
+      hasNotesText: !!note?.notesText,
+      hasMarkdown: !!note?.markdownContent,
+      notesTextLen: note?.notesText?.length || 0,
+      type: note?.type,
+    });
+    console.trace('Call stack:');
+  }
+  console.log('[saveNoteFS]', note?.id, '|', note?.title || '(no title)', '|', _hasContent ? 'has content' : 'EMPTY');
+  // ───── END DIAGNOSTIC ─────
   const now = new Date().toISOString();
   const id = note.id || uuidv4();
   const record = Object.assign({ folderId: null, createdAt: now }, note, { id, updatedAt: now });
