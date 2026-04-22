@@ -6298,92 +6298,26 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
       timerEl.textContent = `경과 시간: ${m}:${s}`;
     }, 1000);
 
-    // Streaming state — cards are appended live as they arrive
+    // Streaming state
     let firstArrived = false;
     const streamedQuestions = [];
     const totalExpected = settings.count;
+    let quizApi = null;
 
-    // Small non-blocking indicator shown while more questions are streaming
-    let streamIndicatorEl = null;
-    function upsertStreamIndicator(arrived) {
-      if (!streamIndicatorEl) {
-        streamIndicatorEl = document.createElement('div');
-        streamIndicatorEl.id = 'quizStreamIndicator';
-        streamIndicatorEl.style.cssText =
-          'text-align:center;font-size:0.82rem;color:var(--text-muted);padding:0.5rem 0 0.25rem;';
-        area.appendChild(streamIndicatorEl);
-      }
-      streamIndicatorEl.textContent = `문제 생성 중... (${arrived} / ${totalExpected})`;
-    }
-    function removeStreamIndicator() {
-      if (streamIndicatorEl) { streamIndicatorEl.remove(); streamIndicatorEl = null; }
-    }
-
-    // Append one question card to the area as it streams in
     function appendStreamCard(q, idx) {
       if (!firstArrived) {
         firstArrived = true;
-        area.innerHTML = ''; // hide loading UI on first question
+        // runInlineQuiz sets container.innerHTML which clears the loading UI
+        quizApi = runInlineQuiz(
+          streamedQuestions,  // live reference — grows as questions arrive
+          area, noteId, noteTitle, noteText, settings, {}
+        );
       }
-      const type = q.type || 'mc';
-      const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
-      let inputHtml = '';
-      if (type === 'mc') {
-        inputHtml = `<div class="quiz-card-choices">
-          ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
-        </div>`;
-      } else if (type === 'short') {
-        inputHtml = `<div class="quiz-card-open">
-          <input class="qi-text-input" data-qi="${idx}" type="text" placeholder="답을 입력하세요" autocomplete="off">
-        </div>`;
-      } else if (type === 'essay') {
-        inputHtml = `<div class="quiz-card-open">
-          <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
-        </div>`;
-      }
-      const card = document.createElement('div');
-      card.className = 'quiz-card quiz-card-enter';
-      card.dataset.qi   = String(idx);
-      card.dataset.type = type;
-      card.innerHTML = `
-        <div class="quiz-card-num">문제 ${idx + 1} / ${totalExpected}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
-        <div class="quiz-card-q">${escHtml(q.q)}</div>
-        ${inputHtml}
-        <div class="qi-explanation"></div>`;
-
-      // Wire immediate visual interaction so cards are usable before stream completes.
-      // runInlineQuiz adds its own delegated listener later; it reconciles answers from DOM.
-      if (type === 'mc') {
-        card.querySelectorAll('.qi-choice').forEach(btn => {
-          btn.addEventListener('click', () => {
-            if (btn.disabled) return;
-            card.querySelectorAll('.qi-choice').forEach(b => b.classList.remove('qi-selected'));
-            btn.classList.add('qi-selected');
-          });
-        });
-      }
-      // text/essay inputs are naturally interactive; no extra wiring needed
-
-      // Insert before the indicator so the indicator stays at the bottom
-      if (streamIndicatorEl) {
-        area.insertBefore(card, streamIndicatorEl);
-      } else {
-        area.appendChild(card);
-      }
-      // Double rAF ensures the opacity:0 base state is painted before the transition fires
-      requestAnimationFrame(() => requestAnimationFrame(() => card.classList.add('visible')));
-
-      upsertStreamIndicator(idx + 1);
+      if (quizApi) quizApi.onNewQuestion(idx);
     }
 
-    // Add grade button and wire up all quiz behavior after cards are in the DOM
-    function finalizeStreamedQuiz(questions, debugInfo) {
-      removeStreamIndicator();
-      const gradeBtnDiv = document.createElement('div');
-      gradeBtnDiv.style.cssText = 'display:flex;justify-content:center;padding-top:0.25rem;';
-      gradeBtnDiv.innerHTML = '<button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>';
-      area.appendChild(gradeBtnDiv);
-      runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
+    function finalizeStreamedQuiz(qs, debugInfo) {
+      if (quizApi) quizApi.onStreamDone();
     }
 
     try {
@@ -6407,16 +6341,15 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
       }
 
       if (!firstArrived) {
-        // Nothing streamed — fall back to full batch render
-        runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
+        showToast('❌ 문제를 생성하지 못했어요');
+        clearQuizInlineArea();
       } else {
-        finalizeStreamedQuiz(questions, debugInfo);
+        finalizeStreamedQuiz(streamedQuestions, debugInfo);
       }
     } catch(e) {
       clearInterval(msgInterval);
       clearInterval(timerInterval);
       if (firstArrived && streamedQuestions.length > 0) {
-        // Partial stream — keep whatever arrived, finalize with those questions
         showToast('❌ 스트리밍 중 오류: ' + e.message);
         finalizeStreamedQuiz(streamedQuestions, {});
       } else {
