@@ -1978,7 +1978,7 @@
     .weakness-red    { background:#ef4444; }
     .weakness-yellow { background:#eab308; }
     .weakness-green  { background:#22c55e; }
-    .weakness-pct { font-size:0.78rem; min-width:40px; text-align:right; font-weight:600; }
+    .weakness-pct { font-size:0.78rem; min-width:78px; text-align:right; font-weight:600; white-space:nowrap; }
     .weakness-pct.weakness-red    { color:#ef4444; }
     .weakness-pct.weakness-yellow { color:#eab308; }
     .weakness-pct.weakness-green  { color:#22c55e; }
@@ -7272,7 +7272,7 @@ function renderWeaknessReport(containerEl, report, quizCount) {
       <div class="weakness-section-row">
         <span class="weakness-label weakness-label-link" title="${escHtml(s.name)}" data-section="${escHtml(s.name)}">${escHtml(s.name)}</span>
         <div class="weakness-bar-bg"><div class="weakness-bar-fill ${colorClass(s)}" style="width:${s.accuracy}%;"></div></div>
-        <span class="weakness-pct ${colorClass(s)}">${s.accuracy}%</span>
+        <span class="weakness-pct ${colorClass(s)}">${s.correct || 0}/${s.total || 0} · ${s.accuracy}%</span>
       </div>`).join('')}
     <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">총 ${report.totalQuizzes}회 퀴즈, ${report.totalQuestions}문제 풀이</div>
     ${weakNames ? `<div style="font-size:0.8rem;color:#ef4444;margin-top:0.2rem;">💡 약점 섹션에 집중해서 복습하세요: ${weakNames}</div>` : ''}`;
