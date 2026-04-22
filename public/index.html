@@ -1982,17 +1982,18 @@
     .weakness-pct.weakness-red    { color:#ef4444; }
     .weakness-pct.weakness-yellow { color:#eab308; }
     .weakness-pct.weakness-green  { color:#22c55e; }
-    .weakness-preview-card { border:1px solid var(--border); border-radius:8px; background:var(--surface2); margin-bottom:1rem; overflow:hidden; }
+    .weakness-preview-card { border:1px solid var(--border); border-radius:8px; background:var(--surface2); margin-bottom:1rem; overflow:hidden; flex-shrink:0; }
     .weakness-preview-header { display:flex; justify-content:space-between; align-items:center; padding:0.7rem 1rem; cursor:pointer; font-size:0.88rem; font-weight:600; color:var(--text); user-select:none; transition:background 0.15s; }
     .weakness-preview-header:hover { background:var(--surface); }
     .weakness-preview-toggle { font-size:0.8rem; color:var(--text-muted); font-weight:500; }
     .weakness-preview-body { padding:0.7rem 1rem 1rem; border-top:1px solid var(--border); }
     .weakness-preview-rows { display:flex; flex-direction:column; gap:0.5rem; }
-    .weakness-preview-row { display:grid; grid-template-columns:minmax(110px,1.2fr) 2fr auto auto; gap:0.6rem; align-items:center; font-size:0.85rem; }
+    .weakness-preview-row { display:grid; grid-template-columns:minmax(110px,1.2fr) 2fr auto auto; gap:0.5rem; align-items:center; font-size:0.85rem; }
     .weakness-preview-name { color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .weakness-preview-bar { height:7px; background:var(--surface); border-radius:4px; overflow:hidden; position:relative; }
     .weakness-preview-bar-fill { display:block; height:100%; border-radius:4px; transition:width 0.3s; }
     .weakness-preview-pct { font-weight:700; min-width:38px; text-align:right; font-size:0.85rem; }
+    .weakness-preview-stats { font-weight:700; min-width:78px; text-align:right; font-size:0.82rem; white-space:nowrap; }
     .weakness-preview-review-btn { padding:0.3rem 0.7rem; border-radius:5px; border:1px solid var(--border); background:var(--surface); color:var(--primary); font-size:0.78rem; font-weight:600; cursor:pointer; transition:background 0.15s; }
     .weakness-preview-review-btn:hover { background:var(--primary-dim, rgba(124,58,237,0.15)); }
     #importNoteBody:empty::before { content:attr(data-placeholder); color:var(--text-muted); pointer-events:none; }
@@ -7307,7 +7308,7 @@ function buildWeaknessPreviewHtml(report) {
     return `<div class="weakness-preview-row">
       <span class="weakness-preview-name" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
       <span class="weakness-preview-bar"><span class="weakness-preview-bar-fill" style="width:${acc}%;background:${color};"></span></span>
-      <span class="weakness-preview-pct" style="color:${color};">${acc}%</span>
+      <span class="weakness-preview-stats" style="color:${color};">${s.correct || 0}/${s.total || 0} · ${acc}%</span>
       <button class="weakness-preview-review-btn" data-section="${escHtml(s.name)}">복습</button>
     </div>`;
   }).join('')}</div>`;
