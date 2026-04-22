@@ -1982,6 +1982,19 @@
     .weakness-pct.weakness-red    { color:#ef4444; }
     .weakness-pct.weakness-yellow { color:#eab308; }
     .weakness-pct.weakness-green  { color:#22c55e; }
+    .weakness-preview-card { border:1px solid var(--border); border-radius:8px; background:var(--surface2); margin-bottom:1rem; overflow:hidden; }
+    .weakness-preview-header { display:flex; justify-content:space-between; align-items:center; padding:0.7rem 1rem; cursor:pointer; font-size:0.88rem; font-weight:600; color:var(--text); user-select:none; transition:background 0.15s; }
+    .weakness-preview-header:hover { background:var(--surface); }
+    .weakness-preview-toggle { font-size:0.8rem; color:var(--text-muted); font-weight:500; }
+    .weakness-preview-body { padding:0.7rem 1rem 1rem; border-top:1px solid var(--border); }
+    .weakness-preview-rows { display:flex; flex-direction:column; gap:0.5rem; }
+    .weakness-preview-row { display:grid; grid-template-columns:minmax(110px,1.2fr) 2fr auto auto; gap:0.6rem; align-items:center; font-size:0.85rem; }
+    .weakness-preview-name { color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .weakness-preview-bar { height:7px; background:var(--surface); border-radius:4px; overflow:hidden; position:relative; }
+    .weakness-preview-bar-fill { display:block; height:100%; border-radius:4px; transition:width 0.3s; }
+    .weakness-preview-pct { font-weight:700; min-width:38px; text-align:right; font-size:0.85rem; }
+    .weakness-preview-review-btn { padding:0.3rem 0.7rem; border-radius:5px; border:1px solid var(--border); background:var(--surface); color:var(--primary); font-size:0.78rem; font-weight:600; cursor:pointer; transition:background 0.15s; }
+    .weakness-preview-review-btn:hover { background:var(--primary-dim, rgba(124,58,237,0.15)); }
     #importNoteBody:empty::before { content:attr(data-placeholder); color:var(--text-muted); pointer-events:none; }
     .import-preview-item { display:flex; align-items:flex-start; gap:0.6rem; padding:0.6rem 0.8rem; background:var(--surface2); border:1px solid var(--border); border-radius:8px; }
     .import-preview-item input[type=checkbox] { margin-top:2px; flex-shrink:0; accent-color:var(--primary); width:15px; height:15px; cursor:pointer; }
@@ -6216,13 +6229,30 @@ function clearQuizInlineArea(containerEl) {
   }
 }
 
-function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
+async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
   const area = containerEl || document.getElementById('quizInlineArea');
   area.style.display = 'flex';
 
   const settings = { count: 10, answerFormat: 'mc', style: 'mixed', difficulty: 'medium' };
 
-  area.innerHTML = `
+  let _weaknessCardHtml = '';
+  if (noteId) {
+    try {
+      const _prevRes = await getQuizResultsByNote(noteId);
+      const _totalAnswered = _prevRes.reduce((sum, r) => sum + (r.answeredCount || r.total || 0), 0);
+      if (_totalAnswered >= 30) {
+        _weaknessCardHtml = `<div class="weakness-preview-card" id="weaknessPreviewCard">
+          <div class="weakness-preview-header" id="weaknessPreviewHeader">
+            <span>📊 내 약점 분석 (총 ${_totalAnswered}문제 풀이)</span>
+            <span class="weakness-preview-toggle" id="weaknessPreviewToggle">▼ 펼쳐서 보기</span>
+          </div>
+          <div class="weakness-preview-body" id="weaknessPreviewBody" style="display:none;"></div>
+        </div>`;
+      }
+    } catch (_e) { /* silent */ }
+  }
+
+  area.innerHTML = _weaknessCardHtml + `
     <div class="quiz-settings-panel">
       <div class="quiz-settings-title">🧪 퀴즈 설정 — ${escHtml(noteTitle)}</div>
       <div class="quiz-setting-row">
@@ -6264,6 +6294,30 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
         <button id="qsStartBtn" class="quiz-grade-btn">퀴즈 시작</button>
       </div>
     </div>`;
+
+  const _wpHeader = area.querySelector('#weaknessPreviewHeader');
+  const _wpBody   = area.querySelector('#weaknessPreviewBody');
+  const _wpToggle = area.querySelector('#weaknessPreviewToggle');
+  let _wpExpanded = false;
+  let _wpRendered = false;
+  if (_wpHeader) {
+    _wpHeader.addEventListener('click', async () => {
+      _wpExpanded = !_wpExpanded;
+      _wpBody.style.display = _wpExpanded ? 'block' : 'none';
+      _wpToggle.textContent  = _wpExpanded ? '▲ 접기' : '▼ 펼쳐서 보기';
+      if (_wpExpanded && !_wpRendered) {
+        _wpRendered = true;
+        _wpBody.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--text-muted);">분석 중...</div>';
+        try {
+          const report = await getWeaknessReport(noteId);
+          _wpBody.innerHTML = buildWeaknessPreviewHtml(report);
+          wireWeaknessReviewButtons(_wpBody);
+        } catch (_e) {
+          _wpBody.innerHTML = '<div style="padding:1rem;color:var(--text-muted);">약점 데이터를 불러올 수 없어요.</div>';
+        }
+      }
+    });
+  }
 
   area.querySelectorAll('.quiz-seg-group').forEach(group => {
     group.addEventListener('click', e => {
@@ -7240,6 +7294,29 @@ function scrollToNoteSection(sectionName) {
   target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   target.classList.add('section-highlight-flash');
   target.addEventListener('animationend', () => target.classList.remove('section-highlight-flash'), { once: true });
+}
+
+function buildWeaknessPreviewHtml(report) {
+  if (!report || !Array.isArray(report.sections) || !report.sections.length) {
+    return '<div style="padding:1rem;color:var(--text-muted);">아직 분석할 데이터가 부족해요.</div>';
+  }
+  const sorted = [...report.sections].sort((a, b) => (a.accuracy || 0) - (b.accuracy || 0));
+  return `<div class="weakness-preview-rows">${sorted.map(s => {
+    const acc   = Math.round(s.accuracy || 0);
+    const color = acc >= 80 ? '#22c55e' : acc >= 50 ? '#eab308' : '#ef4444';
+    return `<div class="weakness-preview-row">
+      <span class="weakness-preview-name" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+      <span class="weakness-preview-bar"><span class="weakness-preview-bar-fill" style="width:${acc}%;background:${color};"></span></span>
+      <span class="weakness-preview-pct" style="color:${color};">${acc}%</span>
+      <button class="weakness-preview-review-btn" data-section="${escHtml(s.name)}">복습</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function wireWeaknessReviewButtons(body) {
+  body.querySelectorAll('.weakness-preview-review-btn').forEach(btn => {
+    btn.addEventListener('click', () => scrollToNoteSection(btn.dataset.section));
+  });
 }
 
 async function updateNoteWeaknessBadges(noteId) {
