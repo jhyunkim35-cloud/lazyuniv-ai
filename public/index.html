@@ -5964,7 +5964,9 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
     validateFn = f.validate;
   }
 
-  const MODEL = 'claude-sonnet-4-20250514';
+  const PREFERRED_MODEL = 'claude-sonnet-4-6';
+  const FALLBACK_MODEL = 'claude-sonnet-4-5';
+  let MODEL = PREFERRED_MODEL;
   const recentPrev = prevQuestions.slice(0, 30);
   const dedupClause = recentPrev.length > 0
     ? `\n\nCRITICAL DUPLICATION RULE: The user has recently taken quizzes containing the following questions. You MUST NOT generate:
@@ -5990,18 +5992,23 @@ Before finalizing each question you generate, check it against the list above. I
     formatInstruction +
     dedupClause;
 
-  const maxTokens = Math.max(8192, count * 1100); // scale with question count
+  const maxTokens = Math.max(16000, count * 1500); // scale with question count
   const t0  = Date.now();
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: noteText }],
-    }),
+  const makeBody = () => JSON.stringify({
+    model: MODEL,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: noteText }],
   });
+  let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody() });
+  if (!res.ok && MODEL === PREFERRED_MODEL) {
+    let errText = ''; try { errText = await res.clone().text(); } catch {}
+    if (/model|not.found|invalid/i.test(errText) || res.status === 404 || res.status === 400) {
+      console.warn(`[quiz] ${PREFERRED_MODEL} failed, falling back to ${FALLBACK_MODEL}`);
+      MODEL = FALLBACK_MODEL;
+      res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody() });
+    }
+  }
   const responseTimeMs = Date.now() - t0;
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -6094,7 +6101,9 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
     validateFn = f.validate;
   }
 
-  const MODEL = 'claude-sonnet-4-20250514';
+  const PREFERRED_MODEL = 'claude-sonnet-4-6';
+  const FALLBACK_MODEL = 'claude-sonnet-4-5';
+  let MODEL = PREFERRED_MODEL;
   const recentPrev = prevQuestions.slice(0, 30);
   const dedupClause = recentPrev.length > 0
     ? `\n\nCRITICAL DUPLICATION RULE: The user has recently taken quizzes containing the following questions. You MUST NOT generate:
@@ -6124,19 +6133,24 @@ Before finalizing each question you generate, check it against the list above. I
     formatInstruction +
     dedupClause;
 
-  const maxTokens = Math.max(8192, count * 1100); // scale with question count
+  const maxTokens = Math.max(16000, count * 1500); // scale with question count
   const t0  = Date.now();
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      stream: true,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: noteText }],
-    }),
+  const makeStreamBody = () => JSON.stringify({
+    model: MODEL,
+    max_tokens: maxTokens,
+    stream: true,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: noteText }],
   });
+  let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody() });
+  if (!res.ok && MODEL === PREFERRED_MODEL) {
+    let errText = ''; try { errText = await res.clone().text(); } catch {}
+    if (/model|not.found|invalid/i.test(errText) || res.status === 404 || res.status === 400) {
+      console.warn(`[quiz] ${PREFERRED_MODEL} failed, falling back to ${FALLBACK_MODEL}`);
+      MODEL = FALLBACK_MODEL;
+      res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody() });
+    }
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || `API 오류 (${res.status})`);
