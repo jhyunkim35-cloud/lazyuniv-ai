@@ -6312,6 +6312,7 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
           streamedQuestions,  // live reference — grows as questions arrive
           area, noteId, noteTitle, noteText, settings, {}
         );
+        area._quizApi = quizApi;
       }
       if (quizApi) quizApi.onNewQuestion(idx);
     }
@@ -6406,6 +6407,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
   const submitted = [];
   let streamingDone = false;
   let waitingForStream = false;
+  let _savedAlready = false;
   const essayGradeResults = {};
 
   container.innerHTML = `
@@ -6889,7 +6891,50 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     }
   }
 
-  return { onNewQuestion, onStreamDone };
+  async function savePartialIfEligible() {
+    if (_savedAlready) return;
+    if (!noteId) return;
+
+    const submittedCount = submitted.filter(Boolean).length;
+    if (submittedCount < Math.ceil(questions.length * 0.5)) return;
+
+    _savedAlready = true;
+    try {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      let correctCount = 0;
+      const savedQuestions = [];
+
+      questions.forEach((q, i) => {
+        if (!submitted[i]) return;
+        const type = q.type || 'mc';
+        let correct = false;
+        if (type === 'mc')    correct = answers[i] === q.answer;
+        if (type === 'short') correct = matchesKeywords(answers[i], q.keywords);
+        if (type === 'essay') correct = (essayGradeResults[i]?.score || 0) >= 60;
+        if (correct) correctCount++;
+        savedQuestions.push({ section: q.section || '', correct, questionText: q.q || '' });
+      });
+
+      const record = {
+        id:        uuidv4(),
+        noteId,
+        noteTitle: noteTitle || '',
+        timestamp: new Date().toISOString(),
+        score:     correctCount,
+        total:     submittedCount,
+        timeTaken: elapsed,
+        partial:   true,
+        questions: savedQuestions,
+      };
+      await saveQuizResult(record);
+      console.log(`[quiz] 부분 저장 완료: ${submittedCount}/${questions.length} (${correctCount}/${submittedCount} 정답)`);
+    } catch (e) {
+      console.warn('[quiz] 부분 저장 실패:', e.message);
+      _savedAlready = false;
+    }
+  }
+
+  return { onNewQuestion, onStreamDone, savePartialIfEligible };
 }
 
 async function getWeaknessReport(noteId) {
@@ -7421,6 +7466,8 @@ splitViewBtn.addEventListener('click', async () => {
 });
 
 document.getElementById('splitCloseBtn').addEventListener('click', () => {
+  const _sqArea = document.getElementById('quizInlineArea');
+  if (_sqArea && _sqArea._quizApi) _sqArea._quizApi.savePartialIfEligible();
   document.getElementById('splitViewer').style.display = 'none';
   document.body.style.overflow = '';
   switchView('home');
@@ -7428,6 +7475,8 @@ document.getElementById('splitCloseBtn').addEventListener('click', () => {
 
 
 function switchSplitTab(tab) {
+  const _sqArea = document.getElementById('quizInlineArea');
+  if (_sqArea && _sqArea._quizApi) _sqArea._quizApi.savePartialIfEligible();
   // Quiz/classify tabs: only activate if notes are available
   if ((tab === 'quiz' || tab === 'classify') && !storedNotesText) return;
 
@@ -9902,6 +9951,8 @@ function openNotionNote(note) {
 }
 
 function _closeNotionViewer() {
+  const _nqArea = document.getElementById('notionQuizArea');
+  if (_nqArea && _nqArea._quizApi) _nqArea._quizApi.savePartialIfEligible();
   const viewer = document.getElementById('notionViewer');
   viewer.style.display = 'none';
   document.body.style.overflow = '';
@@ -9909,6 +9960,8 @@ function _closeNotionViewer() {
 }
 
 function _switchNotionTab(tab) {
+  const _nqArea = document.getElementById('notionQuizArea');
+  if (_nqArea && _nqArea._quizApi) _nqArea._quizApi.savePartialIfEligible();
   document.getElementById('notionTabBody').classList.toggle('active', tab === 'body');
   document.getElementById('notionTabQuiz').classList.toggle('active', tab === 'quiz');
   document.getElementById('notionBodyPanel').style.display  = tab === 'body' ? '' : 'none';
