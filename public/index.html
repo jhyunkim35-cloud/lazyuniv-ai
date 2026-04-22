@@ -5951,10 +5951,20 @@ async function generateQuiz(noteText, settings = {}, prevQuestions = []) {
   }
 
   const MODEL = 'claude-sonnet-4-20250514';
-  const recentPrev = prevQuestions.slice(-30);
+  const recentPrev = prevQuestions.slice(0, 30);
   const dedupClause = recentPrev.length > 0
-    ? `\n\nCRITICAL: The following questions have been asked in previous quizzes. Do NOT generate any question that is identical or nearly identical to these. Create NEW questions that test the same concepts from different angles:\n` +
-      recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    ? `\n\nCRITICAL DUPLICATION RULE: The user has recently taken quizzes containing the following questions. You MUST NOT generate:
+1. Questions that are identical or nearly identical to these
+2. Questions that test THE SAME CONCEPT using similar wording or similar example scenarios
+3. Questions where the correct answer choice has the same content, even if phrased differently
+4. Questions that approach a topic from the same angle (e.g., if a previous question asked about the "definition of X", do not ask about the "meaning of X" or "what X refers to")
+
+Instead, cover DIFFERENT concepts from the source material, OR if you must revisit a concept, approach it from a genuinely different angle (e.g., application vs. definition, comparison vs. identification, cause vs. effect).
+
+Previous questions to avoid duplicating (${recentPrev.length} total):
+${recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+Before finalizing each question you generate, check it against the list above. If it overlaps in concept, angle, or phrasing, discard it and generate a different one.`
     : '';
   const systemPrompt =
     `You are a quiz generator for Korean university exam preparation. ` +
@@ -6071,10 +6081,20 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
   }
 
   const MODEL = 'claude-sonnet-4-20250514';
-  const recentPrev = prevQuestions.slice(-30);
+  const recentPrev = prevQuestions.slice(0, 30);
   const dedupClause = recentPrev.length > 0
-    ? `\n\nCRITICAL: The following questions have been asked in previous quizzes. Do NOT generate any question that is identical or nearly identical to these. Create NEW questions that test the same concepts from different angles:\n` +
-      recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    ? `\n\nCRITICAL DUPLICATION RULE: The user has recently taken quizzes containing the following questions. You MUST NOT generate:
+1. Questions that are identical or nearly identical to these
+2. Questions that test THE SAME CONCEPT using similar wording or similar example scenarios
+3. Questions where the correct answer choice has the same content, even if phrased differently
+4. Questions that approach a topic from the same angle (e.g., if a previous question asked about the "definition of X", do not ask about the "meaning of X" or "what X refers to")
+
+Instead, cover DIFFERENT concepts from the source material, OR if you must revisit a concept, approach it from a genuinely different angle (e.g., application vs. definition, comparison vs. identification, cause vs. effect).
+
+Previous questions to avoid duplicating (${recentPrev.length} total):
+${recentPrev.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+Before finalizing each question you generate, check it against the list above. If it overlaps in concept, angle, or phrasing, discard it and generate a different one.`
     : '';
   const notionClause = isNotion
     ? `This content is from a Notion page (markdown). Generate quiz questions based on the key concepts in this text. `
