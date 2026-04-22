@@ -6473,6 +6473,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
   const submitted = [];
   let streamingDone = false;
   let waitingForStream = false;
+  const essayGradeResults = {};
 
   container.innerHTML = `
     <div class="quiz-sc-container">
@@ -6486,6 +6487,205 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
       </div>
     </div>
   `;
+
+  function updateStatusBar() {
+    const curEl = container.querySelector('#scStatusCurrent');
+    const genEl = container.querySelector('#scStatusGenerated');
+    if (curEl) curEl.textContent = `문제 ${currentIndex + 1} / ${questions.length}`;
+    if (genEl) {
+      const target = settings.count || questions.length;
+      genEl.textContent = streamingDone
+        ? `생성 완료 (${questions.length}${questions.length < target ? '/' + target : ''})`
+        : `생성됨: ${questions.length} / ${target}`;
+    }
+  }
+
+  function renderCurrentCard(idx) {
+    const area = container.querySelector('#scCardArea');
+    if (!area) return;
+    const q = questions[idx];
+    if (!q) { area.innerHTML = '<div class="quiz-sc-placeholder">문제 없음</div>'; return; }
+
+    const type = q.type || 'mc';
+    const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
+
+    let inputHtml = '';
+    if (type === 'mc') {
+      inputHtml = `<div class="quiz-card-choices">
+        ${q.choices.map((c, ci) => `<button class="qi-choice" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
+      </div>`;
+    } else if (type === 'short') {
+      inputHtml = `<div class="quiz-card-open">
+        <input class="qi-text-input" type="text" placeholder="답을 입력하세요" autocomplete="off">
+        <button class="quiz-submit-btn" type="button">제출</button>
+      </div>`;
+    } else if (type === 'essay') {
+      inputHtml = `<div class="quiz-card-open">
+        <textarea class="qi-essay-input" rows="5" placeholder="서술하세요"></textarea>
+        <button class="quiz-submit-btn" type="button">제출</button>
+      </div>`;
+    }
+
+    area.innerHTML = `<div class="quiz-card quiz-card-enter visible" data-qi="${idx}" data-type="${type}">
+      <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
+      <div class="quiz-card-q">${escHtml(q.q)}</div>
+      ${inputHtml}
+      <div class="qi-explanation"></div>
+    </div>`;
+
+    const cardEl = area.querySelector('.quiz-card');
+
+    if (type === 'mc') {
+      cardEl.querySelectorAll('.qi-choice').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (submitted[idx]) return;
+          const ci = Number(btn.dataset.ci);
+          cardEl.querySelectorAll('.qi-choice').forEach(b => b.classList.remove('qi-selected'));
+          btn.classList.add('qi-selected');
+          answers[idx] = ci;
+          submitAnswerForIndex(idx, cardEl);
+        });
+      });
+    } else {
+      const submitBtn = cardEl.querySelector('.quiz-submit-btn');
+      submitBtn.addEventListener('click', () => {
+        if (submitted[idx]) return;
+        const inp = cardEl.querySelector('.qi-text-input, .qi-essay-input');
+        const val = inp ? inp.value.trim() : '';
+        if (!val) { showToast('답을 입력해주세요'); return; }
+        answers[idx] = val;
+        submitAnswerForIndex(idx, cardEl);
+      });
+    }
+
+    if (submitted[idx]) {
+      if (type === 'mc' && typeof answers[idx] === 'number') {
+        const picked = cardEl.querySelector(`.qi-choice[data-ci="${answers[idx]}"]`);
+        if (picked) picked.classList.add('qi-selected');
+      } else if (type !== 'mc') {
+        const inp = cardEl.querySelector('.qi-text-input, .qi-essay-input');
+        if (inp) inp.value = answers[idx] || '';
+      }
+      showFeedbackOnCard(idx, cardEl);
+    }
+
+    updateStatusBar();
+  }
+
+  async function submitAnswerForIndex(idx, cardEl) {
+    if (submitted[idx]) return;
+    const q = questions[idx];
+    const type = q.type || 'mc';
+
+    if (type === 'essay') {
+      const expEl = cardEl.querySelector('.qi-explanation');
+      if (expEl) { expEl.textContent = '채점 중...'; expEl.style.display = 'block'; }
+      try {
+        essayGradeResults[idx] = await gradeEssay(q, answers[idx]);
+      } catch (e) {
+        essayGradeResults[idx] = { score: 0, feedback: '채점 실패: ' + (e.message || '알 수 없는 오류'), rubricResults: [] };
+      }
+    }
+
+    submitted[idx] = true;
+    showFeedbackOnCard(idx, cardEl);
+
+    const nextBtn = container.querySelector('#scNextBtn');
+    if (nextBtn) {
+      if (idx === questions.length - 1 && streamingDone) nextBtn.textContent = '결과 보기';
+      nextBtn.classList.add('pulse');
+    }
+  }
+
+  function showFeedbackOnCard(idx, cardEl) {
+    const q = questions[idx];
+    const type = q.type || 'mc';
+    const expEl = cardEl.querySelector('.qi-explanation');
+
+    if (type === 'mc') {
+      const correctIdx = Number(q.answer);
+      cardEl.querySelectorAll('.qi-choice').forEach(btn => {
+        const ci = Number(btn.dataset.ci);
+        btn.disabled = true;
+        btn.style.pointerEvents = 'none';
+        if (ci === correctIdx) btn.classList.add('qi-correct');
+        else if (ci === answers[idx] && ci !== correctIdx) btn.classList.add('qi-wrong');
+      });
+      if (expEl) { expEl.innerHTML = escHtml(q.explanation || '해설 없음'); expEl.style.display = 'block'; }
+    } else if (type === 'short') {
+      const inp = cardEl.querySelector('.qi-text-input');
+      if (inp) inp.disabled = true;
+      const submitBtn = cardEl.querySelector('.quiz-submit-btn');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.display = 'none'; }
+      if (expEl) {
+        const matched = matchesKeywords(answers[idx], q.keywords);
+        const badge = matched
+          ? '<span style="color:#22c55e;font-weight:700;">✅ 정답</span><br>'
+          : '<span style="color:#ef4444;font-weight:700;">❌ 오답</span><br>';
+        expEl.innerHTML = badge + escHtml(q.fullAnswer || q.explanation || '');
+        expEl.style.display = 'block';
+      }
+    } else if (type === 'essay') {
+      const ta = cardEl.querySelector('.qi-essay-input');
+      if (ta) ta.disabled = true;
+      const submitBtn = cardEl.querySelector('.quiz-submit-btn');
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.display = 'none'; }
+      if (expEl) {
+        const r = essayGradeResults[idx];
+        expEl.innerHTML = r
+          ? `<strong>점수: ${r.score}/10</strong><br>${escHtml(r.feedback || '')}<br><br><strong>해설:</strong> ${escHtml(q.explanation || '')}`
+          : escHtml(q.explanation || '');
+        expEl.style.display = 'block';
+      }
+    }
+  }
+
+  function advanceToNext() {
+    if (!submitted[currentIndex]) {
+      if (!skipWarningShown[currentIndex]) {
+        showToast('아직 답을 선택하지 않았어요');
+        skipWarningShown[currentIndex] = true;
+        return;
+      }
+      answers[currentIndex] = null;
+      submitted[currentIndex] = true;
+    }
+
+    const nextBtn = container.querySelector('#scNextBtn');
+    if (nextBtn) { nextBtn.classList.remove('pulse'); nextBtn.textContent = '다음 ▶'; }
+
+    currentIndex++;
+
+    if (currentIndex >= questions.length) {
+      if (streamingDone) {
+        currentIndex = questions.length - 1;
+        runGrading();
+        return;
+      }
+      waitingForStream = true;
+      const area = container.querySelector('#scCardArea');
+      if (area) area.innerHTML = '<div class="quiz-sc-placeholder">다음 문제 생성 중...</div>';
+      if (nextBtn) nextBtn.disabled = true;
+      updateStatusBar();
+      return;
+    }
+
+    renderCurrentCard(currentIndex);
+  }
+
+  const nextBtn = container.querySelector('#scNextBtn');
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      const btn = container.querySelector('#scNextBtn');
+      if (btn && btn.textContent === '결과 보기') {
+        runGrading();
+      } else {
+        advanceToNext();
+      }
+    });
+  }
+
+  renderCurrentCard(0);
 
   // Debug section
   const notePreview  = (noteText || '').slice(0, 500);
@@ -6509,8 +6709,8 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
   container.appendChild(debugEl);
 
   async function runGrading() {
-    gradeBtn.disabled = true;
-    gradeBtn.textContent = '채점 중...';
+    const scNextBtn = container.querySelector('#scNextBtn');
+    if (scNextBtn) { scNextBtn.disabled = true; scNextBtn.textContent = '채점 중...'; }
 
     // Fire all essay grading calls in parallel
     const essayIndices = questions.reduce((acc, q, i) => {
@@ -6518,14 +6718,14 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
       return acc;
     }, []);
 
-    const essayGradeResults = {};
     if (essayIndices.length > 0) {
       const settled = await Promise.all(
-        essayIndices.map(i =>
-          gradeEssay(questions[i], answers[i] || '')
+        essayIndices.map(i => {
+          if (essayGradeResults[i]) return Promise.resolve({ i, r: essayGradeResults[i] });
+          return gradeEssay(questions[i], answers[i] || '')
             .then(r  => ({ i, r }))
-            .catch(e => ({ i, r: { score: 0, feedback: '채점 오류: ' + e.message, rubricResults: [] } }))
-        )
+            .catch(e => ({ i, r: { score: 0, feedback: '채점 오류: ' + e.message, rubricResults: [] } }));
+        })
       );
       settled.forEach(({ i, r }) => { essayGradeResults[i] = r; });
     }
@@ -6538,6 +6738,12 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     questions.forEach((q, idx) => {
       const type  = q.type || 'mc';
       const card  = container.querySelector(`.quiz-card[data-qi="${idx}"]`);
+      if (!card) {
+        if (type === 'mc') { mcTotal++; if (answers[idx] === q.answer) mcCorrect++; }
+        else if (type === 'short') { shortTotal++; if (matchesKeywords(answers[idx], q.keywords)) shortCorrect++; }
+        else if (type === 'essay') { essayTotal++; essayScoreSum += (essayGradeResults[idx]?.score || 0); }
+        return;
+      }
       const expEl = card.querySelector('.qi-explanation');
 
       if (type === 'mc') {
@@ -6657,7 +6863,9 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
         </div>
       </div>`;
 
-    container.querySelector('#quizGradeBtn').replaceWith(banner);
+    const replaceTarget = container.querySelector('.quiz-sc-container') || container.querySelector('#quizGradeBtn');
+    if (replaceTarget) replaceTarget.replaceWith(banner);
+    else container.appendChild(banner);
     banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     if (noteId) {
@@ -6717,11 +6925,38 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
       clearQuizInlineArea(container === defaultArea ? null : container));
   }
 
-  // B2 will populate these; for now return no-op stubs
-  return {
-    onNewQuestion: () => {},
-    onStreamDone: () => {}
-  };
+  function onNewQuestion(idx) {
+    updateStatusBar();
+    if (waitingForStream && idx === currentIndex) {
+      waitingForStream = false;
+      const nextBtn = container.querySelector('#scNextBtn');
+      if (nextBtn) nextBtn.disabled = false;
+      renderCurrentCard(currentIndex);
+    }
+  }
+
+  function onStreamDone() {
+    streamingDone = true;
+    updateStatusBar();
+
+    if (waitingForStream) {
+      waitingForStream = false;
+      const nextBtn = container.querySelector('#scNextBtn');
+      if (nextBtn) nextBtn.disabled = false;
+      if (questions.length > 0) {
+        currentIndex = questions.length - 1;
+        renderCurrentCard(currentIndex);
+        showToast(`문제를 ${questions.length}개만 생성했어요`);
+      }
+    }
+
+    if (currentIndex === questions.length - 1 && submitted[currentIndex]) {
+      const nextBtn = container.querySelector('#scNextBtn');
+      if (nextBtn) nextBtn.textContent = '결과 보기';
+    }
+  }
+
+  return { onNewQuestion, onStreamDone };
 }
 
 async function getWeaknessReport(noteId) {
