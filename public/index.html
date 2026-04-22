@@ -1951,6 +1951,16 @@
     .quiz-debug-pre { font-family:monospace; font-size:0.75rem; color:var(--text-muted); background:var(--surface2); border:1px solid var(--border); border-radius:5px; padding:0.55rem 0.7rem; white-space:pre-wrap; word-break:break-all; margin:0; }
     .quiz-debug-full-wrap { margin-top:0.25rem; }
     .quiz-debug-full-toggle { font-family:monospace; font-size:0.75rem; color:#7c3aed; cursor:pointer; list-style:none; padding:0.2rem 0; }
+    .quiz-sc-container { display:flex; flex-direction:column; gap:0.75rem; }
+    .quiz-sc-status { display:flex; justify-content:space-between; font-size:0.82rem; color:var(--text-muted); padding:0.25rem 0.5rem; }
+    .quiz-sc-card-area { min-height:280px; }
+    .quiz-sc-nav { display:flex; justify-content:flex-end; padding-top:0.5rem; }
+    .quiz-next-btn { font-weight:700; padding:0.6rem 1.4rem; border-radius:8px; background:var(--primary); color:#fff; border:none; cursor:pointer; font-size:0.95rem; transition:transform 0.15s, opacity 0.15s; }
+    .quiz-next-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .quiz-next-btn.pulse { animation:quiz-pulse 1s infinite ease-in-out; }
+    @keyframes quiz-pulse { 0%{transform:scale(1)} 50%{transform:scale(1.04)} 100%{transform:scale(1)} }
+    .quiz-submit-btn { padding:0.45rem 1rem; background:var(--secondary-dim); color:var(--secondary); border:1px solid rgba(0,180,216,0.4); border-radius:6px; font-size:0.85rem; font-weight:600; cursor:pointer; margin-top:0.5rem; }
+    .quiz-sc-placeholder { text-align:center; padding:2rem 1rem; color:var(--text-muted); font-size:0.9rem; }
     .weakness-section-row { display:flex; align-items:center; gap:0.5rem; padding:0.4rem 0; }
     .weakness-label { font-size:0.82rem; color:var(--text); min-width:120px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .weakness-label-link { cursor:pointer; color:var(--primary) !important; }
@@ -6570,7 +6580,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     checkGradeReady();
   });
 
-  gradeBtn.addEventListener('click', async () => {
+  async function runGrading() {
     gradeBtn.disabled = true;
     gradeBtn.textContent = '채점 중...';
 
@@ -6777,7 +6787,9 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     const defaultArea = document.getElementById('quizInlineArea');
     banner.querySelector('#quizCloseInlineBtn').addEventListener('click', () =>
       clearQuizInlineArea(container === defaultArea ? null : container));
-  });
+  }
+
+  gradeBtn.addEventListener('click', runGrading);
 }
 
 async function getWeaknessReport(noteId) {
