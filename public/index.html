@@ -6383,7 +6383,7 @@ function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
       gradeBtnDiv.style.cssText = 'display:flex;justify-content:center;padding-top:0.25rem;';
       gradeBtnDiv.innerHTML = '<button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>';
       area.appendChild(gradeBtnDiv);
-      runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo, true);
+      runInlineQuiz(questions, area, noteId, noteTitle, noteText, settings, debugInfo);
     }
 
     try {
@@ -6463,68 +6463,29 @@ function matchesKeywords(userVal, keywords) {
   });
 }
 
-// skipCardRender: pass true from the streaming path where cards are already in the DOM
-function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settings = {}, debugInfo = {}, skipCardRender = false) {
+function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settings = {}, debugInfo = {}) {
   const startTime = Date.now();
 
-  // answers[i]: Number for mc (choice index), String for short/essay, null = unanswered
   const answers = questions.map(q => (q.type && q.type !== 'mc') ? '' : null);
 
-  // When cards were streamed in, the user may have already answered some.
-  // Seed answers from the current DOM state so checkGradeReady() reflects them.
-  if (skipCardRender) {
-    questions.forEach((q, i) => {
-      const type = q.type || 'mc';
-      if (type === 'mc') {
-        const sel = container.querySelector(`.quiz-card[data-qi="${i}"] .qi-choice.qi-selected`);
-        if (sel) answers[i] = Number(sel.dataset.ci);
-      } else {
-        const inp = container.querySelector(
-          `.quiz-card[data-qi="${i}"] .qi-text-input, .quiz-card[data-qi="${i}"] .qi-essay-input`
-        );
-        if (inp && inp.value.trim()) answers[i] = inp.value;
-      }
-    });
-    checkGradeReady();
-  }
+  let currentIndex = 0;
+  const skipWarningShown = [];
+  const submitted = [];
+  let streamingDone = false;
+  let waitingForStream = false;
 
-  if (!skipCardRender) {
-    let html = '';
-    questions.forEach((q, idx) => {
-      const type = q.type || 'mc';
-      const typeLabel = type === 'short' ? ' · 단답형' : type === 'essay' ? ' · 서술형' : '';
-      let inputHtml = '';
-      if (type === 'mc') {
-        inputHtml = `<div class="quiz-card-choices">
-          ${q.choices.map((c, ci) => `<button class="qi-choice" data-qi="${idx}" data-ci="${ci}">${QUIZ_CHOICES_PREFIX[ci]} ${escHtml(c)}</button>`).join('')}
-        </div>`;
-      } else if (type === 'short') {
-        inputHtml = `<div class="quiz-card-open">
-          <input class="qi-text-input" data-qi="${idx}" type="text" placeholder="답을 입력하세요" autocomplete="off">
-        </div>`;
-      } else if (type === 'essay') {
-        inputHtml = `<div class="quiz-card-open">
-          <textarea class="qi-essay-input" data-qi="${idx}" rows="4" placeholder="서술하세요"></textarea>
-        </div>`;
-      }
-      // Start cards invisible for staggered pop-in animation
-      html += `<div class="quiz-card quiz-card-enter" data-qi="${idx}" data-type="${type}">
-        <div class="quiz-card-num">문제 ${idx + 1} / ${questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
-        <div class="quiz-card-q">${escHtml(q.q)}</div>
-        ${inputHtml}
-        <div class="qi-explanation"></div>
-      </div>`;
-    });
-    html += `<div style="display:flex;justify-content:center;padding-top:0.25rem;">
-      <button class="quiz-grade-btn" id="quizGradeBtn" disabled>채점하기</button>
-    </div>`;
-    container.innerHTML = html;
-
-    // Stagger cards in one-by-one with 150ms delay between each
-    container.querySelectorAll('.quiz-card-enter').forEach((card, idx) => {
-      setTimeout(() => card.classList.add('visible'), idx * 150);
-    });
-  }
+  container.innerHTML = `
+    <div class="quiz-sc-container">
+      <div class="quiz-sc-status">
+        <span id="scStatusCurrent">문제 1 / ${questions.length}</span>
+        <span id="scStatusGenerated">생성됨: ${questions.length} / ${settings.count || questions.length}</span>
+      </div>
+      <div class="quiz-sc-card-area" id="scCardArea"></div>
+      <div class="quiz-sc-nav">
+        <button class="quiz-next-btn" id="scNextBtn">다음 ▶</button>
+      </div>
+    </div>
+  `;
 
   // Debug section
   const notePreview  = (noteText || '').slice(0, 500);
@@ -6546,39 +6507,6 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
       <pre class="quiz-debug-pre">${escHtml(debugInfo.rawResponse || '—')}</pre>
     </div>`;
   container.appendChild(debugEl);
-
-  const gradeBtn = container.querySelector('#quizGradeBtn');
-
-  // Check if all questions have been answered to enable grade button
-  function checkGradeReady() {
-    const ready = questions.every((q, i) => {
-      const type = q.type || 'mc';
-      if (type === 'mc') return answers[i] !== null;
-      return (answers[i] || '').trim().length > 0;
-    });
-    gradeBtn.disabled = !ready;
-  }
-
-  // mc: click on choice button
-  container.addEventListener('click', e => {
-    const btn = e.target.closest('.qi-choice');
-    if (!btn || btn.disabled) return;
-    const qi   = Number(btn.dataset.qi);
-    const ci   = Number(btn.dataset.ci);
-    const card = container.querySelector(`.quiz-card[data-qi="${qi}"]`);
-    card.querySelectorAll('.qi-choice').forEach(b => b.classList.remove('qi-selected'));
-    btn.classList.add('qi-selected');
-    answers[qi] = ci;
-    checkGradeReady();
-  });
-
-  // short/essay: update answers on input
-  container.addEventListener('input', e => {
-    const el = e.target.closest('.qi-text-input, .qi-essay-input');
-    if (!el) return;
-    answers[Number(el.dataset.qi)] = el.value;
-    checkGradeReady();
-  });
 
   async function runGrading() {
     gradeBtn.disabled = true;
@@ -6789,7 +6717,11 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
       clearQuizInlineArea(container === defaultArea ? null : container));
   }
 
-  gradeBtn.addEventListener('click', runGrading);
+  // B2 will populate these; for now return no-op stubs
+  return {
+    onNewQuestion: () => {},
+    onStreamDone: () => {}
+  };
 }
 
 async function getWeaknessReport(noteId) {
