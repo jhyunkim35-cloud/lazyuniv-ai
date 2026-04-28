@@ -1307,10 +1307,14 @@ function launchExamReview() {
     </div>`;
   document.body.appendChild(overlay);
 
-  const closeModal = () => overlay.remove();
+  let onKey;
+  const closeModal = () => {
+    document.removeEventListener('keydown', onKey);
+    overlay.remove();
+  };
   overlay.querySelector('#examReviewCloseBtn').addEventListener('click', closeModal);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-  const onKey = e => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', onKey); } };
+  onKey = e => { if (e.key === 'Escape') closeModal(); };
   document.addEventListener('keydown', onKey);
 
   examReviewData(_activeFolderId).then(data => {

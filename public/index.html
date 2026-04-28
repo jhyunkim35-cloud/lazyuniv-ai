@@ -2646,14 +2646,6 @@
   <!-- ═══ NEW NOTE VIEW ═══ -->
   <div id="newNoteView" style="display:none; max-width:1080px; margin:0 auto;">
 
-    <!-- Hidden legacy saved-notes elements (backward compat for JS) -->
-    <div id="savedNotesSection" style="display:none;">
-      <input id="noteSearchInput" type="text" />
-      <div id="recentNotesBar"></div>
-      <div id="savedNotesList"></div>
-      <div id="emptyNotesMsg"></div>
-    </div>
-
   <!-- API Key (hidden — server-proxied) -->
   <div style="display:none;">
     <input id="apiKey" type="password" autocomplete="off" />
@@ -3793,20 +3785,6 @@ document.getElementById('imgVisionRunBtn').addEventListener('click', async () =>
 
 // deleteFolderConfirm moved to /js/folders.js
 
-/* ═══════════════════════════════════════════════
-   Search debounce
-═══════════════════════════════════════════════ */
-let _searchTimer;
-document.getElementById('noteSearchInput').addEventListener('input', function() {
-  clearTimeout(_searchTimer);
-  const query = this.value.trim();
-  _searchTimer = setTimeout(async () => {
-    if (!query) { renderSavedNotes(); return; }
-    const results = await searchNotesFS(query);
-    renderSavedNotes(results, query);
-  }, 300);
-});
-
 // exportAllNotes, importNotes moved to /js/notes_crud.js
 
 /* ═══════════════════════════════════════════════
@@ -3861,15 +3839,6 @@ document.getElementById('globalSearchInput').addEventListener('input', function(
    Keyboard shortcuts
 ═══════════════════════════════════════════════ */
 document.addEventListener('keydown', e => {
-  // Ctrl/Cmd+S — save note in split viewer
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-    const splitViewer = document.getElementById('splitViewer');
-    if (splitViewer && splitViewer.style.display === 'flex' && currentNoteId) {
-      e.preventDefault();
-      document.getElementById('splitSaveBtn')?.click();
-    }
-    return;
-  }
   // Esc — close split viewer or settings panel
   if (e.key === 'Escape') {
     const splitViewer = document.getElementById('splitViewer');
