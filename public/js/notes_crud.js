@@ -526,7 +526,23 @@ async function renameSavedNote(id) {
   if (!note) return;
   const newTitle = prompt('노트 이름:', note.title || '');
   if (!newTitle || newTitle.trim() === note.title) return;
-  await saveNoteFS(Object.assign({}, note, { title: newTitle.trim() }));
+  const trimmedTitle = newTitle.trim();
+  const updatedAt = new Date().toISOString();
+
+  // Update IndexedDB local cache
+  const updated = Object.assign({}, note, { title: trimmedTitle, updatedAt });
+  await saveNote(updated);
+
+  // Patch only title + updatedAt to Firestore (no image re-upload)
+  const ref = userNotesRef();
+  if (ref) {
+    try {
+      await ref.doc(id).set({ title: trimmedTitle, updatedAt }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore rename sync failed:', e);
+    }
+  }
+
   await renderSavedNotes();
   await renderHomeView();
 }
