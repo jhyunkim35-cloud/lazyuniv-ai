@@ -42,6 +42,7 @@ async function autoSaveNote() {
     currentNoteId = record.id;
     showSuccessToast('💾 저장 완료');
     renderSavedNotes();
+    renderHomeView();
   } catch (e) {
     console.error('autoSaveNote error:', e);
   }
@@ -59,8 +60,6 @@ function fmtDate(iso) {
 async function renderSavedNotes(filteredNotes, activeQuery = '') {
   const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
   const displayNotes = filteredNotes !== undefined ? filteredNotes : notes;
-  // Keep home view in sync
-  if (typeof renderHomeView === 'function') renderHomeView(filteredNotes, activeQuery).catch(() => {});
 
   // Recent bar (top 5 from all notes, not filtered)
   const recentBar = document.getElementById('recentNotesBar');
@@ -302,7 +301,7 @@ async function confirmDeleteNote(id) {
   await deleteNoteFS(id);
   if (currentNoteId === id) currentNoteId = null;
   showToast('🗑 노트 삭제 완료');
-  renderSavedNotes();
+  await renderSavedNotes();
   await renderHomeView(); // refresh grid and folder note counts
 }
 
@@ -528,7 +527,7 @@ async function renameSavedNote(id) {
   const newTitle = prompt('노트 이름:', note.title || '');
   if (!newTitle || newTitle.trim() === note.title) return;
   await saveNoteFS(Object.assign({}, note, { title: newTitle.trim() }));
-  renderSavedNotes();
+  await renderSavedNotes();
   await renderHomeView();
 }
 
@@ -567,6 +566,7 @@ async function importNotes(input) {
     input.value = '';
     showSuccessToast(`⬆ ${imported}개 노트 가져오기 완료`);
     renderSavedNotes();
+    renderHomeView();
   } catch (e) {
     showToast(`❌ 가져오기 실패: ${e.message}`);
   }
