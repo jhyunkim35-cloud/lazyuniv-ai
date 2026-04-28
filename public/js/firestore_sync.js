@@ -1,0 +1,413 @@
+// Firestore cloud sync + usage tracking + image upload.
+// Depends on: constants.js (auth, db, storage, currentUser, DEVELOPER_EMAILS),
+//             storage.js (saveNote, getNote, getAllNotes, getAllFolders, saveFolder,
+//                         deleteNote, deleteFolder, renameFolder, updateNoteOrder, openDB).
+
+function userNotesRef() {
+  if (!currentUser) return null;
+  return db.collection('users').doc(currentUser.uid).collection('notes');
+}
+function userFoldersRef() {
+  if (!currentUser) return null;
+  return db.collection('users').doc(currentUser.uid).collection('folders');
+}
+async function saveNoteFS(note) {
+  // ───── GHOST NOTE DIAGNOSTIC (temp, remove after debugging) ─────
+  const _hasTitle = note && note.title && note.title.trim();
+  const _hasContent = note && (note.notesText || note.markdownContent) &&
+                      (note.notesText || note.markdownContent).trim();
+  if (!_hasTitle || !_hasContent) {
+    console.warn('🔴 GHOST CANDIDATE saveNoteFS called with empty data!', {
+      id: note?.id,
+      title: note?.title || '(empty)',
+      hasNotesText: !!note?.notesText,
+      hasMarkdown: !!note?.markdownContent,
+      notesTextLen: note?.notesText?.length || 0,
+      type: note?.type,
+    });
+    console.trace('Call stack:');
+  }
+  console.log('[saveNoteFS]', note?.id, '|', note?.title || '(no title)', '|', _hasContent ? 'has content' : 'EMPTY');
+  // ───── END DIAGNOSTIC ─────
+  const now = new Date().toISOString();
+  const id = note.id || uuidv4();
+  const record = Object.assign({ folderId: null, createdAt: now }, note, { id, updatedAt: now });
+
+  // Always save full data to IndexedDB (local cache with base64 images)
+  await saveNote(record);
+
+  // If logged in, upload images to Storage and save to Firestore
+  const ref = userNotesRef();
+  if (ref) {
+    const toSave = Object.assign({}, record);
+    delete toSave.notesHtml;
+    // Upload slide images (could be in slideImages or extractedImages)
+    const images = toSave.slideImages || toSave.extractedImages;
+    if (images && images.length) {
+      toSave.slideImageUrls = await uploadSlideImages(id, images);
+    }
+    delete toSave.slideImages;
+    delete toSave.extractedImages;
+    delete toSave.filteredText;
+
+    // Progressive size reduction until under 900KB
+    const stripOrder = ['pipelineLog', 'highlightedTranscript', 'pptText', 'recText'];
+    for (const key of stripOrder) {
+      if (JSON.stringify(toSave).length <= 900000) break;
+      console.warn('saveNoteFS: stripping', key, '(' + JSON.stringify(toSave[key] || '').length + ' chars)');
+      delete toSave[key];
+    }
+
+    const finalSize = JSON.stringify(toSave).length;
+    if (finalSize > 950000) {
+      console.error('saveNoteFS: STILL too large after all strips:', finalSize,
+        Object.keys(toSave).map(k => k + ':' + JSON.stringify(toSave[k] || '').length).join(', '));
+      return record; // skip Firestore write, IndexedDB already saved
+    }
+
+    await ref.doc(id).set(toSave, { merge: true });
+  }
+  return record;
+}
+async function getNoteFS(id) {
+  return getNote(id);
+}
+async function getAllNotesFS() {
+  return getAllNotes();
+}
+async function deleteNoteFS(id) {
+  await deleteNote(id);
+  const ref = userNotesRef();
+  if (ref) {
+    await ref.doc(id).delete();
+    await deleteSlideImages(id);
+  }
+  // Track deletion for sync
+  if (currentUser) {
+    const deletedKey = 'deleted_notes_' + currentUser.uid;
+    const deleted = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    deleted.push(id);
+    localStorage.setItem(deletedKey, JSON.stringify(deleted));
+  }
+}
+async function searchNotesFS(query) {
+  const all = await getAllNotesFS();
+  const q = query.toLowerCase();
+  return all.filter(n => (n.title || '').toLowerCase().includes(q) || (n.notesText || '').toLowerCase().includes(q));
+}
+async function saveFolderFS(folder) {
+  const ref = userFoldersRef();
+  if (!ref) return saveFolder(folder);
+  const id = folder.id || uuidv4();
+  const record = Object.assign({ createdAt: new Date().toISOString() }, folder, { id });
+  await ref.doc(id).set(record, { merge: true });
+  return record;
+}
+async function getAllFoldersFS() {
+  const ref = userFoldersRef();
+  if (!ref) return getAllFolders();
+  const snap = await ref.orderBy('name').get();
+  return snap.docs.map(d => d.data());
+}
+async function deleteFolderFS(id) {
+  const ref = userFoldersRef();
+  if (!ref) return deleteFolder(id);
+  const notes = await getAllNotesFS();
+  for (const note of notes.filter(n => n.folderId === id)) {
+    await saveNoteFS(Object.assign({}, note, { folderId: null }));
+  }
+  await ref.doc(id).delete();
+  // Also purge from IndexedDB — prevents ghost folder on next login sync
+  await deleteFolder(id);
+}
+async function renameFolderFS(id, newName, color) {
+  const ref = userFoldersRef();
+  if (!ref) return renameFolder(id, newName, color);
+  const doc = await ref.doc(id).get();
+  if (!doc.exists) return;
+  const updated = Object.assign({}, doc.data(), { name: newName }, color !== undefined ? { color } : {});
+  await ref.doc(id).set(updated);
+  return updated;
+}
+async function updateNoteOrderFS(orderedIds) {
+  // Always update IndexedDB so renderHomeView() (which reads IDB) sees the new order
+  await updateNoteOrder(orderedIds);
+  const ref = userNotesRef();
+  if (!ref) return;
+  const batch = db.batch();
+  orderedIds.forEach((id, sortIndex) => {
+    batch.update(ref.doc(id), { sortOrder: sortIndex });
+  });
+  await batch.commit();
+}
+
+async function migrateLocalToFirestore() {
+  if (!currentUser) return;
+  const migrated = localStorage.getItem('fs_migrated_' + currentUser.uid);
+  if (migrated) return;
+  try {
+    const localNotes = await getAllNotes();
+    const localFolders = await getAllFolders();
+    if (localFolders.length > 0 || localNotes.length > 0) {
+      showToast('📦 로컬 노트를 클라우드로 이전 중...');
+      for (const folder of localFolders) {
+        try { await saveFolderFS(folder); } catch (e) { console.warn('Folder migration skip:', e); }
+      }
+      let ok = 0;
+      for (const note of localNotes) {
+        if (!note.title?.trim() || !(note.notesText || note.markdownContent)?.trim()) {
+          console.warn('[migrate] skipped empty legacy note', note.id);
+          continue;
+        }
+        try { await saveNoteFS(note); ok++; } catch (e) { console.warn('Note migration skip:', note.id, e.message); }
+      }
+      showSuccessToast('☁️ ' + ok + '/' + localNotes.length + '개 노트 이전 완료');
+    }
+  } catch (e) {
+    console.error('Migration error:', e);
+  }
+  // Always set flag so we don't retry
+  localStorage.setItem('fs_migrated_' + currentUser.uid, 'true');
+}
+
+async function syncNotesOnLogin() {
+  if (!currentUser) return;
+  const synced = sessionStorage.getItem('synced_' + currentUser.uid);
+  if (synced) return;
+  try {
+    const ref = userNotesRef();
+    const fRef = userFoldersRef();
+    if (!ref || !fRef) return;
+
+    const [localNotes, localFolders, fsNotesSnap, fsFoldersSnap] = await Promise.all([
+      getAllNotes(), getAllFolders(),
+      ref.get(), fRef.get()
+    ]);
+
+    const fsNotes = fsNotesSnap.docs.map(d => d.data());
+    const fsFolders = fsFoldersSnap.docs.map(d => d.data());
+    const fsNoteMap = Object.fromEntries(fsNotes.map(n => [n.id, n]));
+    const localNoteMap = Object.fromEntries(localNotes.map(n => [n.id, n]));
+    const fsFolderMap = Object.fromEntries(fsFolders.map(f => [f.id, f]));
+    const localFolderMap = Object.fromEntries(localFolders.map(f => [f.id, f]));
+
+    // 1. Process deleted notes tracked in localStorage
+    const deletedKey = 'deleted_notes_' + currentUser.uid;
+    const deletedIds = JSON.parse(localStorage.getItem(deletedKey) || '[]');
+    const successfulDeletes = [];
+    for (const did of deletedIds) {
+      try {
+        await ref.doc(did).delete();
+        successfulDeletes.push(did);
+      } catch(e) {
+        console.warn('Firestore delete failed, will retry next sync:', did, e);
+      }
+    }
+    // Only remove successfully deleted IDs; keep failed ones for next sync
+    if (successfulDeletes.length === deletedIds.length) {
+      localStorage.removeItem(deletedKey);
+    } else {
+      const remaining = deletedIds.filter(id => !successfulDeletes.includes(id));
+      localStorage.setItem(deletedKey, JSON.stringify(remaining));
+    }
+    // Purge any zombie notes that exist in IndexedDB despite being on the delete list
+    for (const did of deletedIds) {
+      try { await deleteNote(did); } catch(e) {}
+    }
+    const deletedSet = new Set(deletedIds);
+
+    // 2. Firestore에 있는데 로컬에 없으면 → 로컬에 저장 (단, 삭제 목록에 없는 경우만)
+    for (const fsNote of fsNotes) {
+      if (deletedSet.has(fsNote.id)) continue;
+      if (!localNoteMap[fsNote.id]) {
+        if (!fsNote.notesHtml && fsNote.notesText) fsNote.notesHtml = renderMarkdown(fsNote.notesText);
+        if (fsNote.slideImageUrls && !fsNote.extractedImages) {
+          fsNote.extractedImages = fsNote.slideImageUrls.map((url, i) => url ? { slideNumber: i + 1, imageBase64: url, mimeType: 'url' } : null).filter(Boolean);
+        }
+        await saveNote(fsNote);
+      }
+    }
+    for (const fsFolder of fsFolders) {
+      if (!localFolderMap[fsFolder.id]) await saveFolder(fsFolder);
+    }
+
+    // 3. 로컬에 있는데 Firestore에 없으면 → Firestore에 업로드
+    // HOTFIX: disabled to prevent ghost note resurrection
+    // for (const ln of localNotes) {
+    //   if (deletedSet.has(ln.id)) continue;
+    //   if (!fsNoteMap[ln.id]) {
+    //     try { await saveNoteFS(ln); } catch (e) { console.warn('Sync upload skip:', ln.id, e.message); }
+    //   }
+    // }
+    // for (const lf of localFolders) {
+    //   if (!fsFolderMap[lf.id]) {
+    //     try { await saveFolderFS(lf); } catch (e) { console.warn('Folder sync skip:', e.message); }
+    //   }
+    // }
+
+    // 4. 둘 다 있으면 → updatedAt 비교
+    for (const fsNote of fsNotes) {
+      if (deletedSet.has(fsNote.id)) continue;
+      const local = localNoteMap[fsNote.id];
+      if (!local) continue;
+      const fsTime = fsNote.updatedAt || '';
+      const localTime = local.updatedAt || '';
+      if (fsTime > localTime) {
+        const merged = Object.assign({}, fsNote, { slideImages: local.slideImages, notesHtml: local.notesHtml, extractedImages: local.extractedImages });
+        await saveNote(merged);
+      } else if (localTime > fsTime) {
+        // HOTFIX: disabled to prevent ghost note resurrection
+        // try { await saveNoteFS(local); } catch (e) { console.warn('Sync push skip:', e.message); }
+      }
+    }
+
+    // 5. Sync quiz results from Firestore → IndexedDB (merge only, never delete)
+    try {
+      const qrSnap = await firebase.firestore()
+        .collection('users').doc(currentUser.uid)
+        .collection('quizResults').get();
+      const idbQr = await openDB();
+      for (const doc of qrSnap.docs) {
+        const fsQr = doc.data();
+        await new Promise((res, rej) => {
+          const tx  = idbQr.transaction('quizResults', 'readwrite');
+          const req = tx.objectStore('quizResults').get(fsQr.id);
+          req.onsuccess = e => {
+            const local = e.target.result;
+            // Add if absent; keep the newer record if both exist
+            if (!local || (fsQr.timestamp && local.timestamp && fsQr.timestamp > local.timestamp)) {
+              tx.objectStore('quizResults').put(fsQr);
+            }
+            tx.oncomplete = () => res();
+            tx.onerror    = ev => rej(ev.target.error);
+          };
+          req.onerror = ev => rej(ev.target.error);
+        }).catch(e => console.warn('quizResult IDB merge failed:', fsQr.id, e));
+      }
+    } catch (e) {
+      console.warn('Quiz results sync failed (non-critical):', e);
+    }
+
+    // 6. Convert slideImageUrls for any local note missing extractedImages
+    const allLocal = await getAllNotes();
+    for (const note of allLocal) {
+      if (note.slideImageUrls && !note.extractedImages) {
+        note.extractedImages = note.slideImageUrls.map((url, i) => url ? { slideNumber: i + 1, imageBase64: url, mimeType: 'url' } : null).filter(Boolean);
+        await saveNote(note);
+      }
+    }
+
+    sessionStorage.setItem('synced_' + currentUser.uid, 'true');
+  } catch (e) {
+    console.error('Sync error:', e);
+  }
+}
+
+async function getUserUsage() {
+  if (!currentUser) return { monthlyCount: 0, plan: 'free', planExpiry: null };
+  const ref = db.collection('users').doc(currentUser.uid);
+  const doc = await ref.get();
+  if (!doc.exists) return { monthlyCount: 0, plan: 'free', planExpiry: null };
+  const data = doc.data();
+  const now = new Date();
+  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const count = (data.usage && data.usage[monthKey]) || 0;
+  const plan = data.plan || 'free';
+  const planExpiry = data.planExpiry || null;
+  // Check if paid plan expired
+  if (plan === 'monthly' && planExpiry && new Date(planExpiry) < now) {
+    return { monthlyCount: count, plan: 'free', planExpiry: null };
+  }
+  return { monthlyCount: count, plan, planExpiry };
+}
+
+async function incrementUsage() {
+  if (!currentUser) return;
+  const ref = db.collection('users').doc(currentUser.uid);
+  const now = new Date();
+  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  await ref.set({ usage: { [monthKey]: firebase.firestore.FieldValue.increment(1) } }, { merge: true });
+}
+
+async function canAnalyze() {
+  if (DEVELOPER_EMAILS.includes(currentUser?.email)) return { allowed: true, reason: '' };
+  const usage = await getUserUsage();
+  if (usage.plan === 'monthly') return { allowed: true, reason: '' };
+  if (usage.monthlyCount < 3) return { allowed: true, reason: '', remaining: 3 - usage.monthlyCount };
+  return { allowed: false, reason: 'monthly_limit', monthlyCount: usage.monthlyCount };
+}
+
+async function setPaidPlan(plan, orderId) {
+  if (!currentUser) return;
+  const ref = db.collection('users').doc(currentUser.uid);
+  if (plan === 'monthly') {
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + 1);
+    await ref.set({ plan: 'monthly', planExpiry: expiry.toISOString(), lastOrderId: orderId }, { merge: true });
+  } else if (plan === 'single') {
+    const now = new Date();
+    const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    await ref.set({ singlePurchases: firebase.firestore.FieldValue.increment(1), lastOrderId: orderId }, { merge: true });
+  }
+}
+
+async function uploadSlideImages(noteId, slideImages) {
+  if (!currentUser || !slideImages || !slideImages.length) return [];
+  const urls = [];
+  for (let i = 0; i < slideImages.length; i++) {
+    const img = slideImages[i];
+    if (!img) { urls.push(null); continue; }
+    // If already a storage URL, keep it
+    if (typeof img === 'string' && img.startsWith('https://')) { urls.push(img); continue; }
+    // Upload base64 to Firebase Storage
+    const path = 'users/' + currentUser.uid + '/notes/' + noteId + '/slide_' + i + '.png';
+    const ref = storage.ref(path);
+    try {
+      let data, contentType = 'image/png';
+      if (typeof img === 'object' && img.imageBase64) {
+        if (img.mimeType === 'url' && typeof img.imageBase64 === 'string' && img.imageBase64.startsWith('https://')) {
+          urls.push(img.imageBase64);
+          continue;
+        }
+        data = img.imageBase64;
+        contentType = img.mimeType || 'image/png';
+      } else if (typeof img === 'string' && img.includes('base64,')) {
+        data = img.split('base64,')[1];
+      } else if (typeof img === 'string') {
+        data = img;
+      } else {
+        urls.push(null); continue;
+      }
+      // Convert base64url → standard base64 before upload
+      data = data.replace(/-/g, '+').replace(/_/g, '/');
+      if (data.length % 4) data += '='.repeat(4 - (data.length % 4));
+      await ref.putString(data, 'base64', { contentType });
+      const url = await ref.getDownloadURL();
+      urls.push(url);
+    } catch (e) {
+      console.error('Slide upload error:', i, e);
+      urls.push(null);
+    }
+  }
+  return urls;
+}
+
+async function deleteSlideImages(noteId) {
+  if (!currentUser) return;
+  const prefix = 'users/' + currentUser.uid + '/notes/' + noteId + '/';
+  try {
+    const listRef = storage.ref(prefix);
+    const list = await listRef.listAll();
+    await Promise.all(list.items.map(item => item.delete()));
+  } catch (e) {
+    console.error('deleteSlideImages error:', e);
+  }
+}
+
+async function getNextSortOrder(folderId, excludeId = null) {
+  const notes = await getAllNotesFS();
+  const folderNotes = notes.filter(n =>
+    (n.folderId ?? null) === (folderId ?? null) && n.id !== excludeId
+  );
+  return folderNotes.length ? Math.max(...folderNotes.map(n => n.sortOrder ?? 0)) + 1 : 0;
+}
