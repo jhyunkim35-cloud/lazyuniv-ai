@@ -57,12 +57,15 @@ async function moveNoteToFolder(noteId, folderId) {
   const updated = Object.assign({}, note, { folderId, sortOrder: newSortOrder });
   // Use saveNote (IndexedDB only) — avoids re-uploading slide images via saveNoteFS
   await saveNote(updated);
-  // Firestore: update only the changed fields, fire-and-forget (no image upload)
+  // Firestore: update only the changed fields
   const ref = userNotesRef();
   if (ref) {
     const { updatedAt } = updated;
-    ref.doc(noteId).set({ folderId, sortOrder: newSortOrder, updatedAt }, { merge: true })
-      .catch(e => console.warn('Firestore folder move sync failed:', e));
+    try {
+      await ref.doc(noteId).set({ folderId, sortOrder: newSortOrder, updatedAt }, { merge: true });
+    } catch (e) {
+      console.warn('Firestore folder move sync failed:', e);
+    }
   }
   showToast(`📁 노트를 폴더로 이동했습니다`);
 }
