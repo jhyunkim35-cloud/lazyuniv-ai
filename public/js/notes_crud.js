@@ -577,6 +577,13 @@ async function importNotes(input) {
       if (!existingFolderIds.has(folder.id)) { await saveFolderFS(folder); }
     }
     for (const note of notes) {
+      const _hasTitle = note.title && note.title.trim();
+      const _hasContent = (note.notesText || note.markdownContent) &&
+                          (note.notesText || note.markdownContent).trim();
+      if (!_hasTitle && !_hasContent) {
+        console.warn('[importNotes] skipping ghost note:', note.id);
+        continue;
+      }
       if (!existingNoteIds.has(note.id)) { await saveNoteFS(note); imported++; }
     }
     input.value = '';

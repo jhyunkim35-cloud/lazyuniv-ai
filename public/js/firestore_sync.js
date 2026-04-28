@@ -26,6 +26,7 @@ async function saveNoteFS(note) {
       type: note?.type,
     });
     console.trace('Call stack:');
+    return note;
   }
   console.log('[saveNoteFS]', note?.id, '|', note?.title || '(no title)', '|', _hasContent ? 'has content' : 'EMPTY');
   // ───── END DIAGNOSTIC ─────
@@ -220,6 +221,14 @@ async function syncNotesOnLogin() {
     for (const fsNote of fsNotes) {
       if (deletedSet.has(fsNote.id)) continue;
       if (!localNoteMap[fsNote.id]) {
+        // Skip ghost notes from Firestore (empty title AND empty content)
+        const _hasTitle = fsNote.title && fsNote.title.trim();
+        const _hasContent = (fsNote.notesText || fsNote.markdownContent) &&
+                            (fsNote.notesText || fsNote.markdownContent).trim();
+        if (!_hasTitle && !_hasContent) {
+          console.warn('[sync] skipping ghost note from Firestore:', fsNote.id);
+          continue;
+        }
         if (!fsNote.notesHtml && fsNote.notesText) fsNote.notesHtml = renderMarkdown(fsNote.notesText);
         if (fsNote.slideImageUrls && !fsNote.extractedImages) {
           fsNote.extractedImages = fsNote.slideImageUrls.map((url, i) => url ? { slideNumber: i + 1, imageBase64: url, mimeType: 'url' } : null).filter(Boolean);
