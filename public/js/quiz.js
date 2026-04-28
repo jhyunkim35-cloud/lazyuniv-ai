@@ -8,6 +8,14 @@
    Quiz
 ═══════════════════════════════════════════════ */
 
+// Module-level abort controller for in-flight quiz generation
+let _quizAbortController = null;
+
+// Abort in-flight quiz on page unload (saves tokens when user closes tab)
+window.addEventListener('beforeunload', () => {
+  _quizAbortController?.abort();
+});
+
 // Try to extract the first complete JSON object from a streaming text buffer.
 // Returns { obj, rest } where rest is the unparsed remainder, or null if incomplete.
 function tryExtractJsonObject(str) {
@@ -176,7 +184,7 @@ Before finalizing each question you generate, check it against the list above. I
 // Streaming variant of generateQuiz.
 // Calls onQuestion(questionObj, index) each time a complete question object is parsed from the stream.
 // Returns { questions, debugInfo } after the stream ends.
-async function generateQuizStream(noteText, settings = {}, prevQuestions = [], onQuestion, isNotion = false) {
+async function generateQuizStream(noteText, settings = {}, prevQuestions = [], onQuestion, isNotion = false, signal = undefined) {
   const count        = settings.count        || 10;
   const answerFormat = settings.answerFormat || 'mc';
   const style        = settings.style        || 'mixed';
@@ -281,13 +289,13 @@ Before finalizing each question you generate, check it against the list above. I
     system: systemPrompt,
     messages: [{ role: 'user', content: noteText }],
   });
-  let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody() });
+  let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody(), signal });
   if (!res.ok && MODEL === PREFERRED_MODEL) {
     let errText = ''; try { errText = await res.clone().text(); } catch {}
     if (/model|not.found|invalid/i.test(errText) || res.status === 404 || res.status === 400) {
       console.warn(`[quiz] ${PREFERRED_MODEL} failed, falling back to ${FALLBACK_MODEL}`);
       MODEL = FALLBACK_MODEL;
-      res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody() });
+      res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody(), signal });
     }
   }
   if (!res.ok) {
@@ -302,41 +310,45 @@ Before finalizing each question you generate, check it against the list above. I
   let questionIndex = 0;
   const questions = [];
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    sseRaw += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      sseRaw += decoder.decode(value, { stream: true });
 
-    // Split by double-newline to isolate complete SSE events; keep trailing incomplete part
-    const events = sseRaw.split('\n\n');
-    sseRaw = events.pop();
+      // Split by double-newline to isolate complete SSE events; keep trailing incomplete part
+      const events = sseRaw.split('\n\n');
+      sseRaw = events.pop();
 
-    for (const event of events) {
-      const dataLine = event.split('\n').find(l => l.startsWith('data: '));
-      if (!dataLine) continue;
-      const data = dataLine.slice(6);
-      if (data === '[DONE]') continue;
+      for (const event of events) {
+        const dataLine = event.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        const data = dataLine.slice(6);
+        if (data === '[DONE]') continue;
 
-      let evt;
-      try { evt = JSON.parse(data); } catch(e) { continue; }
+        let evt;
+        try { evt = JSON.parse(data); } catch(e) { continue; }
 
-      if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-        textBuf += evt.delta.text;
+        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+          textBuf += evt.delta.text;
 
-        // Extract and deliver every complete JSON object as it arrives
-        let extracted;
-        while ((extracted = tryExtractJsonObject(textBuf)) !== null) {
-          textBuf = extracted.rest;
-          try {
-            validateFn(extracted.obj, questionIndex);
-            questions.push(extracted.obj);
-            onQuestion(extracted.obj, questionIndex++);
-          } catch(e) {
-            console.warn('generateQuizStream: skipping invalid question object:', e.message);
+          // Extract and deliver every complete JSON object as it arrives
+          let extracted;
+          while ((extracted = tryExtractJsonObject(textBuf)) !== null) {
+            textBuf = extracted.rest;
+            try {
+              validateFn(extracted.obj, questionIndex);
+              questions.push(extracted.obj);
+              onQuestion(extracted.obj, questionIndex++);
+            } catch(e) {
+              console.warn('generateQuizStream: skipping invalid question object:', e.message);
+            }
           }
         }
       }
     }
+  } finally {
+    try { reader.releaseLock(); } catch (e) { /* already released */ }
   }
 
   const responseTimeMs = Date.now() - t0;
@@ -556,10 +568,12 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
         .filter(Boolean);
 
       const isNotionQuiz = area === document.getElementById('notionQuizArea');
+      _quizAbortController = new AbortController();
       const { questions, debugInfo } = await generateQuizStream(
         noteText, settings, prevQuestions,
         (q, idx) => { streamedQuestions.push(q); appendStreamCard(q, idx); },
-        isNotionQuiz
+        isNotionQuiz,
+        _quizAbortController.signal
       );
 
       clearInterval(msgInterval);
@@ -578,6 +592,10 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
     } catch(e) {
       clearInterval(msgInterval);
       clearInterval(timerInterval);
+      if (e.name === 'AbortError') {
+        console.log('[quiz] generation aborted');
+        return;
+      }
       if (firstArrived && streamedQuestions.length > 0) {
         showToast('❌ 스트리밍 중 오류: ' + e.message);
         finalizeStreamedQuiz(streamedQuestions, {});
