@@ -3839,6 +3839,11 @@ document.getElementById('globalSearchInput').addEventListener('input', function(
    Keyboard shortcuts
 ═══════════════════════════════════════════════ */
 document.addEventListener('keydown', e => {
+  // Block browser's Ctrl+S "save page" dialog
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    return;
+  }
   // Esc — close split viewer or settings panel
   if (e.key === 'Escape') {
     const splitViewer = document.getElementById('splitViewer');
