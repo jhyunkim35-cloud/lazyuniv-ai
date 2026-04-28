@@ -335,8 +335,7 @@ function attachNoteDrag(card, noteId) {
     if (!_noteDrag.dragging) {
       if (Math.hypot(dx, dy) < 6) return; // ignore micro-movement
       // -- Drag starts --
-      const grid = card.closest('#allNotesGrid');
-      if (!grid) { cleanupDocListeners(); _noteDrag = null; return; }
+      const grid = card.closest('#allNotesGrid'); // null for #recentNotesGrid cards — folder drop still works
       const rect = card.getBoundingClientRect();
       _noteDrag.dragging   = true;
       _noteDrag.grid       = grid;
@@ -369,44 +368,46 @@ function attachNoteDrag(card, noteId) {
     clone.style.left = cloneLeft + 'px';
     clone.style.top  = cloneTop  + 'px';
 
-    // Determine insert position from clone center Y
-    const cloneCenterY = cloneTop + cardH / 2;
-    const otherCards = [...grid.querySelectorAll('.note-card[data-note-id]')]
-      .filter(c => c !== card);
+    if (grid) {
+      // Determine insert position from clone center Y
+      const cloneCenterY = cloneTop + cardH / 2;
+      const otherCards = [...grid.querySelectorAll('.note-card[data-note-id]')]
+        .filter(c => c !== card);
 
-    let newIdx = otherCards.length;
-    for (let i = 0; i < otherCards.length; i++) {
-      const r = otherCards[i].getBoundingClientRect();
-      if (cloneCenterY < r.top + r.height / 2) { newIdx = i; break; }
-    }
-
-    if (newIdx !== _noteDrag.insertIndex) {
-      _noteDrag.insertIndex = newIdx;
-
-      // FLIP: record positions before DOM change
-      const snapshots = otherCards.map(c => ({ c, top: c.getBoundingClientRect().top }));
-
-      // Move placeholder in DOM
-      if (newIdx >= otherCards.length) {
-        otherCards[otherCards.length - 1]?.after(card) ?? grid.appendChild(card);
-      } else {
-        otherCards[newIdx].before(card);
+      let newIdx = otherCards.length;
+      for (let i = 0; i < otherCards.length; i++) {
+        const r = otherCards[i].getBoundingClientRect();
+        if (cloneCenterY < r.top + r.height / 2) { newIdx = i; break; }
       }
 
-      // FLIP: animate other cards from old → new position
-      requestAnimationFrame(() => {
-        snapshots.forEach(({ c, top: oldTop }) => {
-          const newTop = c.getBoundingClientRect().top;
-          const delta  = oldTop - newTop;
-          if (Math.abs(delta) < 1) return;
-          c.style.transition = 'none';
-          c.style.transform  = `translateY(${delta}px)`;
-          requestAnimationFrame(() => {
-            c.style.transition = 'transform 0.2s ease';
-            c.style.transform  = '';
+      if (newIdx !== _noteDrag.insertIndex) {
+        _noteDrag.insertIndex = newIdx;
+
+        // FLIP: record positions before DOM change
+        const snapshots = otherCards.map(c => ({ c, top: c.getBoundingClientRect().top }));
+
+        // Move placeholder in DOM
+        if (newIdx >= otherCards.length) {
+          otherCards[otherCards.length - 1]?.after(card) ?? grid.appendChild(card);
+        } else {
+          otherCards[newIdx].before(card);
+        }
+
+        // FLIP: animate other cards from old → new position
+        requestAnimationFrame(() => {
+          snapshots.forEach(({ c, top: oldTop }) => {
+            const newTop = c.getBoundingClientRect().top;
+            const delta  = oldTop - newTop;
+            if (Math.abs(delta) < 1) return;
+            c.style.transition = 'none';
+            c.style.transform  = `translateY(${delta}px)`;
+            requestAnimationFrame(() => {
+              c.style.transition = 'transform 0.2s ease';
+              c.style.transform  = '';
+            });
           });
         });
-      });
+      }
     }
   }
 
