@@ -43,6 +43,8 @@ setInterval(() => {
 (async function handlePaymentCallback() {
   const params = new URLSearchParams(window.location.search);
   const paymentStatus = params.get('payment');
+  // Clean URL immediately so paymentKey never leaks to history on error
+  window.history.replaceState({}, '', window.location.pathname);
   if (!paymentStatus) return;
 
   if (paymentStatus === 'success') {
@@ -77,7 +79,4 @@ setInterval(() => {
   } else if (paymentStatus === 'fail') {
     showToast('❌ 결제가 취소되었습니다.');
   }
-
-  // Clean URL
-  window.history.replaceState({}, '', window.location.pathname);
 })();

@@ -3,6 +3,13 @@ const rateLimit = new Map();
 const RATE_LIMIT = 10; // requests per minute
 const RATE_WINDOW = 60 * 1000;
 
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimit.entries()) {
+    if (now - entry.start > RATE_WINDOW * 2) rateLimit.delete(key);
+  }
+}, 60 * 1000);
+
 function checkRateLimit(ip) {
   const now = Date.now();
   const entry = rateLimit.get(ip) || { count: 0, start: now };
@@ -22,7 +29,7 @@ const ALLOWED_ORIGINS = [
 
 module.exports = async (req, res) => {
   const origin = req.headers.origin || '';
-  if (!ALLOWED_ORIGINS.some(o => origin.startsWith(o))) {
+  if (!ALLOWED_ORIGINS.some(o => origin === o)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   res.setHeader('Access-Control-Allow-Origin', origin);
@@ -37,7 +44,8 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+  const xff = req.headers['x-forwarded-for'] || '';
+  const ip = xff.split(',')[0].trim() || req.socket?.remoteAddress || 'unknown';
   if (!checkRateLimit(ip)) {
     return res.status(429).json({ error: 'Too many requests. Please wait.' });
   }

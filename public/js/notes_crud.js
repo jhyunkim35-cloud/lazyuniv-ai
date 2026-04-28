@@ -334,11 +334,17 @@ async function moveSavedNote(id) {
     row.onclick = async () => {
       const newSortOrder = await getNextSortOrder(folder.id, note.id);
       const updated = Object.assign({}, note, { folderId: folder.id, sortOrder: newSortOrder });
-      await saveNoteFS(updated);
-      overlay.remove();
-      showSuccessToast(`📁 "${note.title || '노트'}" 이동 완료`);
-      renderSavedNotes();
-      renderHomeView();
+      try {
+        await saveNoteFS(updated);
+        showSuccessToast(`📁 "${note.title || '노트'}" 이동 완료`);
+      } catch (e) {
+        console.warn('moveSavedNote save failed:', e);
+        showToast('❌ 폴더 이동 실패: ' + e.message);
+      } finally {
+        overlay.remove();
+      }
+      await renderSavedNotes();
+      await renderHomeView();
     };
     listEl.appendChild(row);
   }

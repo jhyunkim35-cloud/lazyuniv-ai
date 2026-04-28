@@ -626,7 +626,12 @@ async function gradeEssay(q, userAnswer) {
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const data = await res.json();
   const raw = (data.content?.[0]?.text || data.content || '').replace(/```json\n?/g, '').replace(/```/g, '').trim();
-  return JSON.parse(raw);
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.warn('gradeEssay: JSON parse failed:', e.message, raw?.slice(0, 200));
+    return { score: 50, feedback: '채점 결과를 파싱하는데 실패했습니다. 다시 시도해주세요.', rubricResults: [] };
+  }
 }
 
 // Normalize text for short-answer keyword matching
