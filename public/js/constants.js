@@ -31,6 +31,10 @@ function debugLog(tag, msg, data = null) {
 // ===== Constants =====
 const MAX_ITERATIONS        = 2;
 const USE_ADVISOR = false;  // DISABLED: advisor never invoked, only adds latency
+const MAX_FILE_SIZE_BYTES  = 200 * 1024 * 1024;  // 200MB hard limit
+const WARN_FILE_SIZE_BYTES = 100 * 1024 * 1024;  // 100MB soft warning
+const MAX_PDF_PAGES        = 200;                  // hard page count limit
+const WARN_PDF_PAGES       = 100;                  // soft page count warning
 const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];
 const MAX_TOKENS_NOTES      = 24000;
 const MAX_TOKENS_CRITIQUE   = 4096;

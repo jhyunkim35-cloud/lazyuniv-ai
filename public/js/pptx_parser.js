@@ -27,6 +27,13 @@ function onPptChange(file) {
     showToast('⚠️ .pptx 또는 .pdf 파일만 업로드할 수 있습니다.');
     return;
   }
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    showToast(`⚠️ 파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+    return;
+  }
+  if (file.size > WARN_FILE_SIZE_BYTES) {
+    if (!confirm(`파일 크기가 ${(file.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) return;
+  }
   pptFile = file;
   document.getElementById('pptIcon').textContent = name.endsWith('.pdf') ? '📄' : '📊';
   document.getElementById('pptTagName').textContent = file.name;
@@ -598,6 +605,14 @@ async function extractPdfText(file) {
   const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   const numPages = pdf.numPages;
 
+  if (numPages > MAX_PDF_PAGES) {
+    pdf.destroy();
+    throw Object.assign(new Error(`PDF가 ${numPages}페이지입니다. 최대 ${MAX_PDF_PAGES}페이지까지 처리할 수 있습니다.`), { name: 'PageLimitError' });
+  }
+  if (numPages > WARN_PDF_PAGES) {
+    showToast(`📄 PDF가 ${numPages}페이지입니다. 처리 시간이 길어질 수 있습니다.`);
+  }
+
   const lines = [];
   for (let i = 1; i <= numPages; i++) {
     // Yield to the browser every 5 pages to keep the UI responsive
@@ -641,6 +656,14 @@ async function extractPdfPageImages(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
 
+    if (pdf.numPages > MAX_PDF_PAGES) {
+      pdf.destroy();
+      throw Object.assign(new Error(`PDF가 ${pdf.numPages}페이지입니다. 최대 ${MAX_PDF_PAGES}페이지까지 처리할 수 있습니다.`), { name: 'PageLimitError' });
+    }
+    if (pdf.numPages > WARN_PDF_PAGES) {
+      showToast(`📄 PDF가 ${pdf.numPages}페이지입니다. 처리 시간이 길어질 수 있습니다.`);
+    }
+
     for (let i = 1; i <= pdf.numPages; i++) {
       // Yield to the browser every 5 pages to keep the UI responsive
       if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
@@ -662,7 +685,7 @@ async function extractPdfPageImages(file) {
 
     pdf.destroy();
   } catch (e) {
-    if (e.name === 'AbortError') throw e;
+    if (e.name === 'AbortError' || e.name === 'PageLimitError') throw e;
     console.warn('PDF 페이지 이미지 추출 오류:', e);
   }
   return images;

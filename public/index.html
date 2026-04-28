@@ -3318,6 +3318,17 @@ document.getElementById('batchPptInput').addEventListener('change', e => {
     showToast('⚠️ .pptx 또는 .pdf 파일만 업로드할 수 있습니다.');
     return;
   }
+  if (f.size > MAX_FILE_SIZE_BYTES) {
+    showToast(`⚠️ 파일이 너무 큽니다 (${(f.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+    e.target.value = '';
+    return;
+  }
+  if (f.size > WARN_FILE_SIZE_BYTES) {
+    if (!confirm(`파일 크기가 ${(f.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) {
+      e.target.value = '';
+      return;
+    }
+  }
   batchPptStaging = f;
   const btn = document.getElementById('batchPptBtn');
   btn.classList.add('has-file');
@@ -3505,7 +3516,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
               ? await extractPdfPageImages(item.pptFile)
               : await extractPptxImages(item.pptFile);
           } catch (imgErr) {
-            if (imgErr.name === 'AbortError') throw imgErr;
+            if (imgErr.name === 'AbortError' || imgErr.name === 'PageLimitError') throw imgErr;
             console.warn('Batch image extraction:', imgErr.message);
           }
         }
