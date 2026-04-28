@@ -3067,23 +3067,9 @@
   </div>
 </div>
 
+<script src="/js/constants.js"></script>
 <script>
-/* ═══════════════════════════════════════════════
-   Firebase Auth
-═══════════════════════════════════════════════ */
-const firebaseConfig = {
-  apiKey: "AIzaSyC68aMiCvyfR3QycxUknmxB3z7NS0qRE2g",
-  authDomain: "lazyuniv-ai.firebaseapp.com",
-  projectId: "lazyuniv-ai",
-  storageBucket: "lazyuniv-ai.firebasestorage.app",
-  messagingSenderId: "152431469306",
-  appId: "1:152431469306:web:a7292a51bd41b31a229f43"
-};
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-const storage = firebase.storage();
-let currentUser = null;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 auth.onAuthStateChanged(user => {
   currentUser = user;
@@ -3592,12 +3578,12 @@ async function deleteSlideImages(noteId) {
   }
 }
 
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 /* ═══════════════════════════════════════════════
    PDF.js — load worker via importScripts-compatible shim.
    pdf.min.mjs is an ES module; we load it dynamically so we
    can set the workerSrc before first use.
 ═══════════════════════════════════════════════ */
-let pdfjsLib = null;
 async function getPdfjsLib() {
   if (pdfjsLib) return pdfjsLib;
   const mod = await import(
@@ -3609,97 +3595,13 @@ async function getPdfjsLib() {
   return pdfjsLib;
 }
 
-/* ═══════════════════════════════════════════════
-   Debug logger
-═══════════════════════════════════════════════ */
-const _debugLog = [];
-function debugLog(tag, msg, data = null) {
-  const ts = ((performance.now()) / 1000).toFixed(1) + 's';
-  const entry = `[${ts}][${tag}] ${msg}` + (data != null ? ' | ' + (typeof data === 'string' ? data : JSON.stringify(data)) : '');
-  _debugLog.push(entry);
-  console.log(entry);
-}
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
-/* ═══════════════════════════════════════════════
-   State & constants
-═══════════════════════════════════════════════ */
-const MAX_ITERATIONS        = 2;
-const USE_ADVISOR = false;  // DISABLED: advisor never invoked, only adds latency
-const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];
-const MAX_TOKENS_NOTES      = 24000;
-const MAX_TOKENS_CRITIQUE   = 4096;
-const DONE_SIGNAL           = '검토 완료 — 수정 필요 없음';
-const TOAST_DURATION_MS     = 5000;
-const PROGRESS_HIDE_DELAY_MS = 1200;  // used by setProgress(null)
-
-const FOLDER_COLORS = [
-  { name: '기본', value: 'var(--text-muted)' },
-  { name: '빨강', value: '#ef4444' },
-  { name: '주황', value: '#f97316' },
-  { name: '노랑', value: '#eab308' },
-  { name: '초록', value: '#22c55e' },
-  { name: '파랑', value: '#3b82f6' },
-  { name: '보라', value: '#8b5cf6' },
-  { name: '분홍', value: '#ec4899' },
-];
-
-let pptFile  = null;
-let txtFiles = [];   // [{id, file}] — ordered slots for multi-recording
-let recIdCounter   = 0;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 let dragSrcRecId   = null;
-
-let storedPptText              = '';
-let storedFilteredText         = '';
-let storedNotesText            = '';
-let storedHighlightedTranscript = '';
-
-let extractedImages    = [];   // [{slideNumber, imageBase64, mimeType, fileName}]
-let recommendedSlides  = [];   // [slideNumber, ...]
-let imageAnalysisMode  = 'text';   // 'text' = Mode 1 (free) | 'vision' = Mode 2 (paid)
-let visionModel        = 'haiku';  // 'haiku' | 'sonnet'
-let imageDescriptions  = {};       // slideNumber → description (Mode 2 only)
-
-let isRunning      = false;      // double-click guard
-let abortController = null;      // cancel support
-let currentNoteId  = null;       // id of the note currently loaded
-let _accordionOpenLabels = new Set(); // persists accordion open state across tab switches
 let draggedNoteId  = null;       // id of the note being dragged (legacy, kept for safety)
-let _noteDrag      = null;       // active pointer-drag state object
-let _lastGenerationError = '';   // last pipeline error message for debug report
 
-/* Sleep that rejects immediately when the user clicks cancel.
-   Plain setTimeout ignores AbortSignal, so a 429 retry wait of up to
-   30 s would appear frozen after the user presses the cancel button. */
-function abortableSleep(ms) {
-  return new Promise((resolve, reject) => {
-    if (abortController?.signal.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const timer = setTimeout(resolve, ms);
-    abortController?.signal.addEventListener('abort', () => {
-      clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    }, { once: true });
-  });
-}
-
-/* ═══════════════════════════════════════════════
-   DOM refs
-═══════════════════════════════════════════════ */
-const apiKeyEl   = document.getElementById('apiKey');
-const analyzeBtn = document.getElementById('analyzeBtn');
-const resultsEl  = document.getElementById('results');
-const toast      = document.getElementById('toast');
-
-const quizBtn         = document.getElementById('quizBtn');
-const notionCopyBtn   = document.getElementById('notionCopyBtn');
-const dlNotionFileBtn = document.getElementById('dlNotionFileBtn');
-const copyNotesBtn    = document.getElementById('copyNotesBtn');
-const dlTxtBtn        = document.getElementById('dlTxtBtn');
-const dlMdBtn         = document.getElementById('dlMdBtn');
-const dlPdfBtn        = document.getElementById('dlPdfBtn');
-const splitViewBtn    = document.getElementById('splitViewBtn');
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 /* ═══════════════════════════════════════════════
    File handling
@@ -3719,8 +3621,8 @@ function onPptChange(file) {
   checkReady();
 }
 
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 /* ── Multi-recording slot management ─────────── */
-const REC_ORDINALS = ['1교시','2교시','3교시','4교시','5교시','6교시','7교시','8교시','9교시','10교시'];
 
 function addRecSlot(file = null) {
   const id = ++recIdCounter;
@@ -5767,7 +5669,7 @@ dlPdfBtn.addEventListener('click', () => {
 /* ═══════════════════════════════════════════════
    Quiz
 ═══════════════════════════════════════════════ */
-const QUIZ_CHOICES_PREFIX = ['①', '②', '③', '④', '⑤'];
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 // Try to extract the first complete JSON object from a streaming text buffer.
 // Returns { obj, rest } where rest is the unparsed remainder, or null if incomplete.
@@ -7311,8 +7213,7 @@ async function showQuizHistory(parentOverlay, noteId, noteTitle) {
 
 // ── Classify tab ────────────────────────────────────────────────────────────
 
-// Cache: { noteId, items } — cleared when a different note is loaded
-let _classifyCache = null;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 async function classifyNoteContent(noteText) {
   const systemPrompt =
@@ -7346,8 +7247,7 @@ async function classifyNoteContent(noteText) {
   return items;
 }
 
-const CLASSIFY_LABELS = { theory: '이론', research: '연구', case: '사례', other: '기타' };
-const CLASSIFY_COLORS = { theory: '#7c3aed', research: '#0ea5e9', case: '#10b981', other: '#6b7280' };
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function renderClassifyArea(items) {
   const area = document.getElementById('classifyArea');
@@ -7729,7 +7629,7 @@ function openPdfPopup(bodyEl) {
 /* ═══════════════════════════════════════════════
    Collapse / expand notes hero body
 ═══════════════════════════════════════════════ */
-let _notesCollapsed = false;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 (function() {
   const btn  = document.getElementById('collapseBtn');
   const body = document.getElementById('finalNotesBody');
@@ -7766,11 +7666,7 @@ function triggerDownload(content, filename) {
 /* ═══════════════════════════════════════════════
    Progress bar
 ═══════════════════════════════════════════════ */
-const progressWrap  = document.getElementById('progressWrap');
-const progressFill  = document.getElementById('progressFill');
-const progressLabel = document.getElementById('progressLabel');
-const progressPct   = document.getElementById('progressPct');
-let progressHideTimer = null;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function setProgress(pct, label) {
   clearTimeout(progressHideTimer);
@@ -7808,15 +7704,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 /* ═══════════════════════════════════════════════
    Agent metadata (icon + name per agent)
 ═══════════════════════════════════════════════ */
-const AGENT_META = {
-  1: { icon: '📝', name: '노트 작성자' },
-  2: { icon: '🔍', name: '비평가'      },
-};
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 /* ═══════════════════════════════════════════════
    Activity feed
 ═══════════════════════════════════════════════ */
-let feedStartTime = null;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function agentLog(agentNum, msg) {
   const feed  = document.getElementById('activityFeed');
@@ -7845,8 +7738,7 @@ function clearActivityFeed() {
 /* ═══════════════════════════════════════════════
    Elapsed timer
 ═══════════════════════════════════════════════ */
-let elapsedTimer = null;
-let elapsedStart = null;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function startElapsedTimer() {
   elapsedStart  = Date.now();
@@ -7935,7 +7827,7 @@ function makeAgentDot(nodeNum) {
 /* ═══════════════════════════════════════════════
    Iteration history chips
 ═══════════════════════════════════════════════ */
-let iterChipData = [];
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function addIterChip(iter, passed) {
   iterChipData.push({ iter, passed });
@@ -8652,15 +8544,7 @@ ${notesText}`;
 /* ═══════════════════════════════════════════════
    Batch mode
 ═══════════════════════════════════════════════ */
-let isBatchMode = false;
-let batchQueue  = [];   // [{id, pptFile, txtFile, status}]
-let batchIdCounter = 0;
-let _batchRunning      = false;
-let _batchProgress     = { done: 0, total: 0 };
-let _batchBuddyVisible = false; // true while buddy should float over non-batch views
-let batchPptStaging = null;
-let batchSessionStaging = []; // [{id, txtFile, professorNum}]
-let batchSessionIdCounter = 0;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 /* Mode switching */
 document.getElementById('modeSingle').addEventListener('click', () => setMode('single'));
@@ -9345,7 +9229,7 @@ document.getElementById('imgVisionRunBtn').addEventListener('click', async () =>
 /* ═══════════════════════════════════════════════
    Toast helper
 ═══════════════════════════════════════════════ */
-let toastTimer;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 function showToast(msg) {
   clearTimeout(toastTimer);
   toast.textContent = msg;
@@ -9356,8 +9240,7 @@ function showToast(msg) {
 /* ═══════════════════════════════════════════════
    IndexedDB — openDB / notes / folders
 ═══════════════════════════════════════════════ */
-const DB_NAME    = 'meetingAppDB';
-const DB_VERSION = 3;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -9385,12 +9268,7 @@ function openDB() {
   });
 }
 
-function uuidv4() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
-}
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 async function saveQuizResult(result) {
   const db = await openDB();
@@ -9901,7 +9779,7 @@ async function parseNotionFile(file) {
 /* ═══════════════════════════════════════════════
    Notion Note Viewer
 ═══════════════════════════════════════════════ */
-let _currentNotionNoteId = null;
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function openNotionNote(note) {
   _currentNotionNoteId = note.id;
@@ -10552,8 +10430,7 @@ function closeSidebar() {
 /* ═══════════════════════════════════════════════
    View switching
 ═══════════════════════════════════════════════ */
-let _currentView = 'home';
-let _activeFolderId = null; // null=all, 'none'=uncategorized, uuid=folder
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function switchView(view) {
   // All pipelines (batch and single note) run in the background — free navigation allowed
@@ -11150,8 +11027,7 @@ window.addEventListener('beforeunload', e => {
 /* ═══════════════════════════════════════════════
    Bulk Delete
 ═══════════════════════════════════════════════ */
-let _bulkSelectMode = false;
-const _selectedNoteIds = new Set();
+// Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
 function toggleBulkSelectMode() {
   _bulkSelectMode = !_bulkSelectMode;
