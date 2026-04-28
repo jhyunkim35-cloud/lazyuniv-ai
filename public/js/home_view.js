@@ -483,6 +483,21 @@ async function renderSidebarFolders(notes, folders) {
       rnBtn.textContent = '✏️';
       rnBtn.addEventListener('click', e => { e.stopPropagation(); renameFolderPrompt(folderId, folder.name, folder.color); });
       item.appendChild(rnBtn);
+
+      item.addEventListener('pointerenter', () => {
+        if (_noteDrag && _noteDrag.noteId) item.classList.add('folder-drag-over');
+      });
+      item.addEventListener('pointerleave', () => {
+        item.classList.remove('folder-drag-over');
+      });
+      item.addEventListener('pointerup', async () => {
+        if (_noteDrag && _noteDrag.noteId) {
+          const noteId = _noteDrag.noteId;
+          item.classList.remove('folder-drag-over');
+          await moveNoteToFolder(noteId, folder.id);
+          await renderHomeView();
+        }
+      });
     }
     item.onclick = () => filterByFolder(folderId);
     return item;
