@@ -30,19 +30,19 @@ function buildFolderCard(folder, noteCount) {
     renderHomeView();
   });
 
-  // ── Accept note drops ──────────────────────────────────────────
-  card.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
-  card.addEventListener('dragenter', e => { e.preventDefault(); card.classList.add('folder-drag-over'); });
-  card.addEventListener('dragleave', e => {
-    if (!card.contains(e.relatedTarget)) card.classList.remove('folder-drag-over');
+  // ── Accept note drops (Pointer Events — matches attachNoteDrag system) ──────
+  card.addEventListener('pointerenter', () => {
+    if (_noteDrag && _noteDrag.noteId) card.classList.add('folder-drag-over');
   });
-  card.addEventListener('drop', async e => {
-    e.preventDefault();
+  card.addEventListener('pointerleave', () => {
     card.classList.remove('folder-drag-over');
-    const noteId = e.dataTransfer.getData('text/plain');
-    if (!noteId) return;
-    await moveNoteToFolder(noteId, folder.id);
-    await renderHomeView();
+  });
+  card.addEventListener('pointerup', async () => {
+    if (_noteDrag && _noteDrag.noteId) {
+      const noteId = _noteDrag.noteId;
+      card.classList.remove('folder-drag-over');
+      await moveNoteToFolder(noteId, folder.id);
+    }
   });
 
   card.addEventListener('click', () => filterByFolder(folder.id));
@@ -349,7 +349,7 @@ function attachNoteDrag(card, noteId) {
       clone.className = 'note-card note-card-dragging';
       clone.style.cssText =
         `position:fixed;width:${rect.width}px;height:${rect.height}px;` +
-        `left:${rect.left}px;top:${rect.top}px;margin:0;`;
+        `left:${rect.left}px;top:${rect.top}px;margin:0;pointer-events:none;`;
       document.body.appendChild(clone);
       _noteDrag.clone = clone;
 
