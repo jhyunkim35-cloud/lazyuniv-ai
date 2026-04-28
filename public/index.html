@@ -2991,116 +2991,25 @@
 <script src="/js/folders.js"></script>
 <script src="/js/home_view.js"></script>
 <script src="/js/bulk.js"></script>
+<script src="/js/firebase_auth.js"></script>
+<script src="/js/payment.js"></script>
+<script src="/js/main.js"></script>
 <script>
 // Constants, state, DOM refs, Firebase init moved to /js/constants.js
 
-auth.onAuthStateChanged(user => {
-  currentUser = user;
-  updateAuthUI();
-});
+// auth state listener + updateAuthUI/loginWithGoogle/logout moved to /js/main.js and /js/firebase_auth.js
 
-function updateAuthUI() {
-  const loginBtn = document.getElementById('loginBtn');
-  const userInfo = document.getElementById('userInfo');
-  const userName = document.getElementById('userName');
-  const userAvatar = document.getElementById('userAvatar');
-  const landingView = document.getElementById('landingView');
-  const sidebar = document.getElementById('sidebar');
-  const homeView = document.getElementById('homeView');
-  const newNoteView = document.getElementById('newNoteView');
+// updateAuthUI moved to /js/firebase_auth.js
 
-  if (currentUser) {
-    loginBtn.style.display = 'none';
-    userInfo.style.display = 'flex';
-    userName.textContent = currentUser.displayName || currentUser.email;
-    userAvatar.src = currentUser.photoURL || '';
-    landingView.style.display = 'none';
-    sidebar.style.display = '';
-    // Show whichever view was active, default to home
-    if (newNoteView.style.display !== 'block') {
-      homeView.style.display = '';
-    }
-    syncNotesOnLogin().then(() => renderHomeView());
-    const sidebarAvatar = document.getElementById('sidebarAvatar');
-    const sidebarUserName = document.getElementById('sidebarUserName');
-    if (sidebarAvatar) sidebarAvatar.src = currentUser.photoURL || '';
-    if (sidebarUserName) sidebarUserName.textContent = currentUser.displayName || currentUser.email;
-  } else {
-    loginBtn.style.display = '';
-    userInfo.style.display = 'none';
-    landingView.style.display = '';
-    sidebar.style.display = 'none';
-    homeView.style.display = 'none';
-    newNoteView.style.display = 'none';
-  }
-}
+// loginWithGoogle moved to /js/firebase_auth.js
 
-async function loginWithGoogle() {
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await auth.signInWithPopup(provider);
-  } catch (e) {
-    if (e.code !== 'auth/popup-closed-by-user') showToast('❌ 로그인 실패: ' + e.message);
-  }
-}
-
-async function logout() {
-  await auth.signOut();
-  showSuccessToast('로그아웃 완료');
-}
+// logout moved to /js/firebase_auth.js
 
 // Firestore sync moved to /js/firestore_sync.js
 
-function showPaymentModal() {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div style="background:var(--surface);border-radius:16px;padding:2rem;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-      <h2 style="margin:0 0 0.5rem;font-size:1.3rem;color:var(--text);">🔒 무료 이용 한도 초과</h2>
-      <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">이번 달 무료 3회를 모두 사용했습니다.</p>
-      <div style="display:flex;flex-direction:column;gap:0.8rem;margin-bottom:1.5rem;">
-        <button onclick="startPayment('single')" style="padding:1rem;border:2px solid var(--primary);border-radius:12px;background:transparent;color:var(--text);cursor:pointer;text-align:left;">
-          <div style="font-weight:700;font-size:1rem;">📝 1회 이용권 — ₩500</div>
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.3rem;">이번 분석 1회만 결제</div>
-        </button>
-        <button onclick="startPayment('monthly')" style="padding:1rem;border:2px solid var(--secondary);border-radius:12px;background:linear-gradient(135deg,rgba(124,77,255,0.08),rgba(0,180,216,0.08));color:var(--text);cursor:pointer;text-align:left;">
-          <div style="font-weight:700;font-size:1rem;">🎓 월정액 — ₩7,900/월</div>
-          <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.3rem;">한 달간 무제한 이용</div>
-        </button>
-      </div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:0.7rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">닫기</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-}
+// showPaymentModal moved to /js/payment.js
 
-async function startPayment(plan) {
-  // Close payment modal
-  document.querySelector('div[style*="position:fixed"][style*="z-index:10000"]')?.remove();
-
-  const amount = plan === 'monthly' ? 7900 : 500;
-  const orderName = plan === 'monthly' ? 'LectureNote AI 월정액' : 'LectureNote AI 1회 이용권';
-  const orderId = 'order_' + currentUser.uid.substring(0, 8) + '_' + Date.now();
-
-  try {
-    const tossPayments = TossPayments('test_ck_mBZ1gQ4YVXBjEx6651Wj8l2KPoqN');
-    const payment = tossPayments.payment({ customerKey: currentUser.uid });
-
-    await payment.requestPayment({
-      method: 'CARD',
-      amount: { currency: 'KRW', value: amount },
-      orderId,
-      orderName,
-      customerEmail: currentUser.email,
-      customerName: currentUser.displayName || '사용자',
-      successUrl: window.location.origin + '?payment=success&plan=' + plan + '&orderId=' + orderId,
-      failUrl: window.location.origin + '?payment=fail',
-    });
-  } catch (e) {
-    if (e.code === 'USER_CANCEL') return;
-    showToast('❌ 결제 실패: ' + e.message);
-  }
-}
+// startPayment moved to /js/payment.js
 
 // Firestore sync moved to /js/firestore_sync.js
 
@@ -3897,45 +3806,7 @@ document.getElementById('noteSearchInput').addEventListener('input', function() 
   }, 300);
 });
 
-/* ═══════════════════════════════════════════════
-   Export / Import
-═══════════════════════════════════════════════ */
-async function exportAllNotes() {
-  const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
-  const data = JSON.stringify({ notes, folders, exportedAt: new Date().toISOString() }, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = Object.assign(document.createElement('a'), { href: url, download: `meeting-notes-export-${dateStamp()}.json` });
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showSuccessToast('⬇ 내보내기 완료');
-}
-
-async function importNotes(input) {
-  const file = input.files[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const data = JSON.parse(text);
-    const notes   = data.notes   || [];
-    const folders = data.folders || [];
-    const [existingNotes, existingFolders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
-    const existingNoteIds   = new Set(existingNotes.map(n => n.id));
-    const existingFolderIds = new Set(existingFolders.map(f => f.id));
-    let imported = 0;
-    for (const folder of folders) {
-      if (!existingFolderIds.has(folder.id)) { await saveFolderFS(folder); }
-    }
-    for (const note of notes) {
-      if (!existingNoteIds.has(note.id)) { await saveNoteFS(note); imported++; }
-    }
-    input.value = '';
-    showSuccessToast(`⬆ ${imported}개 노트 가져오기 완료`);
-    renderSavedNotes();
-  } catch (e) {
-    showToast(`❌ 가져오기 실패: ${e.message}`);
-  }
-}
+// exportAllNotes, importNotes moved to /js/notes_crud.js
 
 /* ═══════════════════════════════════════════════
    Theme toggle
@@ -4018,29 +3889,7 @@ window.addEventListener('beforeunload', e => {
 
 // toggleBulkSelectMode, _updateBulkBar, toggleBulkSelectAll, bulkExportPdf, bulkDeleteSelected moved to /js/bulk.js
 
-/* ═══════════════════════════════════════════════
-   Init — load saved notes on page load
-═══════════════════════════════════════════════ */
-(async function init() {
-  // Load theme preference
-  if (localStorage.getItem('theme') === 'light') {
-    document.documentElement.classList.add('light');
-    const btn = document.getElementById('themeToggleBtn');
-    if (btn) btn.textContent = '🌙';
-  }
-  // Set initial view: home if notes exist, new if empty
-  try {
-    const notes = await getAllNotesFS();
-    switchView(notes.length > 0 ? 'home' : 'new');
-  } catch (_) {
-    switchView('new');
-  }
-})();
-
-// Initial state: hide sidebar and content views until auth resolves
-document.getElementById('sidebar').style.display = 'none';
-document.getElementById('homeView').style.display = 'none';
-document.getElementById('landingView').style.display = '';
+// init() IIFE, initial display state moved to /js/main.js
 </script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
@@ -4064,59 +3913,6 @@ document.getElementById('landingView').style.display = '';
   <pre id="debugLogContent" style="padding:0.6rem; overflow:auto; flex:1; font-size:0.72rem; line-height:1.5; color:var(--text); font-family:Consolas,monospace; white-space:pre-wrap; max-height:calc(50vh - 40px);"></pre>
 </div>
 <button id="debugToggle" onclick="const p=document.getElementById('debugPanel'); const v=p.style.display!=='flex'; p.style.display=v?'flex':'none'; if(v){const c=document.getElementById('debugLogContent'); c.textContent=_debugLog.join('\n'); c.scrollTop=c.scrollHeight;}" style="position:fixed; bottom:20px; right:20px; width:40px; height:40px; border-radius:50%; background:var(--surface2); border:1px solid var(--border-bright); color:var(--text-muted); font-size:1.1rem; cursor:pointer; z-index:9999; display:flex; align-items:center; justify-content:center;">🔧</button>
-<script>
-setInterval(() => {
-  const panel = document.getElementById('debugPanel');
-  if (panel && panel.style.display === 'flex') {
-    const c = document.getElementById('debugLogContent');
-    c.textContent = _debugLog.join('\n');
-    c.scrollTop = c.scrollHeight;
-  }
-}, 1000);
-
-// Handle Toss payment callback
-(async function handlePaymentCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const paymentStatus = params.get('payment');
-  if (!paymentStatus) return;
-
-  if (paymentStatus === 'success') {
-    const paymentKey = params.get('paymentKey');
-    const orderId = params.get('orderId');
-    const amount = params.get('amount');
-    const plan = params.get('plan');
-
-    try {
-      // Verify payment on server
-      const res = await fetch('/api/toss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) })
-      });
-      const result = await res.json();
-
-      if (result.success) {
-        // Wait for auth to be ready
-        await new Promise(resolve => {
-          if (currentUser) resolve();
-          else auth.onAuthStateChanged(u => { if (u) resolve(); });
-        });
-        await setPaidPlan(plan, orderId);
-        showSuccessToast('✅ 결제 완료! ' + (plan === 'monthly' ? '월정액이 활성화되었습니다.' : '1회 이용권이 추가되었습니다.'));
-      } else {
-        showToast('❌ 결제 확인 실패: ' + (result.message || ''));
-      }
-    } catch (e) {
-      showToast('❌ 결제 확인 오류: ' + e.message);
-    }
-  } else if (paymentStatus === 'fail') {
-    showToast('❌ 결제가 취소되었습니다.');
-  }
-
-  // Clean URL
-  window.history.replaceState({}, '', window.location.pathname);
-})();
-</script>
 
 </body>
 </html>

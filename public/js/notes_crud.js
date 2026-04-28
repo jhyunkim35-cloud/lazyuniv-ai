@@ -531,3 +531,43 @@ async function renameSavedNote(id) {
   renderSavedNotes();
   await renderHomeView();
 }
+
+/* ═══════════════════════════════════════════════
+   Export / Import
+═══════════════════════════════════════════════ */
+async function exportAllNotes() {
+  const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
+  const data = JSON.stringify({ notes, folders, exportedAt: new Date().toISOString() }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `meeting-notes-export-${dateStamp()}.json` });
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showSuccessToast('⬇ 내보내기 완료');
+}
+
+async function importNotes(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const notes   = data.notes   || [];
+    const folders = data.folders || [];
+    const [existingNotes, existingFolders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
+    const existingNoteIds   = new Set(existingNotes.map(n => n.id));
+    const existingFolderIds = new Set(existingFolders.map(f => f.id));
+    let imported = 0;
+    for (const folder of folders) {
+      if (!existingFolderIds.has(folder.id)) { await saveFolderFS(folder); }
+    }
+    for (const note of notes) {
+      if (!existingNoteIds.has(note.id)) { await saveNoteFS(note); imported++; }
+    }
+    input.value = '';
+    showSuccessToast(`⬆ ${imported}개 노트 가져오기 완료`);
+    renderSavedNotes();
+  } catch (e) {
+    showToast(`❌ 가져오기 실패: ${e.message}`);
+  }
+}

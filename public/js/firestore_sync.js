@@ -303,53 +303,7 @@ async function syncNotesOnLogin() {
   }
 }
 
-async function getUserUsage() {
-  if (!currentUser) return { monthlyCount: 0, plan: 'free', planExpiry: null };
-  const ref = db.collection('users').doc(currentUser.uid);
-  const doc = await ref.get();
-  if (!doc.exists) return { monthlyCount: 0, plan: 'free', planExpiry: null };
-  const data = doc.data();
-  const now = new Date();
-  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  const count = (data.usage && data.usage[monthKey]) || 0;
-  const plan = data.plan || 'free';
-  const planExpiry = data.planExpiry || null;
-  // Check if paid plan expired
-  if (plan === 'monthly' && planExpiry && new Date(planExpiry) < now) {
-    return { monthlyCount: count, plan: 'free', planExpiry: null };
-  }
-  return { monthlyCount: count, plan, planExpiry };
-}
-
-async function incrementUsage() {
-  if (!currentUser) return;
-  const ref = db.collection('users').doc(currentUser.uid);
-  const now = new Date();
-  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  await ref.set({ usage: { [monthKey]: firebase.firestore.FieldValue.increment(1) } }, { merge: true });
-}
-
-async function canAnalyze() {
-  if (DEVELOPER_EMAILS.includes(currentUser?.email)) return { allowed: true, reason: '' };
-  const usage = await getUserUsage();
-  if (usage.plan === 'monthly') return { allowed: true, reason: '' };
-  if (usage.monthlyCount < 3) return { allowed: true, reason: '', remaining: 3 - usage.monthlyCount };
-  return { allowed: false, reason: 'monthly_limit', monthlyCount: usage.monthlyCount };
-}
-
-async function setPaidPlan(plan, orderId) {
-  if (!currentUser) return;
-  const ref = db.collection('users').doc(currentUser.uid);
-  if (plan === 'monthly') {
-    const expiry = new Date();
-    expiry.setMonth(expiry.getMonth() + 1);
-    await ref.set({ plan: 'monthly', planExpiry: expiry.toISOString(), lastOrderId: orderId }, { merge: true });
-  } else if (plan === 'single') {
-    const now = new Date();
-    const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    await ref.set({ singlePurchases: firebase.firestore.FieldValue.increment(1), lastOrderId: orderId }, { merge: true });
-  }
-}
+// getUserUsage, incrementUsage, canAnalyze, setPaidPlan moved to /js/payment.js
 
 async function uploadSlideImages(noteId, slideImages) {
   if (!currentUser || !slideImages || !slideImages.length) return [];
