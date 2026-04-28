@@ -42,6 +42,7 @@ function buildFolderCard(folder, noteCount) {
       const noteId = _noteDrag.noteId;
       card.classList.remove('folder-drag-over');
       await moveNoteToFolder(noteId, folder.id);
+      await renderHomeView();
     }
   });
 
