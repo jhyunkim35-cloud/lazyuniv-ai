@@ -51,25 +51,28 @@ setInterval(() => {
     const paymentKey = params.get('paymentKey');
     const orderId = params.get('orderId');
     const amount = params.get('amount');
-    const plan = params.get('plan');
+    const plan = params.get('plan'); // kept for diagnostics; not used for state
 
     try {
-      // Verify payment on server
+      // Wait for auth before sending uid to server
+      await new Promise(resolve => {
+        if (currentUser) resolve();
+        else auth.onAuthStateChanged(u => { if (u) resolve(); });
+      });
+      const uid = currentUser.uid;
+
+      // Verify payment on server — server derives plan from Toss-verified amount and writes Firestore
       const res = await fetch('/api/toss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) })
+        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount), uid })
       });
       const result = await res.json();
 
       if (result.success) {
-        // Wait for auth to be ready
-        await new Promise(resolve => {
-          if (currentUser) resolve();
-          else auth.onAuthStateChanged(u => { if (u) resolve(); });
-        });
-        await setPaidPlan(plan, orderId);
-        showSuccessToast('✅ 결제 완료! ' + (plan === 'monthly' ? '월정액이 활성화되었습니다.' : '1회 이용권이 추가되었습니다.'));
+        const planLabel = result.plan === 'monthly' ? '월간 무제한' : '단건';
+        showSuccessToast(`✅ 결제 완료! ${planLabel} 플랜이 활성화되었습니다.`);
+        if (typeof renderHomeView === 'function') await renderHomeView();
       } else {
         showToast('❌ 결제 확인 실패: ' + (result.message || ''));
       }
