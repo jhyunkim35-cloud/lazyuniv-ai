@@ -11,6 +11,16 @@ function userFoldersRef() {
   if (!currentUser) return null;
   return db.collection('users').doc(currentUser.uid).collection('folders');
 }
+
+// M1: Validate folder color against FOLDER_COLORS whitelist to prevent CSS injection.
+// Accepts only values from the predefined palette (or null/undefined to clear).
+function sanitizeFolderColor(color) {
+  if (color == null || color === '') return null;
+  if (typeof color !== 'string') return null;
+  if (typeof FOLDER_COLORS === 'undefined') return null;
+  const allowed = FOLDER_COLORS.some(c => c.value === color);
+  return allowed ? color : null;
+}
 async function saveNoteFS(note) {
   // ───── GHOST NOTE DIAGNOSTIC (temp, remove after debugging) ─────
   const _hasTitle = note && note.title && note.title.trim();
@@ -100,7 +110,9 @@ async function saveFolderFS(folder) {
   const ref = userFoldersRef();
   if (!ref) return saveFolder(folder);
   const id = folder.id || uuidv4();
-  const record = Object.assign({ createdAt: new Date().toISOString() }, folder, { id });
+  // M1: sanitize color against whitelist before persisting
+  const safeFolder = Object.assign({}, folder, { color: sanitizeFolderColor(folder.color) });
+  const record = Object.assign({ createdAt: new Date().toISOString() }, safeFolder, { id });
   await ref.doc(id).set(record, { merge: true });
   return record;
 }
@@ -126,7 +138,9 @@ async function renameFolderFS(id, newName, color) {
   if (!ref) return renameFolder(id, newName, color);
   const doc = await ref.doc(id).get();
   if (!doc.exists) return;
-  const updated = Object.assign({}, doc.data(), { name: newName }, color !== undefined ? { color } : {});
+  // M1: sanitize color against whitelist before persisting
+  const safeColor = color !== undefined ? sanitizeFolderColor(color) : undefined;
+  const updated = Object.assign({}, doc.data(), { name: newName }, safeColor !== undefined ? { color: safeColor } : {});
   await ref.doc(id).set(updated);
   return updated;
 }
