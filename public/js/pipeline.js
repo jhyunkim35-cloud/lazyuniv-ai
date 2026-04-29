@@ -33,7 +33,7 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
         }
         analyzeBtn.textContent = `⏳ Agent 1: 노트 작성 중… (${fmtName})`;
         setProgress(20, `Agent 1: 노트 작성 중… ${fmtName}`);
-        notesText = await agent1_writeNotes(apiKey, storedPptText, storedFilteredText, '', targetBodyEl);
+        notesText = await agent1_writeNotes(apiKey, storedPptText, storedFilteredText, '', targetBodyEl, { isFirstCall: true, feature: 'noteAnalysis' });
         debugLog('PIPE', `Iter ${iter} — Agent1 done, notes=${notesText.length}chars`);
         if (!targetBodyEl) document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
 
@@ -367,7 +367,7 @@ ${notes.slice(0, 3000)}
 ${transcript}`;
 
   try {
-    const result = await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-haiku-4-5-20251001');
+    const result = await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' });
     debugLog('PIPE', `highlightTranscript done, ${result.length}chars`);
     agentLog(0, '녹취록 하이라이트 완료');
     const phrases = result.split('\n').map(l => l.trim()).filter(l => l.length >= 10 && l.length <= 200);
@@ -401,7 +401,7 @@ function applyHighlights(transcript, phrases) {
 /* ═══════════════════════════════════════════════
    Agent 1 — Note Writer / Reviser (streams to hero card)
 ═══════════════════════════════════════════════ */
-async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', targetBodyEl = null) {
+async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', targetBodyEl = null, meta = {}) {
   setAgentNode(1, 'loading', critiqueText ? '노트 수정 중…' : '노트 작성 중…');
 
   const { formatSection, rulesSection } = getNoteFormatBlocks();
@@ -446,7 +446,7 @@ ${critiqueText}`;
     const userPrompt = `위 형식·규칙·PPT 자료를 참고하여 학습 노트를 수정하세요.${revisionClause}${recSection}`;
 
     agentLog(1, 'Claude AI 응답 스트리밍 수신 중…');
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6');
+    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', { isFirstCall: false, feature: 'noteAnalysis' });
 
   } else if (!hasTxt) {
     /* ── PPT-only mode: single Sonnet call ── */
@@ -456,7 +456,7 @@ ${critiqueText}`;
 녹취록이 없으므로 슬라이드 내용만을 기반으로 핵심 개념을 충실히 정리하세요.`;
 
     agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6');
+    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
 
   } else {
     /* ── First write: single or chunked Sonnet call with full transcript ── */
@@ -501,7 +501,7 @@ ${critiqueText}`;
 
         const chunkPrompt = `${prevNotesBlock}위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}\n\n[강의 녹취록]\n${recText}`;
 
-        const chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6');
+        const chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6', c === 0 ? meta : { isFirstCall: false, feature: 'noteAnalysis' });
 
         combinedNotes += (c > 0 ? '\n\n' : '') + chunkText;
         accumulatedNotes += chunkText + '\n';
@@ -522,7 +522,7 @@ ${recText}`;
 
       agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
       debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
-      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6');
+      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
     }
   }
 
@@ -566,7 +566,7 @@ ${critiqueText}`;
   agentLog(1, 'Haiku — JSON 패치 목록 생성 중…');
   targetEl.innerHTML = '<div class="loading-row"><div class="spinner"></div><span>Haiku 패치 적용 중…</span></div>';
 
-  const raw = await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-haiku-4-5-20251001');
+  const raw = await callClaudeOnce(apiKey, userPrompt, systemPrompt, 4096, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' });
 
   let patched = notesText;
   let fixCount = 0;
@@ -600,7 +600,8 @@ ${critiqueText}`;
     const fallbackDot = targetBodyEl ? makeAgentDot(1) : document.getElementById('dotNotes');
     patched = await callClaudeStream(
       apiKey, rewritePrompt, targetEl, fallbackDot,
-      rewriteSystem, 16000, null, 'claude-haiku-4-5-20251001'
+      rewriteSystem, 16000, null, 'claude-haiku-4-5-20251001',
+      { feature: 'noteAnalysis' }
     );
     storedNotesText = patched;
     setAgentNode(1, 'done', '완료');
@@ -673,7 +674,7 @@ ${recText}`;
   const userPrompt = `[검토 대상 학습 노트]
 ${notesText}`;
 
-  const raw     = await callClaudeOnce(apiKey, userPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-sonnet-4-6', cachePrefix);
+  const raw     = await callClaudeOnce(apiKey, userPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' });
   const cleaned = raw.trim();
 
   /* render critique into tab */

@@ -4,7 +4,9 @@
 /* ═══════════════════════════════════════════════
    Claude API — non-streaming
 ═══════════════════════════════════════════════ */
-async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_TOKENS_NOTES, model = 'claude-haiku-4-5-20251001', cachePrefix = null) {
+async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_TOKENS_NOTES, model = 'claude-haiku-4-5-20251001', cachePrefix = null, meta = {}) {
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
   const MAX_RETRIES = 3;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     debugLog('API', `callOnce model=${model} prompt=${userPrompt.length}chars max_tokens=${maxTokens} cache=${!!cachePrefix}`);
@@ -14,7 +16,7 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
           { type: 'text', text: userPrompt }
         ]}]
       : [{ role: 'user', content: userPrompt }];
-    const body = { model, max_tokens: maxTokens, system: systemPrompt, messages };
+    const body = { model, max_tokens: maxTokens, system: systemPrompt, messages, idToken, isFirstCall: meta.isFirstCall || false, feature: meta.feature || 'unknown' };
     if (USE_ADVISOR && model.includes('sonnet') && !systemPrompt.includes('검토자')) {
       body.tools = (body.tools || []).concat([{
         type: 'advisor_20260301',
@@ -60,8 +62,12 @@ async function callClaudeStream(
   systemPrompt = '당신은 전문 회의 분석가입니다. 모든 답변은 반드시 한국어로 작성하세요. 명확하고 구조적으로 정리해주세요.',
   maxTokens = MAX_TOKENS_NOTES,
   cachePrefix = null,
-  model = 'claude-haiku-4-5-20251001'
+  model = 'claude-haiku-4-5-20251001',
+  meta = {}
 ) {
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
+
   dotEl.className = 'status-dot loading';
   if (!isBatchMode) document.getElementById('dotNotes').className = 'status-dot loading';
   targetEl.innerHTML = '<div class="loading-row"><div class="spinner"></div><span>AI 노트 작성 중…</span></div>';
@@ -79,6 +85,9 @@ async function callClaudeStream(
     stream: true,
     system: systemPrompt,
     messages,
+    idToken,
+    isFirstCall: meta.isFirstCall || false,
+    feature: meta.feature || 'unknown',
   };
 
   if (USE_ADVISOR && model.includes('sonnet') && !systemPrompt.includes('검토자')) {

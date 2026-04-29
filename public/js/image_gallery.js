@@ -321,11 +321,13 @@ async function analyzeImagesWithVision(apiKey) {
     text: '위 각 슬라이드 이미지를 한 줄씩 분석해주세요.\n형식: 슬라이드 N: [HIGH/LOW] [이미지 종류] — [핵심 내용]\n\n이미지 유형 분류 시 다음을 HIGH로 표시: 구조 모형, 흐름도, 비교 차트, 개념도, 다이어그램, 관계도\n다음은 LOW로 표시: 제목 슬라이드, 목차, 텍스트만 있는 슬라이드, 단순 장식 이미지\n\n예시:\n슬라이드 1: [LOW] 제목 슬라이드 — 강의 주제 및 목차\n슬라이드 3: [HIGH] 다이어그램 — 시스템 구조와 데이터 흐름\n슬라이드 7: [HIGH] 그래프 — 분기별 매출 비교\n\n모든 슬라이드를 위 형식으로 출력하세요. 추가 설명 없이 목록만 출력하세요.',
   });
 
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal: abortController?.signal,
-    body: JSON.stringify({ model: modelId, max_tokens: 1024, messages: [{ role: 'user', content }] }),
+    body: JSON.stringify({ model: modelId, max_tokens: 1024, messages: [{ role: 'user', content }], idToken, isFirstCall: false, feature: 'vision' }),
   });
 
   if (!res.ok) {
@@ -389,6 +391,8 @@ async function recommendImagesWithVision(apiKey, notesText) {
     const slideNums = [...new Set(extractedImages.map(img => img.slideNumber))].sort((a, b) => a - b);
     const slideList = slideNums.map(n => `슬라이드 ${n}`).join(', ');
 
+    let visionIdToken = null;
+    try { visionIdToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
     const resp = await fetch('/api/claude', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -413,6 +417,9 @@ ${slideList}
 IMAGES: 슬라이드 3 (다이어그램), 슬라이드 7 (그래프)
 추천할 이미지가 없으면: IMAGES: 없음`,
         }],
+        idToken: visionIdToken,
+        isFirstCall: false,
+        feature: 'vision',
       }),
     });
 

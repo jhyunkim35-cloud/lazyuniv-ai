@@ -141,11 +141,16 @@ Before finalizing each question you generate, check it against the list above. I
 
   const maxTokens = Math.max(16000, count * 1500); // scale with question count
   const t0  = Date.now();
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
   const makeBody = () => JSON.stringify({
     model: MODEL,
     max_tokens: maxTokens,
     system: systemPrompt,
     messages: [{ role: 'user', content: noteText }],
+    idToken,
+    isFirstCall: false,
+    feature: 'quiz',
   });
   let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody() });
   if (!res.ok && MODEL === PREFERRED_MODEL) {
@@ -282,12 +287,17 @@ Before finalizing each question you generate, check it against the list above. I
 
   const maxTokens = Math.max(16000, count * 1500); // scale with question count
   const t0  = Date.now();
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
   const makeStreamBody = () => JSON.stringify({
     model: MODEL,
     max_tokens: maxTokens,
     stream: true,
     system: systemPrompt,
     messages: [{ role: 'user', content: noteText }],
+    idToken,
+    isFirstCall: false,
+    feature: 'quiz',
   });
   let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeStreamBody(), signal });
   if (!res.ok && MODEL === PREFERRED_MODEL) {
@@ -613,6 +623,8 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
 async function gradeEssay(q, userAnswer) {
   const systemPrompt = `You are a grading assistant. Grade this student answer against the rubric. Output ONLY valid JSON: {"score":0,"feedback":"1-2 sentences","rubricResults":[{"criterion":"...","met":true}]}`;
   const userMsg = `Question: ${q.q}\nRubric: ${JSON.stringify(q.rubric)}\nModel answer: ${q.modelAnswer}\nStudent answer: ${userAnswer}`;
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -621,6 +633,9 @@ async function gradeEssay(q, userAnswer) {
       max_tokens: 500,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMsg }],
+      idToken,
+      isFirstCall: false,
+      feature: 'essayGrade',
     }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);
@@ -1583,6 +1598,8 @@ async function classifyNoteContent(noteText) {
     'Output ONLY a valid JSON array. Each element: {"category":"theory|research|case|other","title":"short descriptive title","content":"the original text of that section"}. ' +
     'Keep the original text intact. Merge consecutive paragraphs of the same category into one element. All output in Korean.';
 
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
   const res = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1591,6 +1608,9 @@ async function classifyNoteContent(noteText) {
       max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: noteText }],
+      idToken,
+      isFirstCall: false,
+      feature: 'classify',
     }),
   });
 
