@@ -3549,7 +3549,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
             extractedImages: [...(extractedImages || [])],
           }).then(() => renderHomeView()).catch(e => console.error('[batch] save failed:', e));
         }
-        await incrementUsage();
+        // Usage is now incremented server-side by /api/claude on first call.
 
         // Track first success for split viewer
         if (!firstSuccessData) {

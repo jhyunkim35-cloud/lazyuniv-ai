@@ -141,6 +141,36 @@ module.exports = async (req, res) => {
   delete upstreamBody.isFirstCall;
   delete upstreamBody.feature;
 
+  // Bill the user for this analysis on success. Idempotent — guarded so we
+  // never double-bill within one request even if called from both branches.
+  let billed = false;
+  async function billOnSuccess() {
+    if (billed) return;
+    billed = true;
+    if (!isFirstCall) return;
+    const ctx = req._usageContext;
+    if (!ctx || !ctx.uid) return;
+    if (ctx.slot === 'developer' || ctx.slot === 'monthly') return;
+    try {
+      const admin = getAdmin();
+      const ref = admin.firestore().collection('users').doc(ctx.uid);
+      if (ctx.slot === 'free' && ctx.monthKey) {
+        await ref.set(
+          { usage: { [ctx.monthKey]: admin.firestore.FieldValue.increment(1) } },
+          { merge: true }
+        );
+      } else if (ctx.slot === 'single') {
+        await ref.set(
+          { singlePurchases: admin.firestore.FieldValue.increment(-1) },
+          { merge: true }
+        );
+      }
+    } catch (e) {
+      // Fail open — don't block the user response on billing error.
+      console.error('[bill] increment failed:', e.message);
+    }
+  }
+
   try {
     const isStream = upstreamBody.stream === true;
     const MAX_RETRIES = 3;
@@ -171,14 +201,23 @@ module.exports = async (req, res) => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(decoder.decode(value, { stream: true }));
+      // Only bill if upstream returned 2xx — otherwise we're streaming an
+      // error envelope and the user got nothing usable.
+      const upstreamOk = response.ok;
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(decoder.decode(value, { stream: true }));
+        }
+        if (upstreamOk) await billOnSuccess();
+      } finally {
+        res.end();
       }
-      res.end();
     } else {
       const data = await response.json();
+      if (response.ok) await billOnSuccess();
       res.status(response.status).json(data);
     }
   } catch (error) {
