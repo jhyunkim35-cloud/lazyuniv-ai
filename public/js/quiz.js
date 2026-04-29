@@ -625,19 +625,31 @@ async function gradeEssay(q, userAnswer) {
   const userMsg = `Question: ${q.q}\nRubric: ${JSON.stringify(q.rubric)}\nModel answer: ${q.modelAnswer}\nStudent answer: ${userAnswer}`;
   let idToken = null;
   try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 500,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMsg }],
-      idToken,
-      isFirstCall: false,
-      feature: 'essayGrade',
-    }),
-  });
+  // M3: 60s timeout via AbortController to prevent hung essay grading requests
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60000);
+  let res;
+  try {
+    res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }],
+        idToken,
+        isFirstCall: false,
+        feature: 'essayGrade',
+      }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('채점 시간 초과 (60초). 다시 시도해주세요.');
+    throw e;
+  }
+  clearTimeout(timer);
   if (!res.ok) throw new Error(`API error ${res.status}`);
   const data = await res.json();
   const raw = (data.content?.[0]?.text || data.content || '').replace(/```json\n?/g, '').replace(/```/g, '').trim();
