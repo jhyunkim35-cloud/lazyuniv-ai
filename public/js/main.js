@@ -30,14 +30,18 @@ document.getElementById('sidebar').style.display = 'none';
 document.getElementById('homeView').style.display = 'none';
 document.getElementById('landingView').style.display = '';
 
-setInterval(() => {
+// L1: keep interval handle so we can clean it up on unload (defensive — also lets us throttle when hidden)
+const _debugPanelInterval = setInterval(() => {
   const panel = document.getElementById('debugPanel');
   if (panel && panel.style.display === 'flex') {
     const c = document.getElementById('debugLogContent');
-    c.textContent = _debugLog.join('\n');
-    c.scrollTop = c.scrollHeight;
+    if (c) {
+      c.textContent = _debugLog.join('\n');
+      c.scrollTop = c.scrollHeight;
+    }
   }
 }, 1000);
+window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval));
 
 // Handle Toss payment callback
 (async function handlePaymentCallback() {
