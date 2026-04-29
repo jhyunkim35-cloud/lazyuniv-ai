@@ -97,8 +97,10 @@ async function deleteNoteFS(id) {
   if (currentUser) {
     const deletedKey = 'deleted_notes_' + currentUser.uid;
     const deleted = JSON.parse(localStorage.getItem(deletedKey) || '[]');
-    deleted.push(id);
-    localStorage.setItem(deletedKey, JSON.stringify(deleted));
+    // M2: dedupe + cap at 200 (drop oldest) to prevent unbounded localStorage growth
+    if (!deleted.includes(id)) deleted.push(id);
+    const capped = deleted.length > 200 ? deleted.slice(deleted.length - 200) : deleted;
+    localStorage.setItem(deletedKey, JSON.stringify(capped));
   }
 }
 async function searchNotesFS(query) {
