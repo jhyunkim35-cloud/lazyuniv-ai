@@ -1,5 +1,8 @@
 {
   "name": "lecturenote-ai",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^13.8.0"
+  }
 }
