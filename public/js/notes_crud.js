@@ -41,95 +41,18 @@ async function autoSaveNote() {
     });
     currentNoteId = record.id;
     showSuccessToast('💾 저장 완료');
-    renderSavedNotes();
     renderHomeView();
   } catch (e) {
     console.error('autoSaveNote error:', e);
   }
 }
 
-/* ═══════════════════════════════════════════════
-   Render saved notes list + recent bar
-═══════════════════════════════════════════════ */
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
 }
 
-async function renderSavedNotes(filteredNotes, activeQuery = '') {
-  const [notes, folders] = await Promise.all([getAllNotesFS(), getAllFoldersFS()]);
-  const displayNotes = filteredNotes !== undefined ? filteredNotes : notes;
-
-  // Recent bar (top 5 from all notes, not filtered)
-  const recentBar = document.getElementById('recentNotesBar');
-  recentBar.innerHTML = '';
-  notes.slice(0, 5).forEach(n => {
-    const btn = document.createElement('button');
-    btn.className = 'recent-note-pill';
-    const d = new Date(n.updatedAt || n.createdAt);
-    btn.textContent = `📖 ${n.title || '제목없음'} (${d.getMonth()+1}/${d.getDate()})`;
-    btn.onclick = () => openSavedNote(n.id);
-    recentBar.appendChild(btn);
-  });
-
-  const list    = document.getElementById('savedNotesList');
-  const emptyMsg = document.getElementById('emptyNotesMsg');
-  list.innerHTML = '';
-
-  if (!displayNotes.length) {
-    emptyMsg.textContent = activeQuery
-      ? `"${activeQuery}" 검색 결과가 없습니다.`
-      : '저장된 노트가 없습니다. AI 분석을 시작하면 자동으로 저장됩니다.';
-    emptyMsg.style.display = '';
-    return;
-  }
-  emptyMsg.style.display = 'none';
-
-  // Group by folder
-  const folderMap = Object.fromEntries(folders.map(f => [f.id, f.name]));
-  const groups = {};
-  for (const note of displayNotes) {
-    const key = note.folderId || '__none__';
-    (groups[key] = groups[key] || []).push(note);
-  }
-
-  // Sort: uncategorized first, then folders alphabetically
-  const sortedKeys = ['__none__', ...folders.map(f => f.id)].filter(k => groups[k]);
-
-  for (const key of sortedKeys) {
-    const groupNotes = groups[key];
-    if (!groupNotes) continue;
-    const label = document.createElement('div');
-    label.className = 'folder-group-label';
-    label.textContent = key === '__none__' ? '📄 미분류' : `📁 ${folderMap[key] || key}`;
-    list.appendChild(label);
-
-    for (const note of groupNotes) {
-      const card = document.createElement('div');
-      card.className = 'saved-note-card';
-      card.dataset.noteId = note.id;
-      const charCount = (note.notesText || '').length.toLocaleString();
-      const folderName = note.folderId ? (folderMap[note.folderId] || '알 수 없음') : '미분류';
-      card.innerHTML = `
-        <div class="saved-note-title">${escHtml(note.title || '제목없음')}</div>
-        <div class="saved-note-meta">${fmtDate(note.updatedAt)} · ${charCount}자 · ${escHtml(folderName)}</div>
-        <div class="saved-note-actions">
-          <button title="열기" onclick="openSavedNote('${note.id}');event.stopPropagation()">📖 열기</button>
-          <button title="폴더 이동" onclick="moveSavedNote('${note.id}');event.stopPropagation()">📁 이동</button>
-          <button title="삭제" onclick="confirmDeleteNote('${note.id}');event.stopPropagation()">🗑</button>
-        </div>`;
-      card.addEventListener('click', () => openSavedNote(note.id));
-      list.appendChild(card);
-    }
-  }
-
-  // Storage size
-  const bytes = await getStorageSize();
-  const mb    = (bytes / 1024 / 1024).toFixed(2);
-  const el    = document.getElementById('storageSize');
-  if (el) el.textContent = `${mb} MB`;
-}
 
 /* ═══════════════════════════════════════════════
    Open saved note
@@ -301,7 +224,6 @@ async function confirmDeleteNote(id) {
   await deleteNoteFS(id);
   if (currentNoteId === id) currentNoteId = null;
   showToast('🗑 노트 삭제 완료');
-  await renderSavedNotes();
   await renderHomeView(); // refresh grid and folder note counts
 }
 
@@ -343,7 +265,6 @@ async function moveSavedNote(id) {
       } finally {
         overlay.remove();
       }
-      await renderSavedNotes();
       await renderHomeView();
     };
     listEl.appendChild(row);
@@ -549,7 +470,6 @@ async function renameSavedNote(id) {
     }
   }
 
-  await renderSavedNotes();
   await renderHomeView();
 }
 
@@ -594,7 +514,6 @@ async function importNotes(input) {
     }
     input.value = '';
     showSuccessToast(`⬆ ${imported}개 노트 가져오기 완료`);
-    renderSavedNotes();
     renderHomeView();
   } catch (e) {
     showToast(`❌ 가져오기 실패: ${e.message}`);

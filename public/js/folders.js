@@ -1,5 +1,5 @@
 // Folder manager: create, rename, delete folders; modal UI.
-// Depends on: constants.js (FOLDER_COLORS, _activeFolderId), firestore_sync.js (getAllFoldersFS, saveFolderFS, renameFolderFS, deleteFolderFS), ui.js (showToast), markdown.js (escHtml), notes_crud.js (renderSavedNotes), home_view.js (renderHomeView).
+// Depends on: constants.js (FOLDER_COLORS, _activeFolderId), firestore_sync.js (getAllFoldersFS, saveFolderFS, renameFolderFS, deleteFolderFS), ui.js (showToast), markdown.js (escHtml), notes_crud.js (fmtDate), home_view.js (renderHomeView).
 
 async function showFolderManager() {
   const overlay = document.createElement('div');
@@ -62,7 +62,6 @@ async function createFolderFromInput() {
   await saveFolderFS({ name });
   input.value = '';
   await refreshFolderManagerList();
-  renderSavedNotes();
   renderHomeView();
 }
 
@@ -118,7 +117,6 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
       }
       overlay.remove();
       await refreshFolderManagerList().catch(() => {});
-      renderSavedNotes();
       renderHomeView();
     } catch(e) { showToast(`❌ ${e.message}`); }
   };
@@ -130,7 +128,6 @@ async function deleteFolderConfirm(id) {
   if (!confirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)')) return;
   await deleteFolderFS(id);
   await refreshFolderManagerList();
-  renderSavedNotes();
   // If viewing the deleted folder, return to home
   if (_activeFolderId === id) _activeFolderId = null;
   renderHomeView();

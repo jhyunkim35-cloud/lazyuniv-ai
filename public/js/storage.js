@@ -248,7 +248,6 @@ async function clearAllStorage() {
     });
     currentNoteId = null;
     showSuccessToast('🗑 저장소 초기화 완료');
-    renderSavedNotes();
     renderHomeView();
   } catch (e) {
     showToast(`❌ 초기화 실패: ${e.message}`);

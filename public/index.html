@@ -3547,7 +3547,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
             pptText: storedPptText,
             filteredText: storedFilteredText,
             extractedImages: [...(extractedImages || [])],
-          }).then(() => renderSavedNotes()).catch(e => console.error('[batch] save failed:', e));
+          }).then(() => renderHomeView()).catch(e => console.error('[batch] save failed:', e));
         }
         await incrementUsage();
 
@@ -3707,7 +3707,7 @@ document.getElementById('imgVisionRunBtn').addEventListener('click', async () =>
 
 // promptNoteName, autoSaveNote moved to /js/notes_crud.js
 
-// fmtDate, renderSavedNotes moved to /js/notes_crud.js
+// fmtDate moved to /js/notes_crud.js
 
 // openSavedNote moved to /js/notes_crud.js
 
