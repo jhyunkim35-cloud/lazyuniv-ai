@@ -2346,6 +2346,257 @@
       background: var(--secondary-dim);
     }
 
+    .add-rec-btn-mic {
+      margin-top: 0.4rem;
+      border-style: solid;
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-dim);
+    }
+    .add-rec-btn-mic:hover {
+      border-color: var(--primary);
+      color: #fff;
+      background: var(--primary);
+    }
+
+    /* ── Recorder modal ──────────────────────────── */
+    .recorder-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .recorder-modal.hidden { display: none; }
+    .recorder-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      backdrop-filter: blur(2px);
+    }
+    .recorder-panel {
+      position: relative;
+      width: 100%;
+      max-width: 460px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 92vh;
+    }
+    .recorder-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.9rem 1.1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .recorder-title {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .recorder-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 0.3rem;
+    }
+    .recorder-close:hover { color: var(--text); }
+
+    .recorder-body { padding: 1.1rem 1.2rem 1.4rem; overflow-y: auto; }
+    .rec-screen { display: none; }
+    .rec-screen.active { display: block; }
+
+    .rec-help {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      margin: 0 0 1rem;
+    }
+    .rec-ios-warn {
+      background: var(--warning-dim);
+      border: 1px solid var(--warning);
+      border-radius: var(--radius-sm);
+      padding: 0.7rem 0.9rem;
+      font-size: 0.78rem;
+      color: var(--text);
+      line-height: 1.55;
+      margin-bottom: 1rem;
+    }
+    .rec-mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+    .rec-mode-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 1.1rem 0.6rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      color: var(--text);
+      font-family: inherit;
+    }
+    .rec-mode-card:hover {
+      border-color: var(--primary);
+      background: var(--primary-dim);
+    }
+    .rec-mode-icon {
+      font-size: 1.6rem;
+      color: var(--primary);
+      line-height: 1;
+    }
+    .rec-mode-title { font-weight: 600; font-size: 0.92rem; }
+    .rec-mode-sub   { font-size: 0.72rem; color: var(--text-muted); }
+
+    .rec-timer {
+      font-size: 2.4rem;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      margin: 0.5rem 0 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .rec-meter {
+      height: 6px;
+      background: var(--surface3);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 0.8rem;
+    }
+    .rec-meter-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+      transition: width 0.08s linear;
+    }
+    .rec-status {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+    }
+    .rec-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .rec-btn {
+      flex: 1;
+      padding: 0.6rem 0.9rem;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface3);
+      color: var(--text);
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .rec-btn:hover { border-color: var(--text-muted); }
+    .rec-btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .rec-btn-primary:hover { background: var(--primary-light, var(--primary)); }
+    .rec-btn-stop {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+    .rec-btn-stop:hover { background: var(--danger); filter: brightness(1.1); }
+    .rec-btn-secondary { background: var(--surface3); }
+
+    .rec-cancel-link {
+      display: block;
+      width: 100%;
+      margin-top: 0.7rem;
+      padding: 0.4rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+      text-decoration: underline;
+      font-family: inherit;
+    }
+    .rec-cancel-link:hover { color: var(--text); }
+
+    .rec-progress-wrap {
+      width: 100%;
+      height: 8px;
+      background: var(--surface3);
+      border-radius: 99px;
+      overflow: hidden;
+      margin: 1.2rem 0 0.8rem;
+    }
+    .rec-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.2s ease;
+    }
+
+    .rec-spinner {
+      width: 36px;
+      height: 36px;
+      margin: 0.8rem auto 1rem;
+      border: 3px solid var(--surface3);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: rec-spin 0.9s linear infinite;
+    }
+    @keyframes rec-spin { to { transform: rotate(360deg); } }
+
+    .rec-stt-hint {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      line-height: 1.55;
+      margin-bottom: 0.6rem;
+    }
+
+    .rec-done-icon, .rec-error-icon {
+      width: 50px;
+      height: 50px;
+      margin: 0.5rem auto 0.8rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .rec-done-icon  { background: var(--success); }
+    .rec-error-icon { background: var(--danger); }
+    .rec-done-hint {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      line-height: 1.55;
+      margin-bottom: 1rem;
+    }
+
     /* ── Light Theme ─────────────────────────────── */
     :root.light {
       --bg: #ffffff;
@@ -2703,6 +2954,7 @@
         <div class="rec-empty-hint">녹취록이 없으면 PPT만으로 노트를 작성합니다</div>
       </div>
       <button class="add-rec-btn" id="addRecBtn">+ 녹취록 추가</button>
+      <button class="add-rec-btn add-rec-btn-mic" id="recordBtn" type="button">🎙 녹음 / 오디오 업로드</button>
     </div>
   </div>
 
@@ -3014,6 +3266,7 @@
 <script src="/js/bulk.js"></script>
 <script src="/js/firebase_auth.js"></script>
 <script src="/js/payment.js"></script>
+<script src="/js/recorder.js"></script>
 <script src="/js/main.js"></script>
 <script>
 // Constants, state, DOM refs, Firebase init moved to /js/constants.js
@@ -3072,6 +3325,9 @@ let draggedNoteId  = null;       // id of the note being dragged (legacy, kept f
 }
 
 document.getElementById('addRecBtn').addEventListener('click', () => addRecSlot());
+document.getElementById('recordBtn').addEventListener('click', () => {
+  if (typeof window.openRecorderModal === 'function') window.openRecorderModal();
+});
 
 document.getElementById('pptInput').addEventListener('change', e => {
   if (e.target.files[0]) onPptChange(e.target.files[0]);
