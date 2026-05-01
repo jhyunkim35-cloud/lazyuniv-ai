@@ -80,11 +80,94 @@ async function saveNoteFS(note) {
   }
   return record;
 }
-async function getNoteFS(id) {
-  return getNote(id);
+// ─────────────────────────────────────────────────────────────────
+// Firestore is the truth source. IDB is an offline-only cache.
+//
+// Reads go to Firestore first; on success the result is mirrored into
+// IDB so an offline reload still has data. On any failure (network
+// down, SDK error, not-logged-in) we fall back to IDB so the UI never
+// breaks. This single rule kills the "Edge has stale data" class of
+// bugs because there's no longer any per-browser source of truth that
+// can drift.
+//
+// Hydration policy (very important — this is what corrupted the PPT
+// slide URLs before): when we read a note from Firestore we may build
+// `extractedImages` from `slideImageUrls` for the viewer. That field
+// is FOR DISPLAY ONLY. saveNoteFS guards against it being sent back
+// up — see uploadSlideImages, which keeps URL-typed entries as-is.
+// ─────────────────────────────────────────────────────────────────
+
+function _hydrateNoteForViewer(note) {
+  if (!note) return note;
+  if (!note.notesHtml && note.notesText && typeof renderMarkdown === 'function') {
+    note.notesHtml = renderMarkdown(note.notesText);
+  }
+  if (note.slideImageUrls && !note.extractedImages) {
+    note.extractedImages = note.slideImageUrls
+      .map((url, i) => url
+        ? { slideNumber: i + 1, imageBase64: url, mimeType: 'url' }
+        : null)
+      .filter(Boolean);
+  }
+  return note;
 }
+
+async function getNoteFS(id) {
+  // Logged-out path: just hit IDB
+  const ref = userNotesRef();
+  if (!ref) return getNote(id);
+  try {
+    const doc = await ref.doc(id).get();
+    if (doc.exists) {
+      const data = _hydrateNoteForViewer(doc.data());
+      // Mirror to IDB for offline. Use the lower-level put so we bypass
+      // saveNote's ghost guard — Firestore data is canonical even if the
+      // title is somehow blank, the user can still see it.
+      try {
+        const conn = await openDB();
+        await new Promise((res, rej) => {
+          const tx = conn.transaction('notes', 'readwrite');
+          tx.objectStore('notes').put(data);
+          tx.oncomplete = res;
+          tx.onerror = e => rej(e.target.error);
+        });
+      } catch (e) { /* IDB mirror is best-effort */ }
+      return data;
+    }
+    // Doc doesn't exist on Firestore — fall back to IDB so notes the user
+    // is actively editing locally (not yet pushed) still open.
+    return getNote(id);
+  } catch (e) {
+    console.warn('[getNoteFS] Firestore read failed, falling back to IDB:', id, e.message);
+    return getNote(id);
+  }
+}
+
 async function getAllNotesFS() {
-  return getAllNotes();
+  const ref = userNotesRef();
+  if (!ref) return getAllNotes();
+  try {
+    const snap = await ref.get();
+    const notes = snap.docs.map(d => _hydrateNoteForViewer(d.data()));
+    // Mirror set into IDB as a side effect so future offline loads work.
+    // We don't delete IDB-only notes here — that's the realtime listener's
+    // job in v2; for now an IDB-only note still appears so the user never
+    // sees their unsynced work vanish.
+    try {
+      const conn = await openDB();
+      await new Promise((res, rej) => {
+        const tx = conn.transaction('notes', 'readwrite');
+        const store = tx.objectStore('notes');
+        for (const n of notes) store.put(n);
+        tx.oncomplete = res;
+        tx.onerror = e => rej(e.target.error);
+      });
+    } catch (e) { /* best-effort */ }
+    return notes.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  } catch (e) {
+    console.warn('[getAllNotesFS] Firestore read failed, falling back to IDB:', e.message);
+    return getAllNotes();
+  }
 }
 async function deleteNoteFS(id) {
   await deleteNote(id);
@@ -174,8 +257,25 @@ async function saveFolderFS(folder) {
 async function getAllFoldersFS() {
   const ref = userFoldersRef();
   if (!ref) return getAllFolders();
-  const snap = await ref.orderBy('name').get();
-  return snap.docs.map(d => d.data());
+  try {
+    const snap = await ref.orderBy('name').get();
+    const folders = snap.docs.map(d => d.data());
+    // Mirror to IDB so offline page loads still show folders
+    try {
+      const conn = await openDB();
+      await new Promise((res, rej) => {
+        const tx = conn.transaction('folders', 'readwrite');
+        const store = tx.objectStore('folders');
+        for (const f of folders) store.put(f);
+        tx.oncomplete = res;
+        tx.onerror = e => rej(e.target.error);
+      });
+    } catch (e) { /* best-effort */ }
+    return folders;
+  } catch (e) {
+    console.warn('[getAllFoldersFS] Firestore read failed, falling back to IDB:', e.message);
+    return getAllFolders();
+  }
 }
 async function deleteFolderFS(id) {
   const ref = userFoldersRef();
