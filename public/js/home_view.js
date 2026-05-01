@@ -57,15 +57,13 @@ async function moveNoteToFolder(noteId, folderId) {
   const updated = Object.assign({}, note, { folderId, sortOrder: newSortOrder });
   // Use saveNote (IndexedDB only) — avoids re-uploading slide images via saveNoteFS
   await saveNote(updated);
-  // Firestore: update only the changed fields
-  const ref = userNotesRef();
-  if (ref) {
-    const { updatedAt } = updated;
-    try {
-      await ref.doc(noteId).set({ folderId, sortOrder: newSortOrder, updatedAt }, { merge: true });
-    } catch (e) {
-      console.warn('Firestore folder move sync failed:', e);
-    }
+  // Firestore: update only the changed fields — use safeNotePartialUpdate so a
+  // missing Firestore doc cannot be auto-created with `set merge` (ghost note).
+  const { updatedAt } = updated;
+  try {
+    await safeNotePartialUpdate(noteId, { folderId, sortOrder: newSortOrder, updatedAt });
+  } catch (e) {
+    console.warn('Firestore folder move sync failed:', e);
   }
   showToast(`📁 노트를 폴더로 이동했습니다`);
 }
@@ -133,12 +131,9 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
       if (!n) return;
       const updated = Object.assign({}, n, { folderId: null });
       await saveNote(updated);
-      const fsRef = userNotesRef();
-      if (fsRef) {
-        const updatedAt = new Date().toISOString();
-        fsRef.doc(noteId).set({ folderId: null, updatedAt }, { merge: true })
-          .catch(e2 => console.warn('Firestore eject sync failed:', e2));
-      }
+      const updatedAt = new Date().toISOString();
+      safeNotePartialUpdate(noteId, { folderId: null, updatedAt })
+        .catch(e2 => console.warn('Firestore eject sync failed:', e2));
       showToast('📤 홈으로 이동했습니다');
       await renderHomeView();
     });
@@ -283,12 +278,9 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
       e.stopPropagation();
       const updated = Object.assign({}, note, { folderId: null });
       await saveNote(updated);
-      const ref = userNotesRef();
-      if (ref) {
-        const updatedAt = new Date().toISOString();
-        ref.doc(note.id).set({ folderId: null, updatedAt }, { merge: true })
-          .catch(e2 => console.warn('Firestore eject sync failed:', e2));
-      }
+      const updatedAt = new Date().toISOString();
+      safeNotePartialUpdate(note.id, { folderId: null, updatedAt })
+        .catch(e2 => console.warn('Firestore eject sync failed:', e2));
       showToast('📤 홈으로 이동했습니다');
       await renderHomeView();
     });

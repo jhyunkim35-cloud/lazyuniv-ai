@@ -460,14 +460,13 @@ async function renameSavedNote(id) {
   const updated = Object.assign({}, note, { title: trimmedTitle, updatedAt });
   await saveNote(updated);
 
-  // Patch only title + updatedAt to Firestore (no image re-upload)
-  const ref = userNotesRef();
-  if (ref) {
-    try {
-      await ref.doc(id).set({ title: trimmedTitle, updatedAt }, { merge: true });
-    } catch (e) {
-      console.warn('Firestore rename sync failed:', e);
-    }
+  // Patch only title + updatedAt to Firestore (no image re-upload).
+  // safeNotePartialUpdate refuses to create a ghost doc when the Firestore
+  // record doesn't exist yet — protects renames done before the first sync.
+  try {
+    await safeNotePartialUpdate(id, { title: trimmedTitle, updatedAt });
+  } catch (e) {
+    console.warn('Firestore rename sync failed:', e);
   }
 
   await renderHomeView();

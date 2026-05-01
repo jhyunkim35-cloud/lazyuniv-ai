@@ -108,6 +108,59 @@ async function searchNotesFS(query) {
   const q = query.toLowerCase();
   return all.filter(n => (n.title || '').toLowerCase().includes(q) || (n.notesText || '').toLowerCase().includes(q));
 }
+
+// Ghost-note prevention helper.
+//
+// Firestore's `set(..., {merge:true})` will create a new doc if one doesn't
+// already exist — that's how partial updates from folder moves and renames
+// were silently spawning empty notes (no title, no body) on Firestore in the
+// first place. Use this helper for every partial-field write to a note doc:
+//
+//   - If the doc exists  -> apply patch via update() (truly partial, no creation)
+//   - If the doc is missing AND IndexedDB has the full note with real content,
+//     fall through to saveNoteFS() which already gates on title+content.
+//   - If the doc is missing AND local data is also empty, refuse the write —
+//     better to skip a save than to materialise a ghost row.
+//
+// Returns true on success (any path), false if the write was refused.
+async function safeNotePartialUpdate(noteId, partial) {
+  const ref = userNotesRef();
+  if (!ref || !noteId) return false;
+  try {
+    await ref.doc(noteId).update(partial);
+    return true;
+  } catch (e) {
+    const code = e && (e.code || '');
+    const isMissing = code === 'not-found' || code === 'firestore/not-found' ||
+                      /no document to update|not found/i.test(e.message || '');
+    if (!isMissing) {
+      console.warn('[safeNotePartialUpdate] update error', noteId, e);
+      return false;
+    }
+    // Doc missing on Firestore — recover from local IndexedDB if it has real data.
+    let local = null;
+    try { local = await getNote(noteId); } catch {}
+    const hasTitle   = local && local.title && local.title.trim();
+    const hasContent = local && (local.notesText || local.markdownContent) &&
+                       (local.notesText || local.markdownContent).trim();
+    if (!local || !hasTitle || !hasContent) {
+      console.warn('[safeNotePartialUpdate] doc missing AND local empty/missing — refusing to create ghost note',
+        noteId, { localExists: !!local, hasTitle, hasContent });
+      return false;
+    }
+    // Local has real data — push it through saveNoteFS so it goes through the
+    // existing ghost guard there, and merge in the requested partial fields.
+    const merged = Object.assign({}, local, partial);
+    try {
+      await saveNoteFS(merged);
+      return true;
+    } catch (e2) {
+      console.warn('[safeNotePartialUpdate] fallback saveNoteFS failed', noteId, e2);
+      return false;
+    }
+  }
+}
+
 async function saveFolderFS(folder) {
   const ref = userFoldersRef();
   if (!ref) return saveFolder(folder);
