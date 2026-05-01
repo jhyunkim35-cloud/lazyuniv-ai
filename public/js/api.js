@@ -16,7 +16,13 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
           { type: 'text', text: userPrompt }
         ]}]
       : [{ role: 'user', content: userPrompt }];
-    const body = { model, max_tokens: maxTokens, system: systemPrompt, messages, idToken, isFirstCall: meta.isFirstCall || false, feature: meta.feature || 'unknown' };
+    // B1: auto-inject the active analysisId. The pipeline sets this once
+    // at runAgentPipeline start and clears it in finally; every billable
+    // fetch in between picks it up automatically without callers having
+    // to thread it through. meta.analysisId can override (currently unused).
+    const analysisId = meta.analysisId
+      || (typeof _currentAnalysisId !== 'undefined' ? _currentAnalysisId : null);
+    const body = { model, max_tokens: maxTokens, system: systemPrompt, messages, idToken, isFirstCall: meta.isFirstCall || false, feature: meta.feature || 'unknown', analysisId };
     if (USE_ADVISOR && model.includes('sonnet') && !systemPrompt.includes('검토자')) {
       body.tools = (body.tools || []).concat([{
         type: 'advisor_20260301',
@@ -88,6 +94,9 @@ async function callClaudeStream(
     idToken,
     isFirstCall: meta.isFirstCall || false,
     feature: meta.feature || 'unknown',
+    // B1: auto-inject — see callClaudeOnce above for rationale.
+    analysisId: meta.analysisId
+      || (typeof _currentAnalysisId !== 'undefined' ? _currentAnalysisId : null),
   };
 
   if (USE_ADVISOR && model.includes('sonnet') && !systemPrompt.includes('검토자')) {

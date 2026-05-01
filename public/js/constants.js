@@ -104,6 +104,12 @@ let _currentNotionNoteId = null;
 let _currentView = 'home';
 let _activeFolderId = null; // null=all, 'none'=uncategorized, uuid=folder
 
+// B1: per-analysis UUID, set in pipeline.js runAgentPipeline start, cleared
+// in finally. api.js auto-injects this into every billable fetch body so
+// the server can bill the analysis exactly once regardless of how many
+// agent calls happen inside it. null when no pipeline is running.
+let _currentAnalysisId = null;
+
 let toastTimer;
 
 let _bulkSelectMode = false;

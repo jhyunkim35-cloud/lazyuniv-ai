@@ -117,9 +117,113 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
-  // Server-side quota check (only for first call of an analysis)
+  // ─────────────────────────────────────────────────────────────────
+  // B1: Quota check & billing — analysisId-based
+  //
+  // Old model: client sends `isFirstCall: true` on its first request of an
+  // analysis. Quota was checked + decremented on that flag. Problem: the
+  // client could just send `isFirstCall: false` on every call from the
+  // browser console and bypass billing entirely.
+  //
+  // New model: client generates a UUID per analysis and sends it as
+  // `analysisId` on EVERY call of that analysis (auto-injected from a
+  // module-level variable in api.js). The server treats the FIRST request
+  // for any given analysisId as the billable event, regardless of any
+  // client-supplied flag. Subsequent calls with the same id pass through
+  // for free because the analysis was already billed.
+  //
+  // Idempotency: writes are wrapped in a Firestore transaction that
+  // creates an `analysisSessions/{analysisId}` doc and increments usage
+  // atomically. Two concurrent requests with the same id race on the
+  // create — only one wins, the other becomes a no-op replay.
+  //
+  // Backward compat: requests without analysisId fall back to the legacy
+  // isFirstCall path so any old client / non-pipeline call (quiz,
+  // classify, vision) keeps working unchanged.
+  //
+  // The analysisSessions collection is configured with a 7-day TTL on
+  // `createdAt` in Firebase Console → Firestore → TTL policies.
+  // ─────────────────────────────────────────────────────────────────
+  const analysisId = typeof req.body?.analysisId === 'string' ? req.body.analysisId : null;
+  const feature = req.body?.feature || 'unknown';
   const isFirstCall = req.body?.isFirstCall === true;
-  if (isFirstCall) {
+
+  // billCtx records what the request needs at billOnSuccess time:
+  //   { mode: 'analysisId', sessionRef, quota, alreadyBilled }  — new path
+  //   { mode: 'legacy', uid, slot, monthKey }                   — old isFirstCall
+  //   null                                                       — no billing
+  let billCtx = null;
+
+  // Only feature='noteAnalysis' is currently a billable feature. quiz,
+  // classify, vision, essayGrade are part of the free tier — keep them
+  // out of the quota system entirely so users can drill notes without
+  // burning their analysis count.
+  const isBillable = feature === 'noteAnalysis';
+
+  if (isBillable && analysisId) {
+    // New path: analysisId-driven idempotent billing.
+    let admin;
+    try {
+      admin = getAdmin();
+    } catch (e) {
+      console.error('[B1] admin init failed:', e.message);
+      return res.status(500).json({ error: { type: 'admin_init_failed', message: '서버 설정 오류입니다.' } });
+    }
+
+    // Verify token before touching Firestore — checkQuota does this too,
+    // but we need uid first to build the session ref.
+    let decoded;
+    try {
+      decoded = await admin.auth().verifyIdToken(req.body?.idToken);
+    } catch (e) {
+      return res.status(403).json({ error: { type: 'invalid_token', message: '인증이 필요합니다. 다시 로그인 후 시도해주세요.' } });
+    }
+    const uid = decoded.uid;
+
+    // Sanity-check the analysisId shape before using it as a doc id —
+    // keep it tight to Firestore-safe characters and a sane length so a
+    // hostile client can't pollute the collection with weird ids.
+    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(analysisId)) {
+      return res.status(400).json({ error: { type: 'bad_analysis_id', message: '잘못된 분석 ID 형식.' } });
+    }
+
+    const sessionRef = admin.firestore()
+      .collection('users').doc(uid)
+      .collection('analysisSessions').doc(analysisId);
+
+    let sessionDoc;
+    try {
+      sessionDoc = await sessionRef.get();
+    } catch (e) {
+      console.error('[B1] sessionRef.get failed:', e.message);
+      // Fail open — don't block usable analyses on a Firestore hiccup.
+      // Worst case: this call goes unbilled. Better than 500-erroring the
+      // user mid-pipeline.
+      sessionDoc = { exists: false, _readFailed: true };
+    }
+
+    if (sessionDoc.exists) {
+      // Already billed earlier in this analysis — let the request through.
+      billCtx = { mode: 'analysisId', alreadyBilled: true };
+    } else if (sessionDoc._readFailed) {
+      // Couldn't verify state. Don't bill, don't block.
+      billCtx = { mode: 'analysisId', alreadyBilled: true, _readFailed: true };
+    } else {
+      // First call for this analysis — full quota check.
+      const quota = await checkQuota(req.body?.idToken);
+      if (!quota.allowed) {
+        const message = quota.reason === 'quota_exceeded'
+          ? '월 무료 한도(3회)를 초과했습니다.'
+          : (quota.reason === 'invalid_token' || quota.reason === 'missing_token'
+            ? '인증이 필요합니다. 다시 로그인 후 시도해주세요.'
+            : '서버 설정 오류입니다. 관리자에게 문의해주세요.');
+        return res.status(403).json({ error: { type: quota.reason, message } });
+      }
+      billCtx = { mode: 'analysisId', alreadyBilled: false, sessionRef, quota, uid };
+    }
+  } else if (isBillable && isFirstCall) {
+    // Legacy path: old client without analysisId. Keep the existing
+    // behavior so nothing breaks while clients are mid-roll-out.
     const quota = await checkQuota(req.body?.idToken);
     if (!quota.allowed) {
       const message = quota.reason === 'quota_exceeded'
@@ -127,47 +231,93 @@ module.exports = async (req, res) => {
         : (quota.reason === 'invalid_token' || quota.reason === 'missing_token'
           ? '인증이 필요합니다. 다시 로그인 후 시도해주세요.'
           : '서버 설정 오류입니다. 관리자에게 문의해주세요.');
-      return res.status(403).json({
-        error: { type: quota.reason, message },
-      });
+      return res.status(403).json({ error: { type: quota.reason, message } });
     }
-    // Stash for downstream use (e.g. R3 increment).
-    req._usageContext = quota;
+    billCtx = { mode: 'legacy', alreadyBilled: false, uid: quota.uid, slot: quota.slot, monthKey: quota.monthKey };
   }
+
+  req._billCtx = billCtx;
 
   // Strip our custom fields before forwarding to Anthropic
   const upstreamBody = { ...req.body };
   delete upstreamBody.idToken;
   delete upstreamBody.isFirstCall;
   delete upstreamBody.feature;
+  delete upstreamBody.analysisId;
 
-  // Bill the user for this analysis on success. Idempotent — guarded so we
-  // never double-bill within one request even if called from both branches.
+  // Bill the user for this analysis on success. Idempotent at three levels:
+  //   1. The `billed` flag prevents double-bill within a single request even
+  //      if called from both stream + non-stream branches.
+  //   2. analysisId mode wraps the create+increment in a Firestore transaction
+  //      so two concurrent requests with the same analysisId race on the
+  //      sessionDoc create — only one wins, the other becomes a no-op.
+  //   3. alreadyBilled context flag short-circuits when an earlier call in
+  //      the same analysis already paid.
   let billed = false;
   async function billOnSuccess() {
     if (billed) return;
     billed = true;
-    if (!isFirstCall) return;
-    const ctx = req._usageContext;
-    if (!ctx || !ctx.uid) return;
-    if (ctx.slot === 'developer' || ctx.slot === 'monthly') return;
+
+    const ctx = req._billCtx;
+    if (!ctx || ctx.alreadyBilled) return;
+
     try {
       const admin = getAdmin();
-      const ref = admin.firestore().collection('users').doc(ctx.uid);
-      if (ctx.slot === 'free' && ctx.monthKey) {
-        await ref.set(
-          { usage: { [ctx.monthKey]: admin.firestore.FieldValue.increment(1) } },
-          { merge: true }
-        );
-      } else if (ctx.slot === 'single') {
-        await ref.set(
-          { singlePurchases: admin.firestore.FieldValue.increment(-1) },
-          { merge: true }
-        );
+
+      if (ctx.mode === 'analysisId') {
+        // New path: atomic session create + usage decrement.
+        const { sessionRef, quota, uid } = ctx;
+        if (!sessionRef || !quota || !uid) return;
+        // Developer/monthly slots are unlimited — still record the session
+        // doc so future calls in the same analysis short-circuit on the
+        // alreadyBilled branch (saves a quota check).
+        await admin.firestore().runTransaction(async (tx) => {
+          const fresh = await tx.get(sessionRef);
+          if (fresh.exists) return; // another concurrent request already billed
+
+          tx.create(sessionRef, {
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            feature: 'noteAnalysis',
+            slot: quota.slot,
+          });
+
+          if (quota.slot === 'developer' || quota.slot === 'monthly') return;
+
+          const userRef = admin.firestore().collection('users').doc(uid);
+          if (quota.slot === 'free' && quota.monthKey) {
+            tx.set(
+              userRef,
+              { usage: { [quota.monthKey]: admin.firestore.FieldValue.increment(1) } },
+              { merge: true }
+            );
+          } else if (quota.slot === 'single') {
+            tx.set(
+              userRef,
+              { singlePurchases: admin.firestore.FieldValue.increment(-1) },
+              { merge: true }
+            );
+          }
+        });
+      } else if (ctx.mode === 'legacy') {
+        // Old isFirstCall path — keep working for any client that hasn't
+        // been updated to send analysisId yet.
+        if (ctx.slot === 'developer' || ctx.slot === 'monthly') return;
+        const ref = admin.firestore().collection('users').doc(ctx.uid);
+        if (ctx.slot === 'free' && ctx.monthKey) {
+          await ref.set(
+            { usage: { [ctx.monthKey]: admin.firestore.FieldValue.increment(1) } },
+            { merge: true }
+          );
+        } else if (ctx.slot === 'single') {
+          await ref.set(
+            { singlePurchases: admin.firestore.FieldValue.increment(-1) },
+            { merge: true }
+          );
+        }
       }
     } catch (e) {
       // Fail open — don't block the user response on billing error.
-      console.error('[bill] increment failed:', e.message);
+      console.error('[bill] failed:', e.message);
     }
   }
 

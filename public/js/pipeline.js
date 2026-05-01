@@ -8,6 +8,14 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   debugLog('PIPE', 'Pipeline start');
   agentLog(0, `노트 작성·비평 루프 시작… (최대 ${MAX_ITERATIONS}회)`);
 
+  // B1: generate one analysisId for the entire pipeline. api.js auto-injects
+  // this into every fetch body so the server bills the analysis exactly
+  // once on the first call and treats every subsequent call as a no-op
+  // replay. Cleared in finally so quiz/classify/vision calls outside the
+  // pipeline don't accidentally piggyback on it.
+  _currentAnalysisId = uuidv4().replace(/-/g, '').slice(0, 32);
+  debugLog('PIPE', 'analysisId=' + _currentAnalysisId);
+
   const iterTimings = [];
   let notesText    = '';
   let critiqueText = '';
@@ -130,6 +138,10 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
     throw err;  // propagate to caller — single-mode and batch handlers both handle toasting
   } finally {
     stopElapsedTimer();
+    // B1: clear analysisId so quiz/classify/vision calls after the pipeline
+    // don't accidentally inherit it (they have feature !== 'noteAnalysis' so
+    // it would be ignored anyway, but cleaner to null it out).
+    _currentAnalysisId = null;
   }
 }
 
