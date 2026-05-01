@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.vercel/
+
+# editor / OS noise
+.DS_Store
+*.swp
+
+# old html backups (already in repo but stop adding new ones)
+index_backup*.html
+index_new.html
