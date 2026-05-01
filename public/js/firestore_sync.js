@@ -52,10 +52,39 @@ async function saveNoteFS(note) {
   if (ref) {
     const toSave = Object.assign({}, record);
     delete toSave.notesHtml;
-    // Upload slide images (could be in slideImages or extractedImages)
-    const images = toSave.slideImages || toSave.extractedImages;
-    if (images && images.length) {
-      toSave.slideImageUrls = await uploadSlideImages(id, images);
+    // A2 fix: Don't blindly run all images through uploadSlideImages.
+    //
+    // saveNoteFS gets called from two very different places:
+    //   1. Fresh analysis  → toSave.slideImages is base64 (needs upload)
+    //   2. Folder move / image insert / folder delete → toSave.extractedImages
+    //      is the hydrated viewer shape (mimeType:'url' pointing at Firebase
+    //      Storage URLs that already exist).
+    //
+    // If we run case 2 through uploadSlideImages, two things break:
+    //   - Hydrate's .filter(Boolean) may have dropped null slots, so the
+    //     re-emitted slideImageUrls array shrinks (this is the 4/17 PPT
+    //     corruption pattern).
+    //   - It's wasted work — those URLs already exist on Storage.
+    //
+    // The guard: if every extractedImages entry is already a uploaded URL,
+    // keep the existing slideImageUrls (which the spread copied from
+    // `record` → `note`) untouched.
+    if (toSave.slideImages && toSave.slideImages.length) {
+      // Case 1: fresh base64 from analysis pipeline — must upload
+      toSave.slideImageUrls = await uploadSlideImages(id, toSave.slideImages);
+    } else if (toSave.extractedImages && toSave.extractedImages.length) {
+      const allUrlTyped = toSave.extractedImages.every(img =>
+        img && img.mimeType === 'url' &&
+        typeof img.imageBase64 === 'string' &&
+        img.imageBase64.startsWith('https://')
+      );
+      if (!allUrlTyped) {
+        // Case 2b: at least one entry is base64 (e.g. user inserted a new
+        // image into the note) — re-upload the whole set.
+        toSave.slideImageUrls = await uploadSlideImages(id, toSave.extractedImages);
+      }
+      // Case 2a (allUrlTyped): leave toSave.slideImageUrls alone — it was
+      // copied from the spread of `record` and is already correct.
     }
     delete toSave.slideImages;
     delete toSave.extractedImages;
@@ -537,9 +566,15 @@ async function deleteSlideImages(noteId) {
 }
 
 async function getNextSortOrder(folderId, excludeId = null) {
-  const notes = await getAllNotesFS();
-  const folderNotes = notes.filter(n =>
-    (n.folderId ?? null) === (folderId ?? null) && n.id !== excludeId
-  );
-  return folderNotes.length ? Math.max(...folderNotes.map(n => n.sortOrder ?? 0)) + 1 : 0;
+  // B3 fix: Use a timestamp-based sortOrder to avoid race conditions on
+  // concurrent folder moves. The previous Math.max(...) + 1 logic required
+  // a read-then-write that two simultaneous moves could collide on,
+  // returning the same value and producing duplicate sortOrder entries.
+  //
+  // Date.now() gives millisecond uniqueness, and since notes sort ASC by
+  // sortOrder, a freshly-added note (large timestamp) lands at the end of
+  // its folder — matching the previous "max + 1" intent. Existing
+  // small-integer sortOrders from manual drag-reorder still sort first.
+  // The folderId/excludeId args are kept for API compatibility but unused.
+  return Date.now();
 }

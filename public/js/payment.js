@@ -75,11 +75,12 @@ async function getUserUsage() {
 }
 
 async function incrementUsage() {
+  // C1: Deprecated client-side increment. Usage is now tracked server-side
+  // in api/claude.js (see billOnSuccess in the proxy handler) so the user
+  // can't bypass billing by skipping this call. Kept as a no-op in case
+  // any future code path still calls it; safe to delete entirely once
+  // verified there are no callers.
   if (!currentUser) return;
-  const ref = db.collection('users').doc(currentUser.uid);
-  const now = new Date();
-  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  await ref.set({ usage: { [monthKey]: firebase.firestore.FieldValue.increment(1) } }, { merge: true });
 }
 
 async function canAnalyze() {

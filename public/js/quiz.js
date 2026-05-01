@@ -152,14 +152,22 @@ Before finalizing each question you generate, check it against the list above. I
     isFirstCall: false,
     feature: 'quiz',
   });
-  let res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody() });
-  if (!res.ok && MODEL === PREFERRED_MODEL) {
-    let errText = ''; try { errText = await res.clone().text(); } catch {}
-    if (/model|not.found|invalid/i.test(errText) || res.status === 404 || res.status === 400) {
-      console.warn(`[quiz] ${PREFERRED_MODEL} failed, falling back to ${FALLBACK_MODEL}`);
-      MODEL = FALLBACK_MODEL;
-      res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody() });
+  // B2: 60s timeout per attempt — protects against hung quiz generation requests
+  const quizCtl = new AbortController();
+  const quizTimer = setTimeout(() => quizCtl.abort(), 60000);
+  let res;
+  try {
+    res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody(), signal: quizCtl.signal });
+    if (!res.ok && MODEL === PREFERRED_MODEL) {
+      let errText = ''; try { errText = await res.clone().text(); } catch {}
+      if (/model|not.found|invalid/i.test(errText) || res.status === 404 || res.status === 400) {
+        console.warn(`[quiz] ${PREFERRED_MODEL} failed, falling back to ${FALLBACK_MODEL}`);
+        MODEL = FALLBACK_MODEL;
+        res = await fetch('/api/claude', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: makeBody(), signal: quizCtl.signal });
+      }
     }
+  } finally {
+    clearTimeout(quizTimer);
   }
   const responseTimeMs = Date.now() - t0;
   if (!res.ok) {
@@ -1612,19 +1620,31 @@ async function classifyNoteContent(noteText) {
 
   let idToken = null;
   try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
-  const res = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: noteText }],
-      idToken,
-      isFirstCall: false,
-      feature: 'classify',
-    }),
-  });
+  // B2: 30s timeout — classify is a single Haiku call, should be fast
+  const classifyCtl = new AbortController();
+  const classifyTimer = setTimeout(() => classifyCtl.abort(), 30000);
+  let res;
+  try {
+    res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: noteText }],
+        idToken,
+        isFirstCall: false,
+        feature: 'classify',
+      }),
+      signal: classifyCtl.signal,
+    });
+  } catch (e) {
+    clearTimeout(classifyTimer);
+    if (e.name === 'AbortError') throw new Error('분류 시간 초과 (30초). 다시 시도해주세요.');
+    throw e;
+  }
+  clearTimeout(classifyTimer);
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
