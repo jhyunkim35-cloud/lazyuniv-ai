@@ -1,0 +1,8 @@
+# lazyuniv-ai robots.txt
+# Generic crawler — allow indexing of marketing surfaces, block API.
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Sitemap will be added once landing page exists.
+# Sitemap: https://lazyuniv-ai.vercel.app/sitemap.xml
