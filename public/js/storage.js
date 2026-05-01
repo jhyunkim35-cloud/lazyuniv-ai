@@ -66,6 +66,29 @@ async function getQuizResultsByNote(noteId) {
 }
 
 async function saveNote(note) {
+  // ───── GHOST GUARD ─────
+  // saveNote is the only IndexedDB writer for notes. Reject anything that
+  // would render as "제목없음 0자" in the UI — empty title AND empty body.
+  // Without this, multiple legitimate-looking call sites could (and did)
+  // produce empty rows by passing partial data with no id. Silent log so
+  // we can trace the offender; never throw — callers are not error-handled.
+  const _isNotion = note && note.type === 'notion';
+  const _hasTitle = note && note.title && note.title.trim();
+  const _hasBody  = note && (
+    (_isNotion ? (note.markdownContent || '').trim() : (note.notesText || '').trim())
+  );
+  if (!_hasTitle && !_hasBody) {
+    console.warn('🔴 [saveNote] refused empty note', {
+      id: note?.id || '(no id — would have generated new uuid)',
+      title: note?.title,
+      type: note?.type,
+      keys: note ? Object.keys(note).sort() : null,
+    });
+    console.trace('[saveNote] empty-note call stack');
+    return note; // honour the API shape but don't write
+  }
+  // ───── END GHOST GUARD ─────
+
   const db  = await openDB();
   const now = new Date().toISOString();
   // Assign sortOrder for brand-new notes that don't already have one
