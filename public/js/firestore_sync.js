@@ -309,63 +309,19 @@ async function syncNotesOnLogin() {
       if (!localFolderMap[fsFolder.id]) await saveFolder(fsFolder);
     }
 
-    // 3. Local-only notes: either push to Firestore (recent + valid) or
-    //    delete from IDB (stale — already removed elsewhere).
-    //
-    // The ghost-resurrection problem that disabled the old push has been
-    // closed at saveNote (storage.js) and saveNoteFS (here) — both refuse
-    // empty notes. So we can safely re-enable upload for notes that have
-    // real content. Anything else gets cleaned up locally.
-    //
-    // The stale-cleanup branch is what actually fixes "Edge shows notes
-    // I deleted on Chrome": those notes were removed from Firestore by
-    // Chrome but Edge's IDB never heard about it (delete tracking is
-    // per-browser via localStorage). On next login Edge sees them as
-    // local-only and now removes them.
-    const RECENT_MS = 7 * 24 * 60 * 60 * 1000; // 7-day grace window
-    const now = Date.now();
-    for (const ln of localNotes) {
-      if (deletedSet.has(ln.id)) continue;
-      if (fsNoteMap[ln.id]) continue;
-
-      const _hasTitle = ln.title && ln.title.trim();
-      const _hasContent = (ln.notesText || ln.markdownContent) &&
-                          (ln.notesText || ln.markdownContent).trim();
-      if (!_hasTitle || !_hasContent) {
-        // Empty/ghost local note that never made it to Firestore — purge from IDB
-        console.warn('[sync] purging local-only ghost:', ln.id);
-        try { await deleteNote(ln.id); } catch (e) {}
-        continue;
-      }
-
-      const createdMs = ln.createdAt ? Date.parse(ln.createdAt) : 0;
-      const updatedMs = ln.updatedAt ? Date.parse(ln.updatedAt) : 0;
-      const newestMs  = Math.max(createdMs, updatedMs);
-      const isRecent  = newestMs > 0 && (now - newestMs) < RECENT_MS;
-
-      if (isRecent) {
-        // Likely a note created on this device that hasn't synced yet —
-        // try to push it. saveNoteFS guards against empty data.
-        try {
-          await saveNoteFS(ln);
-        } catch (e) {
-          console.warn('[sync] local→FS push skip:', ln.id, e.message);
-        }
-      } else {
-        // Stale: present locally but absent from Firestore and older than
-        // the grace window. Treat as deleted-elsewhere and clean up IDB.
-        console.warn('[sync] removing stale local note (deleted elsewhere):',
-          ln.id, ln.title?.slice(0, 30));
-        try { await deleteNote(ln.id); } catch (e) {}
-      }
-    }
-    // Folders: push local-only folders unconditionally — they're tiny and
-    // there's no ghost-folder pathology equivalent to notes.
-    for (const lf of localFolders) {
-      if (fsFolderMap[lf.id]) continue;
-      try { await saveFolderFS(lf); }
-      catch (e) { console.warn('Folder sync skip:', e.message); }
-    }
+    // 3. 로컬에 있는데 Firestore에 없으면 → Firestore에 업로드
+    // HOTFIX: disabled to prevent ghost note resurrection
+    // for (const ln of localNotes) {
+    //   if (deletedSet.has(ln.id)) continue;
+    //   if (!fsNoteMap[ln.id]) {
+    //     try { await saveNoteFS(ln); } catch (e) { console.warn('Sync upload skip:', ln.id, e.message); }
+    //   }
+    // }
+    // for (const lf of localFolders) {
+    //   if (!fsFolderMap[lf.id]) {
+    //     try { await saveFolderFS(lf); } catch (e) { console.warn('Folder sync skip:', e.message); }
+    //   }
+    // }
 
     // 4. 둘 다 있으면 → updatedAt 비교
     for (const fsNote of fsNotes) {
