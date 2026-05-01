@@ -22,12 +22,19 @@ function updateAuthUI() {
     if (newNoteView.style.display !== 'block') {
       homeView.style.display = '';
     }
-    syncNotesOnLogin().then(() => renderHomeView());
+    syncNotesOnLogin().then(() => {
+      renderHomeView();
+      // Start realtime listeners after the initial backfill finishes —
+      // any subsequent change on any device flows in within ~1 second.
+      startRealtimeSync();
+    });
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     const sidebarUserName = document.getElementById('sidebarUserName');
     if (sidebarAvatar) sidebarAvatar.src = currentUser.photoURL || '';
     if (sidebarUserName) sidebarUserName.textContent = currentUser.displayName || currentUser.email;
   } else {
+    // Tear down realtime listeners first so they don't fire after logout
+    if (typeof stopRealtimeSync === 'function') stopRealtimeSync();
     loginBtn.style.display = '';
     userInfo.style.display = 'none';
     landingView.style.display = '';
