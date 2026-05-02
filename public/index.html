@@ -2870,6 +2870,263 @@
       background: rgba(239, 68, 68, 0.12);
     }
 
+    /* ─────────────────────────────────────────────────
+       Exam plan badges + registration modal
+       ───────────────────────────────────────────────── */
+    .exam-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.12rem 0.45rem;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+      letter-spacing: 0.02em;
+    }
+    .exam-badge-red    { background: rgba(239, 68, 68, 0.16);  color: #ef4444; }
+    .exam-badge-orange { background: rgba(249, 115, 22, 0.16); color: #f97316; }
+    .exam-badge-green  { background: rgba(34, 197, 94, 0.16);  color: #22c55e; }
+    .exam-badge-gray   { background: var(--surface2);          color: var(--text-muted); }
+
+    #folderExamPlanSummary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--primary);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .exam-summary-stat {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .exam-summary-stat-num {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .exam-summary-stat-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+    .exam-summary-divider {
+      width: 1px;
+      height: 28px;
+      background: var(--border);
+    }
+
+    .exam-plan-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .exam-plan-modal.hidden { display: none; }
+    .exam-plan-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+    }
+    .exam-plan-panel {
+      position: relative;
+      width: min(560px, 92vw);
+      max-height: 90vh;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+    .exam-plan-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 1rem 1.2rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      gap: 0.6rem;
+    }
+    .exam-plan-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.15rem;
+    }
+    .exam-plan-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .exam-plan-close {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      line-height: 1;
+      border-radius: 6px;
+    }
+    .exam-plan-close:hover { background: var(--surface2); color: var(--text); }
+    .exam-plan-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .exam-plan-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .exam-plan-field label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .exam-plan-hint {
+      font-size: 0.72rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-left: 0.3rem;
+    }
+    .exam-plan-field input[type="date"],
+    .exam-plan-field input[type="number"] {
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    .exam-plan-field input[type="date"]:focus,
+    .exam-plan-field input[type="number"]:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .exam-plan-target-modes {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .exam-plan-radio {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+    .exam-plan-radio input[type="number"] {
+      width: 70px;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    .exam-plan-radio input[type="number"]:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .exam-plan-preview {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.8rem;
+    }
+    .exam-plan-preview-placeholder {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-align: center;
+      padding: 0.4rem;
+    }
+    .exam-plan-preview-warn {
+      font-size: 0.78rem;
+      color: var(--danger, #ef4444);
+      margin-top: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      background: rgba(239, 68, 68, 0.10);
+      border-radius: 6px;
+    }
+    .exam-plan-mode-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .exam-plan-mode-label {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .exam-plan-mode-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .exam-plan-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+    }
+    .exam-plan-stat {
+      text-align: center;
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 0.45rem 0.3rem;
+    }
+    .exam-plan-stat-num {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    .exam-plan-stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .exam-plan-footer {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      padding: 0.8rem 1.2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .exam-plan-footer .action-btn.primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .exam-plan-footer .action-btn.primary:hover {
+      filter: brightness(1.08);
+    }
+    .exam-plan-footer .action-btn.primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .exam-plan-footer .action-btn.danger {
+      color: var(--danger, #ef4444);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+    .exam-plan-footer .action-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.12);
+    }
+
     /* ── Light Theme ─────────────────────────────── */
     :root.light {
       --bg: #ffffff;
@@ -3199,12 +3456,15 @@
           <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text);">모든 노트</h2>
         </div>
         <div style="display:flex;gap:0.4rem;">
+          <button id="folderExamPlanBtn" class="action-btn" style="display:none;" onclick="if (window._activeFolderId && _activeFolderId !== 'none' && typeof openExamPlanModal === 'function') openExamPlanModal(_activeFolderId)">🎓 시험 등록</button>
           <button id="examReviewBtn" class="action-btn" style="display:none;" onclick="launchExamReview()">📋 시험 대비 요약</button>
           <button id="bulkSelectToggleBtn" class="action-btn" onclick="toggleBulkSelectMode()">선택</button>
           <button class="action-btn" onclick="showImportNoteModal()">📥 가져오기</button>
           <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
         </div>
       </div>
+      <!-- Exam plan summary card — visible only inside a folder view that has an examPlan registered -->
+      <div id="folderExamPlanSummary" style="display:none;"></div>
       <div id="ejectDropZone">📤 홈으로 드래그하여 내보내기</div>
       <div id="allNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
       <div id="emptyHomeMsg" style="display:none; text-align:center; padding:3rem; color:var(--text-muted);">
@@ -3577,6 +3837,7 @@
 <script src="/js/notion_viewer.js"></script>
 <script src="/js/notion_clipboard.js"></script>
 <script src="/js/folders.js"></script>
+<script src="/js/exam_plan.js"></script>
 <script src="/js/home_view.js"></script>
 <script src="/js/transcripts_view.js"></script>
 <script src="/js/bulk.js"></script>

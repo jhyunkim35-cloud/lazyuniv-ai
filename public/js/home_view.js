@@ -11,10 +11,15 @@ function buildFolderCard(folder, noteCount) {
   const colorDot = folder.color
     ? `<span class="folder-color-dot" style="background:${folder.color};width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:0.3rem;vertical-align:middle;"></span>`
     : '';
+  // Optional D-day badge from exam_plan.js — only shown when this folder
+  // has an examPlan registered. Safe-noop if exam_plan.js hasn't loaded.
+  const examBadge = (folder.examPlan && typeof examPlanBadgeHtml === 'function')
+    ? examPlanBadgeHtml(folder.examPlan, noteCount)
+    : '';
   card.innerHTML = `
     <div class="folder-card-icon">📁</div>
     <div class="folder-card-info">
-      <div class="folder-card-name">${colorDot}${escHtml(folder.name)}</div>
+      <div class="folder-card-name">${colorDot}${escHtml(folder.name)}${examBadge}</div>
       <div class="folder-card-count">${noteCount}개의 노트</div>
     </div>
     <div class="folder-card-actions">
@@ -111,6 +116,61 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   // Refresh the "내 녹취록 N개" count on the home record card. Fire-and-forget;
   // best-effort, no need to block the rest of the render on a Firestore round trip.
   if (typeof updateMyTranscriptsCount === 'function') updateMyTranscriptsCount();
+
+  // ── Exam-plan controls (button + summary card) ─────────────────────────
+  // The 🎓 button only makes sense inside a real folder. Inside the special
+  // 'none' (uncategorized) view we have no folderId to attach a plan to.
+  const folderExamPlanBtn = document.getElementById('folderExamPlanBtn');
+  const folderExamSummary = document.getElementById('folderExamPlanSummary');
+  if (folderExamPlanBtn && folderExamSummary) {
+    if (isFolderView) {
+      const folderObj = folders.find(f => f.id === _activeFolderId);
+      const hasPlan   = !!(folderObj && folderObj.examPlan);
+
+      folderExamPlanBtn.style.display = '';
+      folderExamPlanBtn.textContent   = hasPlan ? '🎓 시험 일정' : '🎓 시험 등록';
+
+      if (hasPlan && typeof effectiveDailyTarget === 'function' &&
+          typeof getDaysUntil === 'function' && typeof modeLabel === 'function') {
+        const plan        = folderObj.examPlan;
+        const folderNotes = notes.filter(n => n.folderId === _activeFolderId).length;
+        const daysLeft    = getDaysUntil(plan.examDate);
+        const dailyTarget = effectiveDailyTarget(plan, folderNotes);
+        const dDayLabel   = daysLeft == null ? ''
+                          : daysLeft < 0   ? `D+${-daysLeft}`
+                          : daysLeft === 0 ? 'D-Day'
+                          : `D-${daysLeft}`;
+        const isPast = daysLeft != null && daysLeft < 0;
+
+        folderExamSummary.innerHTML = `
+          <div class="exam-summary-stat" style="min-width:60px;">
+            <div class="exam-summary-stat-num" style="color:${isPast ? 'var(--text-muted)' : 'var(--primary)'};">${dDayLabel}</div>
+            <div class="exam-summary-stat-label">${plan.examDate}</div>
+          </div>
+          <div class="exam-summary-divider"></div>
+          <div class="exam-summary-stat">
+            <div class="exam-summary-stat-num">${dailyTarget}개</div>
+            <div class="exam-summary-stat-label">매일 목표</div>
+          </div>
+          <div class="exam-summary-divider"></div>
+          <div class="exam-summary-stat">
+            <div class="exam-summary-stat-num" style="font-size:0.92rem;">${modeLabel(plan.prepMode)}</div>
+            <div class="exam-summary-stat-label">${plan.prepStartDate} 부터</div>
+          </div>
+          <div class="exam-summary-stat">
+            <div class="exam-summary-stat-num">${folderNotes}개</div>
+            <div class="exam-summary-stat-label">노트</div>
+          </div>
+        `;
+        folderExamSummary.style.display = '';
+      } else {
+        folderExamSummary.style.display = 'none';
+      }
+    } else {
+      folderExamPlanBtn.style.display  = 'none';
+      folderExamSummary.style.display  = 'none';
+    }
+  }
 
   // Show exam-review button only in folder view with 2+ notes
   const examReviewBtn = document.getElementById('examReviewBtn');
