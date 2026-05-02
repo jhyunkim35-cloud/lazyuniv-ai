@@ -10,11 +10,16 @@ auth.onAuthStateChanged(user => {
    Init — load saved notes on page load
 ═══════════════════════════════════════════════ */
 (async function init() {
-  // Load theme preference
+  // Load theme preference. The button shows the icon for the OPPOSITE
+  // theme — in light mode the button shows a moon (click → go dark),
+  // and vice versa. This mirrors what toggleTheme does at runtime.
   if (localStorage.getItem('theme') === 'light') {
     document.documentElement.classList.add('light');
     const btn = document.getElementById('themeToggleBtn');
-    if (btn) btn.textContent = '🌙';
+    if (btn) {
+      btn.innerHTML = '<i data-lucide="moon"></i>';
+      if (typeof window.mountLucideIcons === 'function') window.mountLucideIcons();
+    }
   }
   // Set initial view: home if notes exist, new if empty
   try {

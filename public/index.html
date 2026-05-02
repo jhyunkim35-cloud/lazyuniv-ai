@@ -54,6 +54,31 @@
       --text-dim: #44445a;
       --radius: 14px;
       --radius-sm: 8px;
+
+      /* ── Design tokens (Phase: UI overhaul) ──
+         Existing --radius and --radius-sm are kept for back-compat. The
+         new tokens below are used by the redesigned sidebar/topbar/cards.
+         Stick to these going forward so future spacing/typography tweaks
+         become single-line edits. */
+      --radius-xs: 6px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-5: 1.5rem;
+      --space-6: 2rem;
+      --font-xs: 0.72rem;
+      --font-sm: 0.82rem;
+      --font-base: 0.92rem;
+      --font-md: 1rem;
+      --font-lg: 1.1rem;
+      --font-xl: 1.35rem;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.16);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.20);
+      --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.32);
+      --danger: #ef4444;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -3127,6 +3152,173 @@
       background: rgba(239, 68, 68, 0.12);
     }
 
+    /* ─────────────────────────────────────────────────
+       UI overhaul (Phase 1): Lucide icons + new
+       sidebar/topbar styles. Layout-critical inline
+       styles on the actual HTML elements are kept;
+       these rules adjust appearance only.
+       ───────────────────────────────────────────────── */
+    [data-lucide],
+    svg.lucide {
+      flex-shrink: 0;
+      stroke-width: 1.75;
+      vertical-align: middle;
+    }
+    .icon-xs { width: 12px; height: 12px; }
+    .icon-sm { width: 14px; height: 14px; }
+    .icon-md { width: 16px; height: 16px; }
+    .icon-lg { width: 20px; height: 20px; }
+    .icon-xl { width: 24px; height: 24px; }
+    /* Default size for any [data-lucide] without an explicit size class */
+    [data-lucide]:not(.icon-xs):not(.icon-sm):not(.icon-md):not(.icon-lg):not(.icon-xl),
+    svg.lucide:not(.icon-xs):not(.icon-sm):not(.icon-md):not(.icon-lg):not(.icon-xl) {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── Topbar — minimal, search-prominent ── */
+    .topbar-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: var(--text);
+    }
+    .topbar-logo-mark {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+    .topbar-logo-mark svg.lucide,
+    .topbar-logo-mark [data-lucide] {
+      width: 13px;
+      height: 13px;
+      stroke-width: 2.25;
+    }
+    .topbar-search {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .topbar-search > svg.lucide,
+    .topbar-search > [data-lucide] {
+      position: absolute;
+      left: 0.7rem;
+      color: var(--text-muted);
+      pointer-events: none;
+      width: 14px;
+      height: 14px;
+    }
+    .topbar-search input {
+      padding: 0.42rem 0.7rem 0.42rem 2rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: var(--font-sm);
+      width: 220px;
+      transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+    }
+    .topbar-search input::placeholder { color: var(--text-muted); }
+    .topbar-search input:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--primary-dim);
+    }
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0 !important;
+      color: var(--text-muted);
+    }
+    .icon-btn:hover { color: var(--text); }
+
+    /* ── Sidebar — bigger touch target, active indicator ── */
+    .sidebar-section-label {
+      font-size: var(--font-xs);
+      font-weight: 600;
+      color: var(--text-muted);
+      margin: var(--space-2) 0 var(--space-2) 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* NOTE: more specific selector than the legacy `.sidebar-btn` rule
+       below at line ~3149 so it wins on the same element class. */
+    #sidebar .sidebar-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      width: 100%;
+      text-align: left;
+      padding: 0.5rem 0.7rem;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-md);
+      color: var(--text);
+      font-size: var(--font-base);
+      cursor: pointer;
+      margin-bottom: 0.15rem;
+      position: relative;
+      transition: background 0.12s, color 0.12s;
+    }
+    #sidebar .sidebar-btn > svg.lucide,
+    #sidebar .sidebar-btn > [data-lucide] {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+    }
+    #sidebar .sidebar-btn:hover {
+      background: var(--surface2);
+    }
+    #sidebar .sidebar-btn:hover > svg.lucide,
+    #sidebar .sidebar-btn:hover > [data-lucide] {
+      color: var(--text);
+    }
+    #sidebar .sidebar-btn.active {
+      background: var(--primary-dim);
+      color: var(--primary);
+      font-weight: 600;
+    }
+    #sidebar .sidebar-btn.active > svg.lucide,
+    #sidebar .sidebar-btn.active > [data-lucide] {
+      color: var(--primary);
+    }
+    #sidebar .sidebar-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -0.8rem;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 0 2px 2px 0;
+      background: var(--primary);
+    }
+    .sidebar-storage {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: var(--font-xs);
+      color: var(--text-muted);
+    }
+    .sidebar-storage svg.lucide,
+    .sidebar-storage [data-lucide] {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Folder sidebar items refresh: keep behavior, soften rounded edges */
+    #sidebarFolders .sidebar-folder-item {
+      border-radius: var(--radius-md);
+    }
+
     /* ── Light Theme ─────────────────────────────── */
     :root.light {
       --bg: #ffffff;
@@ -3138,6 +3330,10 @@
       --text-dim: #aaa;
       --border: #e0e0e0;
       --border-bright: #d0d0d0;
+      /* Light-theme shadow tokens — softer than the dark variant. */
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.08);
+      --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
     }
     :root.light body { background-image: none; }
 
@@ -3273,6 +3469,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="https://js.tosspayments.com/v2/standard"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
 <script src="/js/markdown.js"></script>
 </head>
 <body>
@@ -3280,20 +3477,34 @@
 <!-- Top Bar -->
 <div id="topBar" style="position:fixed; top:0; left:0; right:0; height:48px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; padding:0 1rem; z-index:9999;">
   <div style="display:flex; align-items:center; gap:0.6rem;">
-    <button id="topBarMenuBtn" style="display:none; background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1.2rem; padding:0.2rem 0.4rem;" onclick="toggleSidebar()">☰</button>
-    <span style="font-size:1.1rem;">📝</span>
-    <span style="font-weight:700; font-size:0.95rem; color:var(--text);">LectureNote AI</span>
+    <button id="topBarMenuBtn" class="icon-btn" style="display:none;" onclick="toggleSidebar()" aria-label="메뉴">
+      <i data-lucide="menu"></i>
+    </button>
+    <span class="topbar-logo">
+      <span class="topbar-logo-mark"><i data-lucide="notebook-pen"></i></span>
+      <span style="font-weight:700; font-size:0.95rem;">LectureNote AI</span>
+    </span>
   </div>
   <div style="display:flex; align-items:center; gap:0.5rem;">
-    <input id="globalSearchInput" type="text" placeholder="검색..." style="padding:0.3rem 0.8rem; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:0.82rem; width:200px;" />
-    <button id="loginBtn" class="action-btn" onclick="loginWithGoogle()" style="font-size:0.82rem;">🔑 로그인</button>
+    <div class="topbar-search">
+      <i data-lucide="search"></i>
+      <input id="globalSearchInput" type="text" placeholder="검색..." />
+    </div>
+    <button id="loginBtn" class="action-btn" onclick="loginWithGoogle()" style="font-size:0.82rem; display:inline-flex; align-items:center; gap:0.35rem;">
+      <i data-lucide="log-in" class="icon-sm"></i>
+      <span>로그인</span>
+    </button>
     <div id="userInfo" style="display:none; align-items:center; gap:0.4rem;">
       <img id="userAvatar" style="width:24px; height:24px; border-radius:50%; border:1px solid var(--border);" />
       <span id="userName" style="font-size:0.8rem; color:var(--text); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
       <button class="action-btn" onclick="logout()" style="font-size:0.75rem; padding:0.2rem 0.5rem;">로그아웃</button>
     </div>
-    <button class="action-btn" id="themeToggleBtn" onclick="toggleTheme()">☀️</button>
-    <button class="action-btn" id="settingsBtn" onclick="toggleSettings()">⚙️</button>
+    <button class="action-btn icon-btn" id="themeToggleBtn" onclick="toggleTheme()" aria-label="테마 변경">
+      <i data-lucide="sun"></i>
+    </button>
+    <button class="action-btn icon-btn" id="settingsBtn" onclick="toggleSettings()" aria-label="설정">
+      <i data-lucide="settings"></i>
+    </button>
   </div>
 </div>
 
@@ -3338,22 +3549,37 @@
 
 <!-- Sidebar -->
 <div id="sidebar" style="position:fixed; top:48px; left:0; bottom:0; width:240px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:9998; transition:transform 0.2s;">
-  <div style="padding:0.8rem; border-bottom:1px solid var(--border);">
-    <button class="sidebar-btn active" data-view="home" onclick="switchView('home')">🏠 홈</button>
-    <button class="sidebar-btn" data-view="new" onclick="switchView('new')">✨ 새 노트</button>
-    <button class="sidebar-btn" data-view="transcripts" onclick="switchView('transcripts')">🎙 내 녹취록</button>
+  <div style="padding:0.9rem 0.8rem 0.5rem; border-bottom:1px solid var(--border);">
+    <button class="sidebar-btn active" data-view="home" onclick="switchView('home')">
+      <i data-lucide="home"></i>
+      <span>홈</span>
+    </button>
+    <button class="sidebar-btn" data-view="new" onclick="switchView('new')">
+      <i data-lucide="file-plus"></i>
+      <span>새 노트</span>
+    </button>
+    <button class="sidebar-btn" data-view="transcripts" onclick="switchView('transcripts')">
+      <i data-lucide="mic"></i>
+      <span>내 녹취록</span>
+    </button>
   </div>
-  <div style="padding:0.8rem; flex:1; overflow-y:auto;">
-    <div style="font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">폴더</div>
+  <div style="padding:0.7rem 0.8rem; flex:1; overflow-y:auto;">
+    <div class="sidebar-section-label">폴더</div>
     <div id="sidebarFolders"></div>
-    <button class="sidebar-folder-add" onclick="createFolderFromSidebar()">+ 새 폴더</button>
+    <button class="sidebar-folder-add" onclick="createFolderFromSidebar()">
+      <i data-lucide="folder-plus" class="icon-sm"></i>
+      <span>새 폴더</span>
+    </button>
   </div>
-  <div style="padding:0.5rem 0.8rem; border-top:1px solid var(--border);">
-    <div id="sidebarUserInfo" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.3rem;">
+  <div style="padding:0.6rem 0.8rem; border-top:1px solid var(--border);">
+    <div id="sidebarUserInfo" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
       <img id="sidebarAvatar" style="width:20px; height:20px; border-radius:50%;" />
       <span id="sidebarUserName" style="font-size:0.78rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;"></span>
     </div>
-    <div style="font-size:0.72rem; color:var(--text-muted);">💾 <span id="sidebarStorageSize">0 MB</span> 사용 중</div>
+    <div class="sidebar-storage">
+      <i data-lucide="hard-drive"></i>
+      <span><span id="sidebarStorageSize">0 MB</span> 사용 중</span>
+    </div>
   </div>
 </div>
 
@@ -3821,6 +4047,7 @@
 </div>
 
 <script src="/js/constants.js"></script>
+<script src="/js/icons.js"></script>
 <script src="/js/storage.js"></script>
 <script src="/js/firestore_sync.js"></script>
 <script src="/js/transcripts_store.js"></script>

@@ -246,7 +246,16 @@ function showToast(msg) {
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('light');
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  document.getElementById('themeToggleBtn').textContent = isLight ? '🌙' : '☀️';
+  // The button's icon flips between sun (in light mode → click to go dark)
+  // and moon (in dark mode → click to go light). We replace the inner
+  // <i data-lucide="…">; the MutationObserver in icons.js mounts the
+  // SVG automatically, but we trigger it explicitly too in case the
+  // observer is throttled.
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) {
+    btn.innerHTML = `<i data-lucide="${isLight ? 'moon' : 'sun'}"></i>`;
+    if (typeof window.mountLucideIcons === 'function') window.mountLucideIcons();
+  }
 }
 
 /* ═══════════════════════════════════════════════
