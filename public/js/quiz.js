@@ -366,7 +366,10 @@ Before finalizing each question you generate, check it against the list above. I
       }
     }
   } finally {
-    try { reader.releaseLock(); } catch (e) { /* already released */ }
+    // D2: cancel() actively closes the underlying body stream and releases
+    // the connection. releaseLock alone leaves the stream open until GC,
+    // which leaks connections on aborted/early-exit paths. Matches api.js.
+    reader.cancel().catch(() => {});
   }
 
   const responseTimeMs = Date.now() - t0;
@@ -586,6 +589,10 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
         .filter(Boolean);
 
       const isNotionQuiz = area === document.getElementById('notionQuizArea');
+      // D1: cancel any in-flight quiz before starting a new one. Without this,
+      // re-clicking Generate while a quiz is mid-stream leaks the old request —
+      // both run concurrently, doubling server load and burning tokens.
+      _quizAbortController?.abort();
       _quizAbortController = new AbortController();
       const { questions, debugInfo } = await generateQuizStream(
         noteText, settings, prevQuestions,

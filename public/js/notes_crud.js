@@ -143,6 +143,13 @@ async function collectMdFromZip(zip, pathPrefix = '', depth = 0) {
 }
 
 async function parseNotionFile(file) {
+  // C1: OOM guard — Notion exports can be large; a 500MB zip would crash
+  // the JSZip loader. Same 200MB cap as PPT/PDF for consistency.
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    alert(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+    return null;
+  }
+
   let combinedMd = '';
 
   if (file.name.toLowerCase().endsWith('.md')) {

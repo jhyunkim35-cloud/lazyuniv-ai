@@ -134,6 +134,12 @@ function renderRecSlots() {
         showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
         return;
       }
+      // C1: OOM guard — reject absurdly large transcripts before they hit memory.
+      // Real lecture transcripts are <1MB; 200MB is just catching pathological input.
+      if (f.size > MAX_FILE_SIZE_BYTES) {
+        showToast(`⚠️ 녹취록 파일이 너무 큽니다 (${(f.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+        return;
+      }
       setRecSlotFile(item.id, f);
     });
 
@@ -182,6 +188,11 @@ function renderRecSlots() {
         const f = e.dataTransfer.files[0];
         if (!f.name.toLowerCase().endsWith('.txt')) {
           showToast('⚠️ .txt 파일만 업로드할 수 있습니다.');
+          return;
+        }
+        // C1: OOM guard — see fileInput change handler above.
+        if (f.size > MAX_FILE_SIZE_BYTES) {
+          showToast(`⚠️ 녹취록 파일이 너무 큽니다 (${(f.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
           return;
         }
         setRecSlotFile(item.id, f);
