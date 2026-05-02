@@ -141,8 +141,12 @@ module.exports = async (req, res) => {
   // isFirstCall path so any old client / non-pipeline call (quiz,
   // classify, vision) keeps working unchanged.
   //
-  // The analysisSessions collection is configured with a 7-day TTL on
-  // `createdAt` in Firebase Console → Firestore → TTL policies.
+  // The analysisSessions collection is configured with a TTL on
+  // `expireAt` in GCP Console → Firestore → TTL policies. We write
+  // expireAt = now + 7 days so docs are deleted ~7 days after creation.
+  // (Firestore TTL deletes when the timestamp value is older than the
+  // current time, so we cannot use createdAt directly — that would
+  // trigger immediate deletion.)
   // ─────────────────────────────────────────────────────────────────
   const analysisId = typeof req.body?.analysisId === 'string' ? req.body.analysisId : null;
   const feature = req.body?.feature || 'unknown';
@@ -275,8 +279,13 @@ module.exports = async (req, res) => {
           const fresh = await tx.get(sessionRef);
           if (fresh.exists) return; // another concurrent request already billed
 
+          // expireAt = now + 7 days. Stored as a client-computed Timestamp
+          // (not serverTimestamp) because TTL policies need a concrete
+          // future time to compare against, not a sentinel.
+          const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
           tx.create(sessionRef, {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            expireAt: admin.firestore.Timestamp.fromMillis(Date.now() + SEVEN_DAYS_MS),
             feature: 'noteAnalysis',
             slot: quota.slot,
           });
