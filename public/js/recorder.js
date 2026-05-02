@@ -11,8 +11,10 @@
 //   4. Poll /api/assemblyai?action=status&id=...   every 6 seconds
 //   5. When completed, wrap text into a File object and feed addRecSlot(file)
 //
-// Depends on: constants.js (storage, currentUser, txtFiles), pptx_parser.js (addRecSlot, setRecSlotFile),
-//             ui.js (showToast), firebase_auth.js (currentUser ID token), api.js (none).
+// Depends on: constants.js (storage, currentUser, txtFiles, _currentView), pptx_parser.js (addRecSlot, setRecSlotFile),
+//             ui.js (showToast), firebase_auth.js (currentUser ID token), api.js (none),
+//             transcripts_store.js (saveTranscriptFS) — optional; if absent, recorder still works
+//             but transcripts won't be persisted to the user's transcript store.
 
 (function () {
   // ── Audio MIME detection (browser quirks) ───────────────
@@ -65,6 +67,14 @@
     pollHandle: null,
     targetSlotId: null,   // existing rec slot id, if user clicked '녹음' on an empty slot
     objectUrl: null,      // for preview playback
+    // ── Recorded-audio bookkeeping (new in transcript-store flow) ──
+    // We hold onto Storage path + total recording duration so that, after
+    // STT completes, we can:
+    //   1. save the transcript to the user's transcript store with metadata
+    //   2. delete the original audio (per user's "audio: delete after STT"
+    //      decision — saves a lot of Storage quota)
+    audioStoragePath: null,   // 'users/{uid}/recordings/{ts}_..._name.ext'
+    recordingDurationSec: null, // null for file uploads (no duration knowable cheaply)
   };
 
   function ensureModal() {
@@ -372,6 +382,13 @@
       return;
     }
 
+    // Capture total duration (paused chunks already accumulated into elapsedAtPause;
+    // if we stopped while still recording, add the final running segment).
+    const finalMs = modalState.phase === 'recording'
+      ? modalState.elapsedAtPause + (Date.now() - modalState.startTime)
+      : modalState.elapsedAtPause;
+    modalState.recordingDurationSec = Math.max(1, Math.floor(finalMs / 1000));
+
     const filename = 'recording_' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
     handleAudioBlob(blob, filename);
   }
@@ -409,6 +426,9 @@
     const path = 'users/' + currentUser.uid + '/recordings/'
                + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
                + '_' + filename.replace(/[^\w.-]/g, '_');
+
+    // Remember path so deliverTranscript can delete the audio after STT.
+    modalState.audioStoragePath = path;
 
     let downloadUrl;
     try {
@@ -509,7 +529,7 @@
     return `${m}분 ${s}초`;
   }
 
-  function deliverTranscript(text, sourceFilename) {
+  async function deliverTranscript(text, sourceFilename) {
     if (modalState.pollHandle) { clearTimeout(modalState.pollHandle); modalState.pollHandle = null; }
 
     const cleanText = (text || '').trim();
@@ -520,28 +540,82 @@
       return;
     }
 
+    // ── Step 1: persist to the user's transcript store ───────────────
+    // This MUST happen before we touch the new-note slots, because the
+    // user's primary expectation now is "every recording I make ends up
+    // in 내 녹취록". Slot integration is a secondary convenience and
+    // will silently no-op when nobody's on the new-note page.
+    let savedTranscript = null;
+    if (typeof saveTranscriptFS === 'function') {
+      try {
+        savedTranscript = await saveTranscriptFS({
+          text: cleanText,
+          audioFilename: sourceFilename || '',
+          durationSec: modalState.recordingDurationSec,
+        });
+      } catch (err) {
+        // Non-fatal — we still want to deliver the text into a slot below
+        // so the user can at least analyze it right now. We just couldn't
+        // save it for later. Surface this loudly though, because losing a
+        // 90-min lecture's transcript silently would be terrible.
+        console.error('[recorder] saveTranscriptFS failed:', err);
+        window.showToast?.('⚠️ 녹취록 자동 저장에 실패했습니다. 슬롯에는 추가됩니다.');
+      }
+    }
+
+    // ── Step 2: delete the original audio from Storage ───────────────
+    // User chose "delete after STT" for cost reasons. Best-effort —
+    // a stray audio file is fine, just chews quota.
+    if (modalState.audioStoragePath) {
+      const pathToDelete = modalState.audioStoragePath;
+      modalState.audioStoragePath = null;
+      storage.ref(pathToDelete).delete().catch((e) => {
+        console.warn('[recorder] audio delete failed (non-fatal):', e.message);
+      });
+    }
+
+    // ── Step 3: feed text into the new-note slots (existing behavior) ─
     // Wrap as a File so the existing pipeline (which reads .file.text())
     // accepts it transparently.
     const baseName = (sourceFilename || 'recording').replace(/\.[^.]+$/, '');
     const file = new File([cleanText], baseName + '.txt', { type: 'text/plain' });
 
     // Find an empty slot to fill, or push a new one.
+    let didFillSlot = false;
     if (modalState.targetSlotId != null && typeof setRecSlotFile === 'function') {
       setRecSlotFile(modalState.targetSlotId, file);
+      didFillSlot = true;
     } else {
       // Try to fill the first empty existing slot — feels more natural than always appending.
       const emptySlot = (typeof txtFiles !== 'undefined') ? txtFiles.find(s => !s.file) : null;
       if (emptySlot && typeof setRecSlotFile === 'function') {
         setRecSlotFile(emptySlot.id, file);
-      } else if (typeof addRecSlot === 'function') {
+        didFillSlot = true;
+      } else if (typeof addRecSlot === 'function' && _currentView === 'new') {
+        // Only auto-append a new slot when the user is actually on the
+        // new-note page — otherwise this would silently mutate slot
+        // state for a future analysis and surprise the user. When they
+        // recorded from home, the transcript is already in the store.
         addRecSlot(file);
+        didFillSlot = true;
       }
     }
 
     switchScreen('done');
     const status = document.getElementById('recDoneStatus');
-    if (status) status.textContent = `변환 완료 · ${cleanText.length.toLocaleString()}자`;
-    window.showToast?.('🎙️ 녹취록이 추가되었습니다.');
+    if (status) {
+      const lenLabel = `${cleanText.length.toLocaleString()}자`;
+      const savedLabel = savedTranscript ? ' · 내 녹취록에 저장됨' : '';
+      status.textContent = `변환 완료 · ${lenLabel}${savedLabel}`;
+    }
+
+    if (didFillSlot && savedTranscript) {
+      window.showToast?.('🎙️ 녹취록이 슬롯에 추가되고 내 녹취록에도 저장되었습니다.');
+    } else if (savedTranscript) {
+      window.showToast?.('🎙️ 내 녹취록에 저장되었습니다.');
+    } else if (didFillSlot) {
+      window.showToast?.('🎙️ 녹취록이 추가되었습니다.');
+    }
   }
 
   // ── Public entry ────────────────────────────────────────
