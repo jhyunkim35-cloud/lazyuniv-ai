@@ -252,18 +252,23 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     const text = document.getElementById('emptyHomeMsgText');
     const sub  = document.getElementById('emptyHomeSubText');
     const btn  = document.getElementById('emptyHomeNewBtn');
+    // Empty-state icon: replace emoji textContent with a Lucide SVG. The
+    // outer #emptyHomeIcon container already styles the 56×56 rounded
+    // background — we just swap its child icon to match the state.
+    const emptyIconHtml = (name) =>
+      `<i data-lucide="${name}" style="width:26px; height:26px; color:var(--text-muted);"></i>`;
     if (activeQuery) {
-      if (icon) icon.textContent = '🔍';
+      if (icon) icon.innerHTML = emptyIconHtml('search-x');
       if (text) text.textContent = `"${activeQuery}" 검색 결과가 없습니다`;
       if (sub)  sub.textContent  = '다른 검색어를 시도해보세요';
       if (btn)  btn.style.display = 'none';
     } else if (_activeFolderId) {
-      if (icon) icon.textContent = '📂';
+      if (icon) icon.innerHTML = emptyIconHtml('folder-open');
       if (text) text.textContent = '이 폴더에 노트가 없습니다';
       if (sub)  sub.textContent  = '새 분석을 실행하거나 다른 노트를 이동하세요';
       if (btn)  btn.style.display = 'none';
     } else {
-      if (icon) icon.textContent = '📝';
+      if (icon) icon.innerHTML = emptyIconHtml('notebook-pen');
       if (text) text.textContent = '아직 저장된 노트가 없습니다';
       if (sub)  sub.textContent  = 'AI 분석을 완료하면 자동으로 저장됩니다';
       if (btn)  btn.style.display = '';

@@ -3491,11 +3491,14 @@
     /* Folder back button — chevron + label. Display managed inline via
        JS (style="display:none" → '' on folder enter); we restyle only. */
     #folderBackBtn {
+      display: inline-flex;
       align-items: center;
       gap: 0.25rem;
       font-size: var(--font-sm);
       padding: 0.2rem 0.4rem 0.2rem 0;
       border-radius: var(--radius-xs);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     #folderBackBtn svg.lucide,
     #folderBackBtn [data-lucide] {
@@ -3505,6 +3508,25 @@
     #folderBackBtn:hover {
       text-decoration: none;
       background: var(--primary-dim);
+    }
+    /* Folder header title — keep on a single line and ellipsize when the
+       action-button group on the right squeezes the available width. The
+       inline style on the element gives it `display:flex; gap:0.4rem`, so
+       we add the truncation behavior here. The flex children (icon, span)
+       need min-width:0 to let the span actually shrink. */
+    #allNotesTitle {
+      min-width: 0;
+      flex-shrink: 1;
+    }
+    #allNotesTitle > span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+    #allNotesTitle svg.lucide,
+    #allNotesTitle [data-lucide] {
+      flex-shrink: 0;
     }
 
     /* Action-btn icon alignment — buttons that have <i data-lucide> + <span> */
@@ -3563,8 +3585,8 @@
     .sidebar-folder-add:hover { color:var(--primary); }
 
     /* ── Note Cards ──────────────────────────────── */
-    .note-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:1rem; cursor:pointer; transition:all 0.15s; position:relative; overflow:hidden; display:flex; align-items:flex-start; gap:0.5rem; }
-    .note-card:hover { border-color:var(--primary); transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .note-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1rem; cursor:pointer; transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease; position:relative; overflow:hidden; display:flex; align-items:flex-start; gap:0.5rem; }
+    .note-card:hover { border-color:var(--border-bright); transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,0.12); }
     .note-card-content { flex:1; min-width:0; }
     .note-card-folder { font-size:0.72rem; color:var(--primary); font-weight:600; margin-bottom:0.3rem; }
     .note-card-title { font-size:0.95rem; font-weight:700; color:var(--text); margin-bottom:0.4rem; line-height:1.3; }
@@ -3589,8 +3611,8 @@
     #bulkSelectToggleBtn.active { border-color:var(--primary); color:var(--primary); background:var(--primary-dim); }
 
     /* ── Folder Cards ────────────────────────────── */
-    .folder-card { background:var(--surface); border:2px dashed var(--border-bright); border-radius:10px; padding:1rem; cursor:pointer; transition:all 0.15s; position:relative; display:flex; align-items:center; gap:0.75rem; }
-    .folder-card:hover { border-color:var(--primary); transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.15); background:var(--surface2); }
+    .folder-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1rem; cursor:pointer; transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease; position:relative; display:flex; align-items:center; gap:0.75rem; }
+    .folder-card:hover { border-color:var(--border-bright); transform:translateY(-1px); box-shadow:0 2px 8px rgba(0,0,0,0.12); background:var(--surface2); }
     .folder-card-icon { font-size:2rem; flex-shrink:0; line-height:1; }
     .folder-card-info { flex:1; min-width:0; }
     .folder-card-name { font-size:0.95rem; font-weight:700; color:var(--text); margin-bottom:0.25rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
