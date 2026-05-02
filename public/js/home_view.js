@@ -17,14 +17,14 @@ function buildFolderCard(folder, noteCount) {
     ? examPlanBadgeHtml(folder.examPlan, noteCount)
     : '';
   card.innerHTML = `
-    <div class="folder-card-icon">📁</div>
+    <div class="folder-card-icon"><i data-lucide="folder"></i></div>
     <div class="folder-card-info">
       <div class="folder-card-name">${colorDot}${escHtml(folder.name)}${examBadge}</div>
       <div class="folder-card-count">${noteCount}개의 노트</div>
     </div>
     <div class="folder-card-actions">
-      <button title="이름 변경">✏️</button>
-      <button title="삭제">🗑</button>
+      <button title="이름 변경"><i data-lucide="pencil"></i></button>
+      <button title="삭제"><i data-lucide="trash-2"></i></button>
     </div>`;
   const [renameBtn, deleteBtn] = card.querySelectorAll('.folder-card-actions button');
   renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderEditModal(folder.id, folder.name, folder.color || null); });
@@ -295,13 +295,20 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
   const sourceText  = isNotion ? (note.markdownContent || '') : (note.notesText || '');
   const preview = sourceText
     .replace(/^#+\s+.*/gm, '').replace(/\*\*/g, '').replace(/\n+/g, ' ').trim().slice(0, 100);
-  const displayTitle = isNotion ? '📓 ' + (note.title || '제목없음') : (note.title || '제목없음');
+  // Title is plain — the "노션" badge in the corner already signals type, no
+  // need for a redundant emoji prefix.
+  const displayTitle = note.title || '제목없음';
   const notionBadge  = isNotion ? '<span class="notion-type-badge">노션</span>' : '';
+  // Folder pill: color dot + folder name (no folder emoji — the dot is the
+  // folder marker). Unfiled notes use a small file icon.
+  const folderPill = folderName
+    ? `${colorDot}${escHtml(folderName)}`
+    : `<i data-lucide="file-text" class="icon-xs"></i><span>미분류</span>`;
   card.innerHTML = `
     <input type="checkbox" class="note-card-checkbox">
-    <span class="note-card-drag-handle">⠿</span>
+    <span class="note-card-drag-handle"><i data-lucide="grip-vertical"></i></span>
     <div class="note-card-content">
-      <div class="note-card-folder">${folderName ? colorDot + '📁 ' + escHtml(folderName) : '📄 미분류'}</div>
+      <div class="note-card-folder">${folderPill}</div>
       <div class="note-card-title">${escHtml(displayTitle)}</div>
       <div class="note-card-preview">${escHtml(preview)}</div>
       <div class="note-card-footer">
@@ -311,9 +318,9 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
     </div>
     ${notionBadge}
     <div class="note-card-actions">
-      <button title="이름 변경">✏️</button>
-      <button title="폴더 이동">📁</button>
-      <button title="삭제">🗑</button>
+      <button title="이름 변경"><i data-lucide="pencil"></i></button>
+      <button title="폴더 이동"><i data-lucide="folder-input"></i></button>
+      <button title="삭제"><i data-lucide="trash-2"></i></button>
     </div>`;
   const checkbox = card.querySelector('.note-card-checkbox');
   checkbox.addEventListener('click', e => {
@@ -342,7 +349,7 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
     const ejectBtn = document.createElement('button');
     ejectBtn.className = 'note-eject-btn';
     ejectBtn.title = '폴더에서 내보내기';
-    ejectBtn.textContent = '📤';
+    ejectBtn.innerHTML = '<i data-lucide="log-out"></i>';
     ejectBtn.addEventListener('click', async e => {
       e.stopPropagation();
       const updated = Object.assign({}, note, { folderId: null });
