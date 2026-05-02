@@ -2597,6 +2597,279 @@
       margin-bottom: 1rem;
     }
 
+    /* ─────────────────────────────────────────────────
+       Home record card + transcripts list/preview
+       (added with the home-page-recording feature)
+       ───────────────────────────────────────────────── */
+    .home-record-card {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .home-record-card:hover {
+      border-color: var(--primary-dim, var(--primary));
+      box-shadow: 0 2px 12px rgba(124, 58, 237, 0.10);
+    }
+    .home-record-main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.2rem 1.4rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+    }
+    .home-record-icon {
+      flex: 0 0 auto;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2, var(--primary)));
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+    .home-record-text { flex: 1; min-width: 0; }
+    .home-record-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.18rem;
+    }
+    .home-record-sub {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .home-record-link {
+      flex: 0 0 auto;
+      align-self: stretch;
+      padding: 0 1.2rem;
+      background: transparent;
+      border: none;
+      border-left: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: color 0.12s, background 0.12s;
+    }
+    .home-record-link:hover {
+      color: var(--primary);
+      background: var(--surface2);
+    }
+    .home-record-link span#myTranscriptsCount {
+      color: var(--text);
+      margin: 0 0.15rem;
+    }
+    @media (max-width: 640px) {
+      .home-record-card { flex-direction: column; }
+      .home-record-link {
+        border-left: none;
+        border-top: 1px solid var(--border);
+        padding: 0.6rem 1.2rem;
+        align-self: auto;
+      }
+    }
+
+    .transcript-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.95rem 1rem 0.85rem;
+      cursor: pointer;
+      transition: box-shadow 0.15s, border-color 0.15s, transform 0.08s;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .transcript-card:hover {
+      border-color: var(--primary-dim, var(--primary));
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    .transcript-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.4rem;
+    }
+    .transcript-card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.35;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .transcript-card-menu-btn {
+      flex: 0 0 auto;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+    .transcript-card-menu-btn:hover { background: var(--surface2); color: var(--text); }
+    .transcript-card-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      display: flex;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+    .transcript-card-preview {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+    .transcript-truncated-tag {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--danger, #ef4444);
+      background: rgba(239, 68, 68, 0.12);
+      padding: 0.05rem 0.4rem;
+      border-radius: 4px;
+      margin-left: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .transcript-card-menu {
+      position: absolute;
+      width: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+      padding: 0.3rem;
+      z-index: 9000;
+      display: flex;
+      flex-direction: column;
+    }
+    .transcript-card-menu button {
+      background: transparent;
+      border: none;
+      padding: 0.55rem 0.7rem;
+      text-align: left;
+      cursor: pointer;
+      border-radius: 5px;
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    .transcript-card-menu button:hover { background: var(--surface2); }
+    .transcript-card-menu button.danger { color: var(--danger, #ef4444); }
+    .transcript-card-menu button.danger:hover { background: rgba(239, 68, 68, 0.12); }
+
+    .transcript-preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .transcript-preview-modal.hidden { display: none; }
+    .transcript-preview-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+    }
+    .transcript-preview-panel {
+      position: relative;
+      width: min(720px, 92vw);
+      max-height: 86vh;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    }
+    .transcript-preview-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 1rem 1.2rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      gap: 0.6rem;
+    }
+    .transcript-preview-title-wrap { flex: 1; min-width: 0; }
+    .transcript-preview-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.2rem;
+      word-break: break-word;
+    }
+    .transcript-preview-meta {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .transcript-preview-close {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      line-height: 1;
+      border-radius: 6px;
+    }
+    .transcript-preview-close:hover { background: var(--surface2); color: var(--text); }
+    .transcript-preview-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem 1.2rem;
+      font-size: 0.92rem;
+      line-height: 1.65;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .transcript-preview-footer {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      padding: 0.7rem 1.2rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .transcript-preview-footer .action-btn.danger {
+      color: var(--danger, #ef4444);
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+    .transcript-preview-footer .action-btn.danger:hover {
+      background: rgba(239, 68, 68, 0.12);
+    }
+
     /* ── Light Theme ─────────────────────────────── */
     :root.light {
       --bg: #ffffff;
@@ -2811,6 +3084,7 @@
   <div style="padding:0.8rem; border-bottom:1px solid var(--border);">
     <button class="sidebar-btn active" data-view="home" onclick="switchView('home')">🏠 홈</button>
     <button class="sidebar-btn" data-view="new" onclick="switchView('new')">✨ 새 노트</button>
+    <button class="sidebar-btn" data-view="transcripts" onclick="switchView('transcripts')">🎙 내 녹취록</button>
   </div>
   <div style="padding:0.8rem; flex:1; overflow-y:auto;">
     <div style="font-size:0.75rem; font-weight:600; color:var(--text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em;">폴더</div>
@@ -2894,6 +3168,26 @@
 
   <!-- ═══ HOME VIEW ═══ -->
   <div id="homeView">
+    <!-- Top: jump-into-recording card. Visible on the unfiltered home only
+         (folder views hide it via JS) so it's the first thing a user sees
+         when they land. Click → opens the recorder modal directly without
+         needing to go through the new-note flow. The "내 녹취록 N개" link
+         opens the transcript browser. -->
+    <div id="homeRecordSection" style="margin-bottom:1.5rem;">
+      <div class="home-record-card">
+        <button id="homeRecordBtn" class="home-record-main" type="button">
+          <div class="home-record-icon">🎙</div>
+          <div class="home-record-text">
+            <div class="home-record-title">강의 녹음 시작</div>
+            <div class="home-record-sub">강의실에서 바로 녹음 → AI가 텍스트로 변환 → 내 녹취록에 자동 저장</div>
+          </div>
+        </button>
+        <button id="myTranscriptsLink" class="home-record-link" type="button" onclick="switchView('transcripts')">
+          내 녹취록 <span id="myTranscriptsCount">0</span>개 <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </div>
+
     <div id="recentSection" style="margin-bottom:1.5rem;">
       <h2 style="font-size:1.1rem; font-weight:700; color:var(--text); margin-bottom:0.8rem;">최근 노트</h2>
       <div id="recentNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
@@ -2919,6 +3213,26 @@
         <div id="emptyHomeSubText" style="font-size:0.82rem; margin-bottom:1.2rem;">AI 분석을 완료하면 자동으로 저장됩니다</div>
         <button id="emptyHomeNewBtn" class="action-btn" style="padding:0.5rem 1.4rem; font-size:0.88rem;" onclick="switchView('new')">✨ 새 노트 만들기</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ═══ TRANSCRIPTS VIEW ═══ -->
+  <!-- Stand-alone browser for STT-saved lecture transcripts. Card layout
+       mirrors note cards. The preview modal is built lazily by
+       transcripts_view.js so we don't carry its markup in the HTML. -->
+  <div id="transcriptsView" style="display:none;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
+      <h2 style="font-size:1.1rem; font-weight:700; color:var(--text);">
+        🎙 내 녹취록 <span id="transcriptsViewCount" style="color:var(--text-muted); font-weight:400; margin-left:0.3rem;">0</span>
+      </h2>
+      <button class="action-btn" type="button" onclick="if (typeof openRecorderModal === 'function') openRecorderModal()">+ 새 녹음</button>
+    </div>
+    <div id="transcriptsGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
+    <div id="emptyTranscriptsMsg" style="display:none; text-align:center; padding:3rem; color:var(--text-muted);">
+      <div style="font-size:3.5rem; margin-bottom:0.8rem;">🎙</div>
+      <div style="font-size:1rem; font-weight:600; color:var(--text); margin-bottom:0.3rem;">아직 저장된 녹취록이 없습니다</div>
+      <div style="font-size:0.82rem; margin-bottom:1.2rem;">홈에서 녹음하면 이곳에 자동으로 저장됩니다</div>
+      <button class="action-btn" type="button" style="padding:0.5rem 1.4rem; font-size:0.88rem;" onclick="if (typeof openRecorderModal === 'function') openRecorderModal()">🎙 녹음 시작</button>
     </div>
   </div>
 
@@ -3264,6 +3578,7 @@
 <script src="/js/notion_clipboard.js"></script>
 <script src="/js/folders.js"></script>
 <script src="/js/home_view.js"></script>
+<script src="/js/transcripts_view.js"></script>
 <script src="/js/bulk.js"></script>
 <script src="/js/firebase_auth.js"></script>
 <script src="/js/payment.js"></script>
@@ -3327,6 +3642,14 @@ let draggedNoteId  = null;       // id of the note being dragged (legacy, kept f
 
 document.getElementById('addRecBtn').addEventListener('click', () => addRecSlot());
 document.getElementById('recordBtn').addEventListener('click', () => {
+  if (typeof window.openRecorderModal === 'function') window.openRecorderModal();
+});
+
+// Home-page record button — same handler as the new-note record button,
+// but the modal logic in recorder.js detects _currentView and skips the
+// "auto-add a new rec slot" branch when fired from home (the transcript is
+// saved to the store either way).
+document.getElementById('homeRecordBtn').addEventListener('click', () => {
   if (typeof window.openRecorderModal === 'function') window.openRecorderModal();
 });
 

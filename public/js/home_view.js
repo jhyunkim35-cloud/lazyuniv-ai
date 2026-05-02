@@ -103,6 +103,15 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   if (recentSection) recentSection.style.display = isFolderView ? 'none' : '';
   if (folderBackBtn) folderBackBtn.style.display  = isFolderView ? ''     : 'none';
 
+  // Hide the home-page record card while inside a folder view — it belongs
+  // on the unfiltered home only.
+  const homeRecordSection = document.getElementById('homeRecordSection');
+  if (homeRecordSection) homeRecordSection.style.display = isFolderView ? 'none' : '';
+
+  // Refresh the "내 녹취록 N개" count on the home record card. Fire-and-forget;
+  // best-effort, no need to block the rest of the render on a Firestore round trip.
+  if (typeof updateMyTranscriptsCount === 'function') updateMyTranscriptsCount();
+
   // Show exam-review button only in folder view with 2+ notes
   const examReviewBtn = document.getElementById('examReviewBtn');
   if (examReviewBtn) {

@@ -282,11 +282,14 @@ function switchView(view) {
   _currentView = view;
   document.getElementById('homeView').style.display    = view === 'home' ? '' : 'none';
   document.getElementById('newNoteView').style.display = view === 'new'  ? '' : 'none';
+  const transcriptsViewEl = document.getElementById('transcriptsView');
+  if (transcriptsViewEl) transcriptsViewEl.style.display = view === 'transcripts' ? '' : 'none';
   document.querySelectorAll('#sidebar .sidebar-btn[data-view]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
   closeSidebar();
   if (view === 'home') renderHomeView();
+  if (view === 'transcripts' && typeof renderTranscriptsView === 'function') renderTranscriptsView();
   if (view === 'new') {
     // Clear stale action-button state from any previously loaded note
     [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = true; });
