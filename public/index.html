@@ -2899,7 +2899,9 @@
        Exam plan badges + registration modal
        ───────────────────────────────────────────────── */
     .exam-badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.22rem;
       font-size: 0.68rem;
       font-weight: 700;
       padding: 0.12rem 0.45rem;
@@ -2907,6 +2909,12 @@
       vertical-align: middle;
       margin-left: 0.4rem;
       letter-spacing: 0.02em;
+    }
+    .exam-badge svg.lucide,
+    .exam-badge [data-lucide] {
+      width: 11px;
+      height: 11px;
+      stroke-width: 2;
     }
     .exam-badge-red    { background: rgba(239, 68, 68, 0.16);  color: #ef4444; }
     .exam-badge-orange { background: rgba(249, 115, 22, 0.16); color: #f97316; }
@@ -3319,6 +3327,206 @@
       border-radius: var(--radius-md);
     }
 
+    /* ─────────────────────────────────────────────────
+       UI overhaul (Phase 2): home view cards.
+       More-specific selectors override the legacy
+       .note-card / .folder-card / etc. rules above. We
+       tune radius, border, hover, and icon presentation
+       — behavior (drag, click, actions) is unchanged.
+       ───────────────────────────────────────────────── */
+    /* Home record card — top of home: bigger CTA, softer shadow */
+    .home-record-card {
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+    .home-record-card:hover {
+      box-shadow: var(--shadow-md);
+    }
+    .home-record-icon {
+      font-size: 0; /* no fallback emoji glyph; we render a Lucide SVG */
+    }
+    .home-record-icon svg.lucide,
+    .home-record-icon [data-lucide] {
+      width: 24px;
+      height: 24px;
+      color: #fff;
+      stroke-width: 2;
+    }
+    .home-record-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .home-record-link svg.lucide,
+    .home-record-link [data-lucide] {
+      transition: transform 0.15s;
+    }
+    .home-record-link:hover svg.lucide,
+    .home-record-link:hover [data-lucide] {
+      transform: translateX(2px);
+    }
+
+    /* Note + folder cards — unified radius and gentle hover */
+    #homeView .note-card {
+      border-radius: var(--radius-md);
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    #homeView .note-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+    #homeView .folder-card {
+      border: 1px solid var(--border);          /* was: 2px dashed */
+      border-radius: var(--radius-md);
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+    }
+    #homeView .folder-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+      background: var(--surface);                 /* was surface2 — keep subtler */
+    }
+
+    /* Folder card icon: compact gradient mark, like the topbar logo. */
+    #homeView .folder-card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-xs);
+      background: var(--primary-dim);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0;
+    }
+    #homeView .folder-card-icon svg.lucide,
+    #homeView .folder-card-icon [data-lucide] {
+      width: 18px;
+      height: 18px;
+      color: var(--primary);
+    }
+
+    /* Note card folder/file label — the small line above the title. */
+    .note-card-folder {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .note-card-folder svg.lucide,
+    .note-card-folder [data-lucide] {
+      width: 12px;
+      height: 12px;
+      color: currentColor;
+    }
+    .note-card-folder.unfiled {
+      color: var(--text-muted);
+    }
+
+    /* Drag handle ⠿ → grip icon. Same hover-reveal behavior. */
+    .note-card-drag-handle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.1rem;
+    }
+    .note-card-drag-handle svg.lucide,
+    .note-card-drag-handle [data-lucide] {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+    }
+
+    /* Card action buttons (rename / move / delete / eject). All
+       icon-only on hover-reveal — keep target size readable on touch. */
+    .note-card-actions button,
+    .folder-card-actions button {
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-xs);
+    }
+    .note-card-actions button svg.lucide,
+    .note-card-actions button [data-lucide],
+    .folder-card-actions button svg.lucide,
+    .folder-card-actions button [data-lucide] {
+      width: 14px;
+      height: 14px;
+    }
+    .note-eject-btn {
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-xs);
+    }
+    .note-eject-btn svg.lucide,
+    .note-eject-btn [data-lucide] {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Eject drop zone: keep the original display:none/'' toggle from
+       home_view.js intact — we only restyle the box. The icon and label
+       sit inline; we tweak font-size/border/radius for the new look. */
+    #ejectDropZone {
+      border: 1.5px dashed var(--border-bright);
+      border-radius: var(--radius-md);
+      padding: 0.65rem 0.8rem;
+      color: var(--text-muted);
+      font-size: var(--font-sm);
+      margin-bottom: 0.75rem;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    #ejectDropZone svg.lucide,
+    #ejectDropZone [data-lucide] {
+      width: 14px;
+      height: 14px;
+      vertical-align: -2px;
+      margin-right: 0.3rem;
+    }
+
+    /* Folder back button — chevron + label. Display managed inline via
+       JS (style="display:none" → '' on folder enter); we restyle only. */
+    #folderBackBtn {
+      align-items: center;
+      gap: 0.25rem;
+      font-size: var(--font-sm);
+      padding: 0.2rem 0.4rem 0.2rem 0;
+      border-radius: var(--radius-xs);
+    }
+    #folderBackBtn svg.lucide,
+    #folderBackBtn [data-lucide] {
+      vertical-align: -2px;
+      margin-right: 0.15rem;
+    }
+    #folderBackBtn:hover {
+      text-decoration: none;
+      background: var(--primary-dim);
+    }
+
+    /* Action-btn icon alignment — buttons that have <i data-lucide> + <span> */
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .action-btn svg.lucide,
+    .action-btn [data-lucide] {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Folder title h2 inside folder view — folder icon prefix */
+    #allNotesTitle svg.lucide,
+    #allNotesTitle [data-lucide] {
+      width: 18px;
+      height: 18px;
+      color: var(--primary);
+    }
+
     /* ── Light Theme ─────────────────────────────── */
     :root.light {
       --bg: #ffffff;
@@ -3659,14 +3867,15 @@
     <div id="homeRecordSection" style="margin-bottom:1.5rem;">
       <div class="home-record-card">
         <button id="homeRecordBtn" class="home-record-main" type="button">
-          <div class="home-record-icon">🎙</div>
+          <div class="home-record-icon"><i data-lucide="mic"></i></div>
           <div class="home-record-text">
             <div class="home-record-title">강의 녹음 시작</div>
             <div class="home-record-sub">강의실에서 바로 녹음 → AI가 텍스트로 변환 → 내 녹취록에 자동 저장</div>
           </div>
         </button>
         <button id="myTranscriptsLink" class="home-record-link" type="button" onclick="switchView('transcripts')">
-          내 녹취록 <span id="myTranscriptsCount">0</span>개 <span aria-hidden="true">→</span>
+          <span>내 녹취록 <span id="myTranscriptsCount">0</span>개</span>
+          <i data-lucide="chevron-right" class="icon-sm"></i>
         </button>
       </div>
     </div>
@@ -3678,26 +3887,47 @@
     <div>
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
         <div style="display:flex; align-items:center; gap:0.4rem;">
-          <button id="folderBackBtn" style="display:none;" onclick="filterByFolder(null)">← 뒤로</button>
-          <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text);">모든 노트</h2>
+          <button id="folderBackBtn" style="display:none;" onclick="filterByFolder(null)">
+            <i data-lucide="chevron-left" class="icon-sm"></i>
+            <span>뒤로</span>
+          </button>
+          <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:0.4rem;">모든 노트</h2>
         </div>
         <div style="display:flex;gap:0.4rem;">
-          <button id="folderExamPlanBtn" class="action-btn" style="display:none;" onclick="if (window._activeFolderId && _activeFolderId !== 'none' && typeof openExamPlanModal === 'function') openExamPlanModal(_activeFolderId)">🎓 시험 등록</button>
-          <button id="examReviewBtn" class="action-btn" style="display:none;" onclick="launchExamReview()">📋 시험 대비 요약</button>
+          <button id="folderExamPlanBtn" class="action-btn" style="display:none;" onclick="if (window._activeFolderId && _activeFolderId !== 'none' && typeof openExamPlanModal === 'function') openExamPlanModal(_activeFolderId)">
+            <i data-lucide="graduation-cap" class="icon-sm"></i>
+            <span>시험 등록</span>
+          </button>
+          <button id="examReviewBtn" class="action-btn" style="display:none;" onclick="launchExamReview()">
+            <i data-lucide="clipboard-list" class="icon-sm"></i>
+            <span>시험 대비 요약</span>
+          </button>
           <button id="bulkSelectToggleBtn" class="action-btn" onclick="toggleBulkSelectMode()">선택</button>
-          <button class="action-btn" onclick="showImportNoteModal()">📥 가져오기</button>
-          <button class="action-btn" onclick="showFolderManager()">📁 폴더 관리</button>
+          <button class="action-btn" onclick="showImportNoteModal()">
+            <i data-lucide="download" class="icon-sm"></i>
+            <span>가져오기</span>
+          </button>
+          <button class="action-btn" onclick="showFolderManager()">
+            <i data-lucide="folder-cog" class="icon-sm"></i>
+            <span>폴더 관리</span>
+          </button>
         </div>
       </div>
       <!-- Exam plan summary card — visible only inside a folder view that has an examPlan registered -->
       <div id="folderExamPlanSummary" style="display:none;"></div>
-      <div id="ejectDropZone">📤 홈으로 드래그하여 내보내기</div>
+      <div id="ejectDropZone">
+        <i data-lucide="folder-output" class="icon-sm"></i>
+        <span>홈으로 드래그하여 내보내기</span>
+      </div>
       <div id="allNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
       <div id="emptyHomeMsg" style="display:none; text-align:center; padding:3rem; color:var(--text-muted);">
-        <div id="emptyHomeIcon" style="font-size:3.5rem; margin-bottom:0.8rem;">📝</div>
+        <div id="emptyHomeIcon" style="display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; border-radius:14px; background:var(--surface2); margin-bottom:0.8rem;"><i data-lucide="notebook-pen" style="width:26px; height:26px; color:var(--text-muted);"></i></div>
         <div id="emptyHomeMsgText" style="font-size:1rem; font-weight:600; color:var(--text); margin-bottom:0.3rem;">아직 저장된 노트가 없습니다</div>
         <div id="emptyHomeSubText" style="font-size:0.82rem; margin-bottom:1.2rem;">AI 분석을 완료하면 자동으로 저장됩니다</div>
-        <button id="emptyHomeNewBtn" class="action-btn" style="padding:0.5rem 1.4rem; font-size:0.88rem;" onclick="switchView('new')">✨ 새 노트 만들기</button>
+        <button id="emptyHomeNewBtn" class="action-btn" style="padding:0.5rem 1.4rem; font-size:0.88rem; display:inline-flex; align-items:center; gap:0.35rem;" onclick="switchView('new')">
+          <i data-lucide="plus" class="icon-sm"></i>
+          <span>새 노트 만들기</span>
+        </button>
       </div>
     </div>
   </div>

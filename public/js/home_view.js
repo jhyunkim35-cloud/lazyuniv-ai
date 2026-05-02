@@ -128,7 +128,9 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
       const hasPlan   = !!(folderObj && folderObj.examPlan);
 
       folderExamPlanBtn.style.display = '';
-      folderExamPlanBtn.textContent   = hasPlan ? '🎓 시험 일정' : '🎓 시험 등록';
+      folderExamPlanBtn.innerHTML = hasPlan
+        ? '<i data-lucide="graduation-cap" class="icon-sm"></i><span>시험 일정</span>'
+        : '<i data-lucide="graduation-cap" class="icon-sm"></i><span>시험 등록</span>';
 
       if (hasPlan && typeof effectiveDailyTarget === 'function' &&
           typeof getDaysUntil === 'function' && typeof modeLabel === 'function') {
@@ -211,7 +213,9 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   if (allNotesTitle) {
     if (isFolderView) {
       const folderName = folderMap[_activeFolderId] || '폴더';
-      allNotesTitle.textContent = '📁 ' + folderName;
+      // Folder header title: lucide folder icon + name (replaces 📁 emoji
+      // prefix). The Mutation observer in icons.js will mount the SVG.
+      allNotesTitle.innerHTML = `<i data-lucide="folder" class="icon-sm"></i><span>${escHtml(folderName)}</span>`;
     } else {
       allNotesTitle.textContent = '모든 노트';
     }
@@ -528,16 +532,25 @@ async function renderSidebarFolders(notes, folders) {
   const countMap = {};
   notes.forEach(n => { const k = n.folderId || '__none__'; countMap[k] = (countMap[k] || 0) + 1; });
 
-  const mkItem = (label, folderId, count, folder) => {
+  const mkItem = (label, folderId, count, folder, iconName) => {
     const item = document.createElement('div');
     item.className = 'sidebar-folder-item' + (_activeFolderId === folderId ? ' active' : '');
     const span = document.createElement('span');
     if (folder?.color) {
+      // User folder: color dot + name. The dot is the visual marker, no
+      // need for a folder icon on top of it.
       const dot = document.createElement('span');
       dot.className = 'folder-color-dot';
       dot.style.background = folder.color;
       span.appendChild(dot);
       span.append(folder.name);
+    } else if (iconName) {
+      // System pseudo-folder (전체 / 미분류): Lucide icon + label.
+      span.innerHTML = `<i data-lucide="${iconName}" class="icon-xs"></i><span>${escHtml(label)}</span>`;
+    } else if (folder) {
+      // User folder without a color — still no folder emoji, just the
+      // name (the indent + sidebar-folder-item context is enough).
+      span.textContent = folder.name;
     } else {
       span.textContent = label;
     }
@@ -549,7 +562,7 @@ async function renderSidebarFolders(notes, folders) {
       const rnBtn = document.createElement('button');
       rnBtn.className = 'sidebar-folder-rename';
       rnBtn.title = '이름 변경';
-      rnBtn.textContent = '✏️';
+      rnBtn.innerHTML = '<i data-lucide="pencil"></i>';
       rnBtn.addEventListener('click', e => { e.stopPropagation(); renameFolderPrompt(folderId, folder.name, folder.color); });
       item.appendChild(rnBtn);
 
@@ -572,9 +585,9 @@ async function renderSidebarFolders(notes, folders) {
     return item;
   };
 
-  container.appendChild(mkItem('📋 전체',  null,   notes.length));
-  container.appendChild(mkItem('📄 미분류', 'none', countMap['__none__'] || 0));
-  folders.forEach(f => container.appendChild(mkItem('📁 ' + f.name, f.id, countMap[f.id] || 0, f)));
+  container.appendChild(mkItem('전체',  null,   notes.length, null, 'list'));
+  container.appendChild(mkItem('미분류', 'none', countMap['__none__'] || 0, null, 'file-text'));
+  folders.forEach(f => container.appendChild(mkItem(f.name, f.id, countMap[f.id] || 0, f)));
 }
 
 function filterByFolder(folderId) {

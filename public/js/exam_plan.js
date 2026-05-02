@@ -209,7 +209,7 @@
     else if (d <= 7) cls = 'exam-badge-red';
     else if (d <= 14) cls = 'exam-badge-orange';
 
-    return `<span class="exam-badge ${cls}" title="시험: ${plan.examDate}">📅 ${label}</span>`;
+    return `<span class="exam-badge ${cls}" title="시험: ${plan.examDate}"><i data-lucide="calendar" class="icon-xs"></i>${label}</span>`;
   }
 
   // Resolved daily target for a folder's plan against its current note count.
