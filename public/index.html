@@ -3907,15 +3907,15 @@
       <div id="recentNotesGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1rem;"></div>
     </div>
     <div>
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
-        <div style="display:flex; align-items:center; gap:0.4rem;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem; gap:0.6rem;">
+        <div style="display:flex; align-items:center; gap:0.4rem; flex:1 1 auto; min-width:0;">
           <button id="folderBackBtn" style="display:none;" onclick="filterByFolder(null)">
             <i data-lucide="chevron-left" class="icon-sm"></i>
             <span>뒤로</span>
           </button>
-          <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:0.4rem;">모든 노트</h2>
+          <h2 id="allNotesTitle" style="font-size:1.1rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:0.4rem; min-width:0; overflow:hidden;">모든 노트</h2>
         </div>
-        <div style="display:flex;gap:0.4rem;">
+        <div style="display:flex;gap:0.4rem;flex-shrink:0;">
           <button id="folderExamPlanBtn" class="action-btn" style="display:none;" onclick="if (window._activeFolderId && _activeFolderId !== 'none' && typeof openExamPlanModal === 'function') openExamPlanModal(_activeFolderId)">
             <i data-lucide="graduation-cap" class="icon-sm"></i>
             <span>시험 등록</span>
