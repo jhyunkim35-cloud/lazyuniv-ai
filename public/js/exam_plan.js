@@ -90,13 +90,18 @@
     return 'long';
   }
 
+  // Returns HTML — callers always splice this into innerHTML, never as
+  // textContent. The Mutation observer in icons.js will mount the SVG.
   function modeLabel(mode) {
-    return ({
-      cram:     '⚡ 벼락치기',
-      standard: '🎯 표준',
-      relaxed:  '📅 여유',
-      long:     '🌱 장기',
-    })[mode] || mode;
+    const map = {
+      cram:     { icon: 'zap',      label: '벼락치기' },
+      standard: { icon: 'target',   label: '표준' },
+      relaxed:  { icon: 'calendar', label: '여유' },
+      long:     { icon: 'sprout',   label: '장기' },
+    };
+    const m = map[mode];
+    if (!m) return mode;
+    return `<i data-lucide="${m.icon}" class="icon-sm"></i><span>${m.label}</span>`;
   }
 
   function modeDescription(mode) {
@@ -247,12 +252,12 @@
 
         <div class="exam-plan-body">
           <div class="exam-plan-field">
-            <label for="examPlanDateInput">📝 시험일</label>
+            <label for="examPlanDateInput"><i data-lucide="calendar" class="icon-sm"></i><span>시험일</span></label>
             <input type="date" id="examPlanDateInput" />
           </div>
 
           <div class="exam-plan-field">
-            <label for="examPlanStartInput">🚀 복습 시작일
+            <label for="examPlanStartInput"><i data-lucide="play" class="icon-sm"></i><span>복습 시작일</span>
               <span class="exam-plan-hint">(추천: 시험 21일 전)</span>
             </label>
             <input type="date" id="examPlanStartInput" />
@@ -263,7 +268,7 @@
           </div>
 
           <div class="exam-plan-field">
-            <label>🎯 매일 목표 노트 수</label>
+            <label><i data-lucide="target" class="icon-sm"></i><span>매일 목표 노트 수</span></label>
             <div class="exam-plan-target-modes">
               <label class="exam-plan-radio">
                 <input type="radio" name="examPlanTargetMode" value="auto" checked />
@@ -346,7 +351,11 @@
     const saveBtn   = document.getElementById('examPlanSaveBtn');
 
     titleEl.textContent = isEdit ? '시험 일정 수정' : '시험 등록';
-    subEl.textContent = `📁 ${folder.name} · 노트 ${notesCount}개`;
+    // Folder name: prefer escHtml from markdown.js. Cheap safety guard for
+    // the (unlikely) load-order race where this fires before markdown.js
+    // is parsed.
+    const safeName = (typeof escHtml === 'function') ? escHtml(folder.name) : folder.name;
+    subEl.innerHTML = `<i data-lucide="folder" class="icon-xs"></i><span>${safeName} · 노트 ${notesCount}개</span>`;
     deleteBtn.style.display = isEdit ? '' : 'none';
     saveBtn.textContent = isEdit ? '저장' : '등록';
 
@@ -396,7 +405,7 @@
 
     const windowDays = (daysBetween(startDate, examDate) || 0) + 1;
     if (windowDays <= 0) {
-      previewEl.innerHTML = '<div class="exam-plan-preview-warn">⚠ 복습 시작일이 시험일보다 늦습니다.</div>';
+      previewEl.innerHTML = '<div class="exam-plan-preview-warn"><i data-lucide="triangle-alert" class="icon-sm"></i><span>복습 시작일이 시험일보다 늦습니다.</span></div>';
       recEl.textContent = '-';
       return;
     }
@@ -422,9 +431,9 @@
 
     let warn = '';
     if (windowDays <= 7) {
-      warn = `<div class="exam-plan-preview-warn">⚠ 1주일 이내 — 벼락치기 모드. 가능하면 시작일을 더 앞당기세요.</div>`;
+      warn = `<div class="exam-plan-preview-warn"><i data-lucide="triangle-alert" class="icon-sm"></i><span>1주일 이내 — 벼락치기 모드. 가능하면 시작일을 더 앞당기세요.</span></div>`;
     } else if (notesCount === 0) {
-      warn = `<div class="exam-plan-preview-warn">ℹ 이 폴더에 노트가 없습니다. 먼저 노트를 추가하면 권장값이 정확해집니다.</div>`;
+      warn = `<div class="exam-plan-preview-warn"><i data-lucide="info" class="icon-sm"></i><span>이 폴더에 노트가 없습니다. 먼저 노트를 추가하면 권장값이 정확해집니다.</span></div>`;
     }
 
     previewEl.innerHTML = `
