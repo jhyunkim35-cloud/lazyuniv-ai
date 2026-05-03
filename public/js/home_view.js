@@ -114,6 +114,26 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     displayNotes = displayNotes.filter(n => !n.folderId);
   }
 
+  // Gamification streak/XP badge — home view only
+  const gamifBadge = document.getElementById('gamifStreakBadge');
+  if (gamifBadge) {
+    if (!isFolderView && typeof getGamificationState === 'function') {
+      getGamificationState().then(state => {
+        gamifBadge.innerHTML =
+          `<span style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.85rem;` +
+          `color:var(--text-muted);background:var(--surface2);padding:0.3rem 0.75rem;border-radius:999px;">` +
+          `<i data-lucide="flame" class="icon-sm"></i><span>${state.streak}일 연속</span>` +
+          `<span style="opacity:0.4;">·</span>` +
+          `<i data-lucide="star" class="icon-sm"></i><span>${state.xp} XP</span>` +
+          `</span>`;
+        gamifBadge.style.display = '';
+        window.mountLucideIcons?.();
+      }).catch(() => { gamifBadge.style.display = 'none'; });
+    } else {
+      gamifBadge.style.display = 'none';
+    }
+  }
+
   // Show/hide recent section and update title/back button
   const recentSection = document.getElementById('recentSection');
   const folderBackBtn = document.getElementById('folderBackBtn');
