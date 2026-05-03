@@ -153,7 +153,7 @@
 
           <!-- Error -->
           <div class="rec-screen rec-screen-error" data-screen="error">
-            <div class="rec-error-icon"><i data-lucide="triangle-alert"></i></div>
+            <div class="rec-error-icon"><i data-lucide="alert-triangle"></i></div>
             <div class="rec-status" id="recErrorStatus">오류가 발생했습니다.</div>
             <div class="rec-actions">
               <button class="rec-btn rec-btn-primary" id="recErrorRetryBtn">다시 시도</button>

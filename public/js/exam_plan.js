@@ -405,7 +405,7 @@
 
     const windowDays = (daysBetween(startDate, examDate) || 0) + 1;
     if (windowDays <= 0) {
-      previewEl.innerHTML = '<div class="exam-plan-preview-warn"><i data-lucide="triangle-alert" class="icon-sm"></i><span>복습 시작일이 시험일보다 늦습니다.</span></div>';
+      previewEl.innerHTML = '<div class="exam-plan-preview-warn"><i data-lucide="alert-triangle" class="icon-sm"></i><span>복습 시작일이 시험일보다 늦습니다.</span></div>';
       recEl.textContent = '-';
       return;
     }
@@ -431,7 +431,7 @@
 
     let warn = '';
     if (windowDays <= 7) {
-      warn = `<div class="exam-plan-preview-warn"><i data-lucide="triangle-alert" class="icon-sm"></i><span>1주일 이내 — 벼락치기 모드. 가능하면 시작일을 더 앞당기세요.</span></div>`;
+      warn = `<div class="exam-plan-preview-warn"><i data-lucide="alert-triangle" class="icon-sm"></i><span>1주일 이내 — 벼락치기 모드. 가능하면 시작일을 더 앞당기세요.</span></div>`;
     } else if (notesCount === 0) {
       warn = `<div class="exam-plan-preview-warn"><i data-lucide="info" class="icon-sm"></i><span>이 폴더에 노트가 없습니다. 먼저 노트를 추가하면 권장값이 정확해집니다.</span></div>`;
     }
