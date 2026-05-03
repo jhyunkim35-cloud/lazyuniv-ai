@@ -21,6 +21,11 @@ function openDB() {
         qr.createIndex('noteId',    'noteId',    { unique: false });
         qr.createIndex('timestamp', 'timestamp', { unique: false });
       }
+      if (!db.objectStoreNames.contains('srsCards')) {
+        const sc = db.createObjectStore('srsCards', { keyPath: 'id' });
+        sc.createIndex('folderId',       'folderId',       { unique: false });
+        sc.createIndex('nextReviewDate', 'nextReviewDate', { unique: false });
+      }
     };
     req.onsuccess = e => resolve(e.target.result);
     req.onerror   = e => reject(e.target.error);

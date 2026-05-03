@@ -58,7 +58,7 @@ const QUIZ_CHOICES_PREFIX = ['①', '②', '③', '④', '⑤'];
 const CLASSIFY_LABELS = { theory: '이론', research: '연구', case: '사례', other: '기타' };
 const CLASSIFY_COLORS = { theory: '#7c3aed', research: '#0ea5e9', case: '#10b981', other: '#6b7280' };
 const DB_NAME    = 'meetingAppDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const AGENT_META = {
   1: { icon: '📝', name: '노트 작성자' },

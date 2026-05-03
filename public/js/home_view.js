@@ -19,7 +19,7 @@ function buildFolderCard(folder, noteCount) {
   card.innerHTML = `
     <div class="folder-card-icon"><i data-lucide="folder"></i></div>
     <div class="folder-card-info">
-      <div class="folder-card-name">${colorDot}${escHtml(folder.name)}${examBadge}</div>
+      <div class="folder-card-name">${colorDot}${escHtml(folder.name)}${examBadge}<span class="srs-due-badge" style="display:none"></span></div>
       <div class="folder-card-count">${noteCount}개의 노트</div>
     </div>
     <div class="folder-card-actions">
@@ -27,6 +27,19 @@ function buildFolderCard(folder, noteCount) {
       <button title="삭제"><i data-lucide="trash-2"></i></button>
     </div>`;
   const [renameBtn, deleteBtn] = card.querySelectorAll('.folder-card-actions button');
+  // Async SRS due badge — only for folders with an exam plan; populated after card is returned
+  if (folder.examPlan && typeof getDueCards === 'function') {
+    const d = new Date();
+    const ymd = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    getDueCards(folder.id, ymd).then(dueCards => {
+      if (!dueCards.length) return;
+      const badgeEl = card.querySelector('.srs-due-badge');
+      if (badgeEl) {
+        badgeEl.textContent = `오늘 복습 ${dueCards.length}개`;
+        badgeEl.style.display = '';
+      }
+    }).catch(() => {});
+  }
   renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderEditModal(folder.id, folder.name, folder.color || null); });
   deleteBtn.addEventListener('click', async e => {
     e.stopPropagation();
