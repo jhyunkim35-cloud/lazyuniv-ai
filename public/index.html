@@ -3765,13 +3765,13 @@
 <!-- Settings Panel -->
 <div id="settingsPanel">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.2rem;">
-    <span style="font-weight:700; font-size:0.95rem; color:var(--text);">⚙️ 설정</span>
-    <button onclick="toggleSettings()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:0.2rem 0.4rem;">✕</button>
+    <span style="font-weight:700; font-size:0.95rem; color:var(--text); display:inline-flex; align-items:center; gap:0.4rem;"><i data-lucide="settings" class="icon-sm" style="color:var(--primary);"></i><span>설정</span></span>
+    <button onclick="toggleSettings()" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; padding:0.2rem 0.4rem; display:inline-flex; align-items:center;" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
   </div>
   <div>
     <div class="settings-panel-row">API 키</div>
     <div class="card api-card" style="margin-bottom:0; display:none;">
-      <span class="api-icon">🔑</span>
+      <span class="api-icon"><i data-lucide="key" class="icon-sm"></i></span>
       <span class="api-label">Anthropic API Key</span>
       <input class="api-input" type="password" id="apiKeySettings" placeholder="sk-ant-api03-..." autocomplete="off"
         oninput="var p=document.getElementById('apiKey');if(p)p.value=this.value;" />
@@ -3780,7 +3780,7 @@
   <div>
     <div class="settings-panel-row">교수님 발화자 설정</div>
     <div class="card settings-card" style="margin-bottom:0;">
-      <span class="settings-icon">👨‍🏫</span>
+      <span class="settings-icon"><i data-lucide="graduation-cap" class="icon-sm"></i></span>
       <label class="settings-label" for="professorNum">교수님 발화자 번호</label>
       <div class="professor-input-group">
         <span class="professor-prefix">참석자</span>
@@ -3791,13 +3791,13 @@
   <div>
     <div class="settings-panel-row">데이터</div>
     <div style="display:flex; flex-direction:column; gap:0.4rem;">
-      <button class="action-btn" style="text-align:left;" onclick="exportAllNotes()">⬇ 노트 내보내기</button>
-      <label class="action-btn" style="cursor:pointer; text-align:left;">⬆ 노트 가져오기<input type="file" id="importNotesInput" accept=".json" style="display:none;" onchange="importNotes(this)" /></label>
-      <button class="action-btn" style="text-align:left; color:#fca5a5; border-color:rgba(248,113,113,0.3);" onclick="clearAllStorage()">🗑 저장소 초기화</button>
+      <button class="action-btn" style="text-align:left; display:inline-flex; align-items:center; gap:0.4rem;" onclick="exportAllNotes()"><i data-lucide="arrow-down-to-line" class="icon-sm"></i><span>노트 내보내기</span></button>
+      <label class="action-btn" style="cursor:pointer; text-align:left; display:inline-flex; align-items:center; gap:0.4rem;"><i data-lucide="arrow-up-from-line" class="icon-sm"></i><span>노트 가져오기</span><input type="file" id="importNotesInput" accept=".json" style="display:none;" onchange="importNotes(this)" /></label>
+      <button class="action-btn" style="text-align:left; color:#fca5a5; border-color:rgba(248,113,113,0.3); display:inline-flex; align-items:center; gap:0.4rem;" onclick="clearAllStorage()"><i data-lucide="trash-2" class="icon-sm"></i><span>저장소 초기화</span></button>
     </div>
   </div>
-  <div style="font-size:0.72rem; color:var(--text-muted); border-top:1px solid var(--border); padding-top:0.5rem;">
-    💾 저장소: <span id="storageSize">0 MB</span> 사용 중
+  <div style="font-size:0.72rem; color:var(--text-muted); border-top:1px solid var(--border); padding-top:0.5rem; display:inline-flex; align-items:center; gap:0.35rem;">
+    <i data-lucide="hard-drive" class="icon-xs"></i><span>저장소: <span id="storageSize">0 MB</span> 사용 중</span>
   </div>
 </div>
 

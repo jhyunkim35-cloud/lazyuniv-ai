@@ -7,7 +7,7 @@ async function showFolderManager() {
   overlay.id = 'folderManagerOverlay';
   overlay.innerHTML = `
     <div class="db-modal">
-      <h3>📁 폴더 관리</h3>
+      <h3 style="display:flex;align-items:center;gap:0.4rem;"><i data-lucide="folder-cog" class="icon-sm" style="color:var(--primary);"></i><span>폴더 관리</span></h3>
       <div class="db-modal-list" id="folderManagerList"></div>
       <div class="db-modal-footer">
         <input id="newFolderInput" type="text" placeholder="새 폴더 이름..." />
@@ -33,20 +33,28 @@ async function refreshFolderManagerList() {
     row.className = 'db-modal-row';
     row.dataset.folderId = folder.id;
 
+    // Use a color dot + name (matching the sidebar/home-view style) instead
+    // of a generic 📁 emoji. Falls back to neutral if folder has no color.
     const label = document.createElement('span');
-    label.textContent = `📁 ${folder.name}`;
+    label.style.display = 'inline-flex';
+    label.style.alignItems = 'center';
+    label.style.gap = '0.4rem';
+    const dotColor = folder.color || 'var(--text-muted)';
+    label.innerHTML = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${escHtml(dotColor)};flex-shrink:0;"></span><span>${escHtml(folder.name)}</span>`;
 
     const actions = document.createElement('div');
     actions.className = 'db-modal-row-actions';
 
     const renameBtn = document.createElement('button');
     renameBtn.title = '이름 변경';
-    renameBtn.textContent = '✏️';
+    renameBtn.setAttribute('aria-label', '이름 변경');
+    renameBtn.innerHTML = '<i data-lucide="pencil" class="icon-sm"></i>';
     renameBtn.addEventListener('click', () => renameFolderPrompt(folder.id, folder.name, folder.color));
 
     const deleteBtn = document.createElement('button');
     deleteBtn.title = '삭제';
-    deleteBtn.textContent = '🗑';
+    deleteBtn.setAttribute('aria-label', '삭제');
+    deleteBtn.innerHTML = '<i data-lucide="trash-2" class="icon-sm"></i>';
     deleteBtn.addEventListener('click', () => deleteFolderConfirm(folder.id));
 
     actions.append(renameBtn, deleteBtn);
@@ -78,7 +86,7 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
   ).join('');
   overlay.innerHTML = `
     <div class="db-modal">
-      <h3 style="margin-bottom:1rem; font-size:1rem;">${id ? '📁 폴더 편집' : '📁 새 폴더'}</h3>
+      <h3 style="margin-bottom:1rem; font-size:1rem; display:flex; align-items:center; gap:0.4rem;"><i data-lucide="${id ? 'folder-pen' : 'folder-plus'}" class="icon-sm" style="color:var(--primary);"></i><span>${id ? '폴더 편집' : '새 폴더'}</span></h3>
       <div style="margin-bottom:0.8rem;">
         <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.3rem;">폴더 이름</label>
         <input class="folderEditNameInput" value="${escHtml(currentName)}" placeholder="폴더 이름..."
