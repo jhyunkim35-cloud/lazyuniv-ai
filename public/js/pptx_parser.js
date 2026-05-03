@@ -35,7 +35,9 @@ function onPptChange(file) {
     if (!confirm(`파일 크기가 ${(file.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) return;
   }
   pptFile = file;
-  document.getElementById('pptIcon').textContent = name.endsWith('.pdf') ? '📄' : '📊';
+  document.getElementById('pptIcon').innerHTML = name.endsWith('.pdf')
+    ? '<i data-lucide="file-text"></i>'
+    : '<i data-lucide="presentation"></i>';
   document.getElementById('pptTagName').textContent = file.name;
   document.getElementById('pptTag').style.display = 'inline-flex';
   document.getElementById('pptZone').classList.add('has-file');

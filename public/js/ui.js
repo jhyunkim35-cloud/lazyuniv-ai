@@ -61,10 +61,10 @@ async function copyDebugReport() {
     _notesCollapsed = !_notesCollapsed;
     if (_notesCollapsed) {
       body.style.maxHeight = '0'; body.style.overflow = 'hidden';
-      body.style.padding = '0 1.75rem'; btn.textContent = '▼ 펼치기';
+      body.style.padding = '0 1.75rem'; btn.innerHTML = '<i data-lucide="chevron-down" class="icon-xs"></i> 펼치기';
     } else {
       body.style.maxHeight = ''; body.style.overflow = '';
-      body.style.padding = ''; btn.textContent = '▲ 접기';
+      body.style.padding = ''; btn.innerHTML = '<i data-lucide="chevron-up" class="icon-xs"></i> 접기';
     }
   });
 })();

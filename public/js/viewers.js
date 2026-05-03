@@ -48,7 +48,9 @@ function populateSplitImagePanel() {
   document.getElementById('splitImageHeader').onclick = () => {
     const hidden = grid.style.display === 'none';
     grid.style.display = hidden ? 'flex' : 'none';
-    document.getElementById('splitImageToggle').textContent = hidden ? '▲' : '▼';
+    document.getElementById('splitImageToggle').innerHTML = hidden
+      ? '<i data-lucide="chevron-up" class="icon-xs"></i>'
+      : '<i data-lucide="chevron-down" class="icon-xs"></i>';
   };
 
   // Insert button

@@ -430,7 +430,7 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
       if (_totalAnswered >= 30) {
         _weaknessCardHtml = `<div class="weakness-preview-card" id="weaknessPreviewCard">
           <div class="weakness-preview-header" id="weaknessPreviewHeader">
-            <span>📊 내 약점 분석 (총 ${_totalAnswered}문제 풀이)</span>
+            <span><i data-lucide="presentation" class="icon-sm"></i> 내 약점 분석 (총 ${_totalAnswered}문제 풀이)</span>
             <span class="weakness-preview-toggle" id="weaknessPreviewToggle">▼ 펼쳐서 보기</span>
           </div>
           <div class="weakness-preview-body" id="weaknessPreviewBody" style="display:none;"></div>
@@ -441,7 +441,7 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
 
   area.innerHTML = _weaknessCardHtml + `
     <div class="quiz-settings-panel">
-      <div class="quiz-settings-title">🧪 퀴즈 설정 — ${escHtml(noteTitle)}</div>
+      <div class="quiz-settings-title"><i data-lucide="flask-conical" class="icon-sm"></i> 퀴즈 설정 — ${escHtml(noteTitle)}</div>
       <div class="quiz-setting-row">
         <span class="quiz-setting-label">문제 수</span>
         <div class="quiz-seg-group" id="qsCount">
@@ -491,7 +491,9 @@ async function showQuizSettings(noteTitle, noteId, noteText, containerEl) {
     _wpHeader.addEventListener('click', async () => {
       _wpExpanded = !_wpExpanded;
       _wpBody.style.display = _wpExpanded ? 'block' : 'none';
-      _wpToggle.textContent  = _wpExpanded ? '▲ 접기' : '▼ 펼쳐서 보기';
+      _wpToggle.innerHTML = _wpExpanded
+        ? '<i data-lucide="chevron-up" class="icon-xs"></i> 접기'
+        : '<i data-lucide="chevron-down" class="icon-xs"></i> 펼쳐서 보기';
       if (_wpExpanded && !_wpRendered) {
         _wpRendered = true;
         _wpBody.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--text-muted);">분석 중...</div>';
@@ -1084,7 +1086,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
       ${wrongs.length > 0 ? '<div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-top:0.25rem;">오답 목록</div>' : ''}
       <div class="quiz-wrong-list">${wrongHtml}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-top:0.4rem;">
-        <button id="quizHistInlineBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;">📊 퀴즈 이력</button>
+        <button id="quizHistInlineBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;"><i data-lucide="presentation" class="icon-sm"></i> 퀴즈 이력</button>
         <div style="display:flex;gap:0.5rem;margin-left:auto;">
           <button id="quizRetryBtn" class="quiz-grade-btn">다시 풀기</button>
           <button id="quizCloseInlineBtn" style="padding:0.6rem 1rem;border-radius:7px;border:1px solid var(--border);background:var(--surface3);color:var(--text);font-size:0.88rem;cursor:pointer;">닫기</button>
@@ -1482,7 +1484,7 @@ function renderWeaknessReport(containerEl, report, quizCount) {
   const totalAnswered = report ? report.totalQuestions : 0;
   const hasEnough     = totalAnswered >= minQuestions;
   if (!hasEnough) {
-    containerEl.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.4rem 0;">📊 약점 분석은 누적 ${minQuestions}문제 이상 풀면 제공됩니다 (${totalAnswered}/${minQuestions})</div>`;
+    containerEl.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.4rem 0;"><i data-lucide="presentation" class="icon-sm"></i> 약점 분석은 누적 ${minQuestions}문제 이상 풀면 제공됩니다 (${totalAnswered}/${minQuestions})</div>`;
     return;
   }
   if (!report || !report.sections.length) return;
@@ -1491,7 +1493,7 @@ function renderWeaknessReport(containerEl, report, quizCount) {
   const weakNames  = report.sections.filter(s => s.status === 'weak').map(s => escHtml(s.name)).join(', ');
 
   containerEl.innerHTML = `
-    <div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;">📊 약점 분석 (퀴즈 ${report.totalQuizzes}회 기준)</div>
+    <div style="font-size:0.82rem;font-weight:700;color:var(--text);margin-bottom:0.4rem;"><i data-lucide="presentation" class="icon-sm"></i> 약점 분석 (퀴즈 ${report.totalQuizzes}회 기준)</div>
     ${report.sections.map(s => `
       <div class="weakness-section-row">
         <span class="weakness-label weakness-label-link" title="${escHtml(s.name)}" data-section="${escHtml(s.name)}">${escHtml(s.name)}</span>
@@ -1499,7 +1501,7 @@ function renderWeaknessReport(containerEl, report, quizCount) {
         <span class="weakness-pct ${colorClass(s)}">${s.correct || 0}/${s.total || 0} · ${s.accuracy}%</span>
       </div>`).join('')}
     <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.3rem;">총 ${report.totalQuizzes}회 퀴즈, ${report.totalQuestions}문제 풀이</div>
-    ${weakNames ? `<div style="font-size:0.8rem;color:#ef4444;margin-top:0.2rem;">💡 약점 섹션에 집중해서 복습하세요: ${weakNames}</div>` : ''}`;
+    ${weakNames ? `<div style="font-size:0.8rem;color:#ef4444;margin-top:0.2rem;"><i data-lucide="lightbulb" class="icon-xs"></i> 약점 섹션에 집중해서 복습하세요: ${weakNames}</div>` : ''}`;
 
   // Attach click handlers to section labels — scroll to matching h2 in splitNotes
   containerEl.querySelectorAll('.weakness-label-link[data-section]').forEach(el => {
@@ -1582,7 +1584,7 @@ async function showQuizHistory(parentOverlay, noteId, noteTitle) {
 
   histOverlay.innerHTML = `
     <div class="db-modal" style="max-width:500px;display:flex;flex-direction:column;max-height:85vh;">
-      <h3>📊 퀴즈 이력 — ${escHtml(noteTitle || '노트')}</h3>
+      <h3><i data-lucide="presentation" class="icon-sm"></i> 퀴즈 이력 — ${escHtml(noteTitle || '노트')}</h3>
       <div class="db-modal-list" id="quizHistList" style="overflow-y:auto;flex:1;"></div>
       <div class="db-modal-footer" style="justify-content:flex-end;">
         <button onclick="this.closest('.db-modal-overlay').remove()" style="background:var(--surface3);color:var(--text);">닫기</button>
