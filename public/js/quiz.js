@@ -1343,8 +1343,8 @@ function launchExamReview() {
   overlay.innerHTML = `
     <div class="db-modal" style="max-width:720px;width:96vw;max-height:92vh;display:flex;flex-direction:column;gap:0;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:0.8rem;border-bottom:1px solid var(--border);flex-shrink:0;">
-        <h3 style="margin:0;font-size:1.05rem;">📋 시험 대비 요약</h3>
-        <button id="examReviewCloseBtn" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--text-muted);padding:0.2rem 0.4rem;">✕</button>
+        <h3 style="margin:0;font-size:1.05rem;display:flex;align-items:center;gap:0.4rem;"><i data-lucide="clipboard-list" class="icon-sm" style="color:var(--primary);"></i><span>시험 대비 요약</span></h3>
+        <button id="examReviewCloseBtn" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0.2rem 0.4rem;display:inline-flex;align-items:center;" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
       </div>
       <div id="examReviewBody" style="overflow-y:auto;flex:1;padding:1rem 0.2rem 0.5rem;">
         <div style="display:flex;align-items:center;gap:0.6rem;color:var(--text-muted);font-size:0.88rem;padding:2rem 0;justify-content:center;">
@@ -1414,7 +1414,7 @@ function renderExamReviewHTML(data, _closeModal) {
 
   // ── Section 2: Weak sections ──
   const weakHTML = data.weakSections.length === 0
-    ? `<div style="color:var(--text-muted);font-size:0.88rem;padding:0.5rem 0;">약점 섹션이 없습니다! 🎉</div>`
+    ? `<div style="color:var(--text-muted);font-size:0.88rem;padding:0.5rem 0;display:flex;align-items:center;gap:0.4rem;"><i data-lucide="party-popper" class="icon-sm" style="color:#22c55e;"></i><span>약점 섹션이 없습니다!</span></div>`
     : data.weakSections.map(s => `
       <div class="er-section-card" style="border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;overflow:hidden;">
         <div class="er-section-header" style="display:flex;align-items:center;gap:0.5rem;padding:0.65rem 0.8rem;cursor:pointer;background:var(--surface2);">
@@ -1461,18 +1461,20 @@ function renderExamReviewHTML(data, _closeModal) {
           </div>`;
       }).join('');
 
-  const sec = (icon, title, content) => `
+  // sec() now takes a Lucide icon name + a tint color. The icon and title
+  // are placed in a single inline-flex row so they line up cleanly.
+  const sec = (iconName, iconColor, title, content) => `
     <div style="margin-bottom:1.4rem;">
-      <div style="font-size:0.92rem;font-weight:700;color:var(--text);margin-bottom:0.6rem;">${icon} ${escHtml(title)}</div>
+      <div style="font-size:0.92rem;font-weight:700;color:var(--text);margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem;"><i data-lucide="${iconName}" class="icon-sm" style="color:${iconColor};"></i><span>${escHtml(title)}</span></div>
       ${content}
     </div>`;
 
   return `
-    <div style="font-size:0.88rem;font-weight:700;color:var(--text-muted);margin-bottom:0.8rem;">📁 ${escHtml(data.folderName)}</div>
+    <div style="font-size:0.88rem;font-weight:700;color:var(--text-muted);margin-bottom:0.8rem;display:flex;align-items:center;gap:0.35rem;"><i data-lucide="folder" class="icon-xs"></i><span>${escHtml(data.folderName)}</span></div>
     ${statsBar}
-    ${sec('🔴', '약점 섹션 (정답률 70% 미만)', weakHTML)}
-    ${sec('⭐', '중요 섹션 (출제 빈도 상위)', importantHTML)}
-    ${sec('📊', '전체 섹션 정답률', allHTML)}`;
+    ${sec('trending-down', '#ef4444', '약점 섹션 (정답률 70% 미만)', weakHTML)}
+    ${sec('star',          '#eab308', '중요 섹션 (출제 빈도 상위)', importantHTML)}
+    ${sec('bar-chart-3',   '#6366f1', '전체 섹션 정답률', allHTML)}`;
 }
 
 function renderWeaknessReport(containerEl, report, quizCount) {

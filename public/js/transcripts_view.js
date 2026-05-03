@@ -99,7 +99,7 @@
     card.innerHTML = `
       <div class="transcript-card-head">
         <div class="transcript-card-title">${title} ${truncatedTag}</div>
-        <button class="transcript-card-menu-btn" title="메뉴" aria-label="메뉴">⋯</button>
+        <button class="transcript-card-menu-btn" title="메뉴" aria-label="메뉴"><i data-lucide="more-horizontal" class="icon-sm"></i></button>
       </div>
       <div class="transcript-card-meta">
         <span>${date}</span>
@@ -267,14 +267,14 @@
             <div id="transcriptPreviewTitle" class="transcript-preview-title">제목</div>
             <div id="transcriptPreviewMeta" class="transcript-preview-meta"></div>
           </div>
-          <button id="transcriptPreviewCloseBtn" class="transcript-preview-close" aria-label="닫기">×</button>
+          <button id="transcriptPreviewCloseBtn" class="transcript-preview-close" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </header>
         <div id="transcriptPreviewBody" class="transcript-preview-body"></div>
         <footer class="transcript-preview-footer">
-          <button id="transcriptPreviewRenameBtn"   class="action-btn">이름 변경</button>
-          <button id="transcriptPreviewCopyBtn"     class="action-btn">텍스트 복사</button>
-          <button id="transcriptPreviewDownloadBtn" class="action-btn">.txt 다운로드</button>
-          <button id="transcriptPreviewDeleteBtn"   class="action-btn danger">삭제</button>
+          <button id="transcriptPreviewRenameBtn"   class="action-btn"><i data-lucide="pencil" class="icon-sm"></i><span>이름 변경</span></button>
+          <button id="transcriptPreviewCopyBtn"     class="action-btn"><i data-lucide="copy" class="icon-sm"></i><span>텍스트 복사</span></button>
+          <button id="transcriptPreviewDownloadBtn" class="action-btn"><i data-lucide="download" class="icon-sm"></i><span>.txt 다운로드</span></button>
+          <button id="transcriptPreviewDeleteBtn"   class="action-btn danger"><i data-lucide="trash-2" class="icon-sm"></i><span>삭제</span></button>
         </footer>
       </div>
     `;

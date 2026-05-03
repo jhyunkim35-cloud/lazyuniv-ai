@@ -87,7 +87,7 @@
       <div class="recorder-panel" role="dialog" aria-modal="true" aria-label="녹음">
         <div class="recorder-head">
           <div class="recorder-title" id="recTitle">녹음하기</div>
-          <button class="recorder-close" id="recCloseBtn" aria-label="닫기">×</button>
+          <button class="recorder-close" id="recCloseBtn" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </div>
 
         <div class="recorder-body" id="recBody">
@@ -100,12 +100,12 @@
             </div>
             <div class="rec-mode-grid">
               <button class="rec-mode-card" id="recPickLive">
-                <div class="rec-mode-icon">●</div>
+                <div class="rec-mode-icon"><i data-lucide="mic"></i></div>
                 <div class="rec-mode-title">직접 녹음</div>
                 <div class="rec-mode-sub">PC · 안드로이드 권장</div>
               </button>
               <label class="rec-mode-card" for="recFileInput">
-                <div class="rec-mode-icon">↑</div>
+                <div class="rec-mode-icon"><i data-lucide="upload"></i></div>
                 <div class="rec-mode-title">오디오 파일 업로드</div>
                 <div class="rec-mode-sub">mp3 · m4a · wav · webm</div>
               </label>
@@ -143,7 +143,7 @@
 
           <!-- Completed -->
           <div class="rec-screen rec-screen-done" data-screen="done">
-            <div class="rec-done-icon">✓</div>
+            <div class="rec-done-icon"><i data-lucide="check"></i></div>
             <div class="rec-status" id="recDoneStatus">변환 완료</div>
             <div class="rec-done-hint">녹취록 슬롯에 텍스트가 추가되었습니다. 분석을 시작하세요.</div>
             <div class="rec-actions">
@@ -153,7 +153,7 @@
 
           <!-- Error -->
           <div class="rec-screen rec-screen-error" data-screen="error">
-            <div class="rec-error-icon">!</div>
+            <div class="rec-error-icon"><i data-lucide="triangle-alert"></i></div>
             <div class="rec-status" id="recErrorStatus">오류가 발생했습니다.</div>
             <div class="rec-actions">
               <button class="rec-btn rec-btn-primary" id="recErrorRetryBtn">다시 시도</button>
