@@ -185,6 +185,11 @@
       el.classList.toggle('active', el.dataset.screen === name);
     });
     modalState.phase = name;
+    // Lucide skips data-lucide nodes inside hidden parents, so screens that
+    // were never visible at modal-build time arrive with un-mounted <i> tags
+    // (the <svg> swap only happens once a screen is actually shown).
+    // We poke the mount fn now that the target screen is .active.
+    window.mountLucideIcons?.();
   }
 
   function showModal(targetSlotId = null) {
