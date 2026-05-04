@@ -80,6 +80,40 @@ function renderRecSlots() {
   const zone = document.getElementById('multiRecZone');
   if (!list) return;
 
+  // BYO transcript hint card — shown only on new-note view, dismissed via localStorage
+  if (zone && _currentView === 'new') {
+    if (!document.getElementById('byoTranscriptHint')) {
+      if (!localStorage.getItem('byoTranscriptHintDismissed')) {
+        const card = document.createElement('div');
+        card.id = 'byoTranscriptHint';
+        card.style.cssText = [
+          'background:rgba(var(--surface2-rgb,30,30,40),0.7)',
+          'border:1px solid var(--border,rgba(255,255,255,0.12))',
+          'border-radius:10px',
+          'padding:0.75rem 1rem',
+          'margin-bottom:0.75rem',
+          'font-size:0.82rem',
+          'line-height:1.5',
+          'color:var(--text-muted,#aaa)',
+          'position:relative',
+        ].join(';');
+        card.innerHTML = `
+          <button id="byoTranscriptHintClose" aria-label="닫기" style="position:absolute;top:0.4rem;right:0.6rem;background:none;border:none;cursor:pointer;color:var(--text-muted,#aaa);font-size:1rem;line-height:1">×</button>
+          <div style="margin-bottom:0.3rem;font-weight:600;color:var(--text,#e8e8e8)">💡 더 정확한 녹취록을 원하시나요?</div>
+          다른 한국어 STT 서비스에서 녹취록을 만든 뒤 <strong>.txt 파일로 업로드</strong>하셔도 됩니다:<br>
+          &nbsp;•&nbsp;<a href="https://clovanote.naver.com" target="_blank" rel="noopener" style="color:var(--accent,#7c9ef8)">클로바노트</a> — 무료 월 5시간<br>
+          &nbsp;•&nbsp;<a href="https://daglo.ai" target="_blank" rel="noopener" style="color:var(--accent,#7c9ef8)">다글로</a> — 한국어 정확도 최상<br>
+          <span style="display:block;margin-top:0.35rem;font-size:0.78rem">본 앱의 내장 녹음/STT는 빠른 시작용이며, 정확도가 낮을 수 있습니다.</span>
+        `;
+        card.querySelector('#byoTranscriptHintClose').addEventListener('click', () => {
+          localStorage.setItem('byoTranscriptHintDismissed', '1');
+          card.remove();
+        });
+        list.parentNode.insertBefore(card, list);
+      }
+    }
+  }
+
   list.innerHTML = '';
 
   const hasFiles = txtFiles.some(s => s.file !== null);

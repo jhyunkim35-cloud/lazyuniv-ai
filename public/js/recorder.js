@@ -421,6 +421,7 @@
             <div class="rec-done-icon"><i data-lucide="check"></i></div>
             <div class="rec-status" id="recDoneStatus">변환 완료</div>
             <div class="rec-done-hint" id="recDoneHint">녹취록 슬롯에 텍스트가 추가되었습니다. 분석을 시작하세요.</div>
+            <div class="rec-done-byo-hint" id="recDoneBYOHint" style="font-size:0.75rem;color:var(--text-muted,#aaa);margin:0.4rem 0 0;line-height:1.45">💡 정확도가 부족하면 <a href="https://clovanote.naver.com" target="_blank" rel="noopener" style="color:var(--accent,#7c9ef8)">클로바노트</a>에서 변환 후 .txt 업로드 가능</div>
             <div class="rec-actions">
               <button class="rec-btn rec-btn-secondary" id="recDoneCloseBtn">확인</button>
               <button class="rec-btn rec-btn-primary" id="recDoneGoNewBtn" style="display:none">다음: 강의 자료 추가하기 →</button>
