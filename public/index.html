@@ -3727,9 +3727,36 @@
       #topBarMenuBtn { display:flex !important; }
       #allNotesGrid, #recentNotesGrid { grid-template-columns:1fr !important; }
       #settingsPanel { left:1rem; right:1rem; width:auto !important; }
-      #splitViewer > div:last-of-type { flex-direction:column !important; }
-      #splitViewer > div:last-of-type > div:first-child { width:100% !important; height:40vh; border-right:none !important; border-bottom:1px solid var(--border-bright); }
-      #splitViewer > div:last-of-type > div:last-child { width:100% !important; }
+      /* Split viewer mobile layout: stack slides on top, notes below.
+         The inner flex row needs to become a column AND its children
+         need their inline width/border overridden. The previous
+         :last-of-type selector matched, but `width:50%` inline style
+         beat the cascade in some browsers — using more specific
+         selectors (id-targeted) plus !important guarantees override. */
+      #splitViewer > div:nth-of-type(2) {
+        flex-direction:column !important;
+      }
+      #splitSlides {
+        width:100% !important;
+        height:45vh !important;
+        flex-shrink:0 !important;
+        border-right:none !important;
+        border-bottom:1px solid var(--border-bright) !important;
+      }
+      #splitRight {
+        width:100% !important;
+        flex:1 !important;
+        min-height:0 !important;
+      }
+      /* Top bar buttons: hide labels, keep icons only on narrow screens */
+      #splitTopBar .action-btn {
+        padding:0.4rem 0.55rem !important;
+        font-size:0 !important;
+      }
+      #splitTopBar .action-btn .icon-sm,
+      #splitTopBar .action-btn .icon-xs {
+        font-size:1rem !important;
+      }
     }
   </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
