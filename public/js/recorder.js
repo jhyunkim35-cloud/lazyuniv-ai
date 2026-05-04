@@ -580,9 +580,9 @@
         ? (modalState.elapsedAtPause + (Date.now() - modalState.startTime))
         : modalState.elapsedAtPause;
       const totalSec = Math.floor(ms / 1000);
-      const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
-      const s = String(totalSec % 60).padStart(2, '0');
       const h = Math.floor(totalSec / 3600);
+      const m = String(Math.floor(totalSec / 60) % 60).padStart(2, '0');
+      const s = String(totalSec % 60).padStart(2, '0');
       const timeStr = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
       const el = document.getElementById('recTimer');
       if (el) el.textContent = timeStr;
