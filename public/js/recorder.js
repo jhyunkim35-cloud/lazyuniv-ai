@@ -184,7 +184,12 @@
     modalEl.querySelectorAll('.rec-screen').forEach(el => {
       el.classList.toggle('active', el.dataset.screen === name);
     });
-    modalState.phase = name;
+    modalState.screen = name; // track which screen is visible (separate from recording phase)
+    // Note: do NOT touch modalState.phase here. switchScreen('live') used to
+    // overwrite the 'recording' phase set by startTimer(), which made the
+    // setInterval timer always read elapsedAtPause=0 and freeze at 00:00.
+    // phase is owned by startTimer/pauseRecording/resumeRecording.
+
     // Lucide skips data-lucide nodes inside hidden parents, so screens that
     // were never visible at modal-build time arrive with un-mounted <i> tags
     // (the <svg> swap only happens once a screen is actually shown).
