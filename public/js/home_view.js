@@ -155,11 +155,14 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
           });
         }
         renderDailyEngagementSection(state);
+        renderAchievementSection(state);
       }).catch(() => { gamifBadge.style.display = 'none'; });
     } else {
       gamifBadge.style.display = 'none';
       const existing = document.getElementById('gamifDailyGoal');
       if (existing) existing.style.display = 'none';
+      const existingA = document.getElementById('gamifAchievements');
+      if (existingA) existingA.style.display = 'none';
     }
   }
 
@@ -665,6 +668,75 @@ function filterByFolder(folderId) {
 
 function createFolderFromSidebar() {
   showFolderEditModal(null);
+}
+
+/* ═══════════════════════════════════════════════
+   Achievement section (collapsible)
+═══════════════════════════════════════════════ */
+function renderAchievementSection(state) {
+  if (typeof renderAchievementGrid !== 'function') return;
+
+  let section = document.getElementById('gamifAchievements');
+  const isNew = !section;
+  if (isNew) {
+    section = document.createElement('div');
+    section.id = 'gamifAchievements';
+    section.style.cssText =
+      'margin-bottom:1.25rem;padding:0.75rem 1.25rem 0.85rem;' +
+      'background:var(--surface2,#1a1a2e);border-radius:var(--radius,12px);' +
+      'border:1px solid var(--border,rgba(255,255,255,0.08));';
+    const dailyGoal = document.getElementById('gamifDailyGoal');
+    const badge     = document.getElementById('gamifStreakBadge');
+    if (dailyGoal) dailyGoal.insertAdjacentElement('afterend', section);
+    else if (badge) badge.insertAdjacentElement('afterend', section);
+  }
+  section.style.display = '';
+
+  const total         = (window.ACHIEVEMENTS || []).length || 17;
+  const unlockedCount = (state.unlockedIds || []).length;
+
+  // Rebuild header + collapse body (preserve expanded state across re-renders)
+  const wasExpanded = section.dataset.expanded === '1';
+
+  const header = document.createElement('div');
+  header.style.cssText = 'cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;padding:0.1rem 0;';
+  header.innerHTML =
+    `<span style="display:flex;align-items:center;gap:0.4rem;font-size:0.88rem;font-weight:700;color:var(--text);">` +
+      `<i data-lucide="trophy" style="width:15px;height:15px;color:gold;"></i>내 업적` +
+    `</span>` +
+    `<span style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--text-muted);">` +
+      `${unlockedCount} / ${total} 달성` +
+      `<i data-lucide="chevron-down" id="gamifAchievChevron" style="width:14px;height:14px;transition:transform 0.25s;` +
+        (wasExpanded ? 'transform:rotate(180deg);' : '') + `"></i>` +
+    `</span>`;
+
+  const gridWrap = document.createElement('div');
+  gridWrap.id = 'gamifAchievGrid';
+  gridWrap.style.cssText =
+    'overflow:hidden;transition:max-height 0.35s ease;' +
+    (wasExpanded ? 'max-height:1200px;padding-top:0.75rem;' : 'max-height:0;');
+
+  section.innerHTML = '';
+  section.appendChild(header);
+  section.appendChild(gridWrap);
+  window.mountLucideIcons?.();
+
+  if (wasExpanded) renderAchievementGrid(gridWrap, state);
+
+  header.addEventListener('click', () => {
+    const expanded = section.dataset.expanded !== '1';
+    section.dataset.expanded = expanded ? '1' : '0';
+    const chevron = document.getElementById('gamifAchievChevron');
+    if (chevron) chevron.style.transform = expanded ? 'rotate(180deg)' : '';
+    if (expanded) {
+      gridWrap.style.maxHeight   = '1200px';
+      gridWrap.style.paddingTop  = '0.75rem';
+      renderAchievementGrid(gridWrap, state);
+    } else {
+      gridWrap.style.maxHeight  = '0';
+      gridWrap.style.paddingTop = '0';
+    }
+  });
 }
 
 /* ═══════════════════════════════════════════════

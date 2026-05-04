@@ -22,7 +22,9 @@
 
   const DEFAULTS = {
     streak: 0, lastReviewDay: null, xp: 0, todayDoneCount: 0, todayYmd: null,
-    dailyGoal: 5, dailyProgress: {}, dailyHistory: []
+    dailyGoal: 5, dailyProgress: {}, dailyHistory: [],
+    totalNotes: 0, totalReviews: 0, totalQuizzes: 0, perfectQuizzes: 0,
+    unlockedIds: [], unlockedDates: {},
   };
 
   // ── IDB (standalone gamification DB) ─────────────────────────
@@ -208,14 +210,17 @@
       state.streak = 1;
     }
 
-    state.lastReviewDay = today;
-    state.xp = (state.xp || 0) + (quality >= 3 ? 10 : 5);
+    state.lastReviewDay  = today;
+    state.xp             = (state.xp || 0) + (quality >= 3 ? 10 : 5);
     state.todayDoneCount = (state.todayDoneCount || 0) + 1;
+    state.totalReviews   = (state.totalReviews || 0) + 1;
 
     const prog = ensureTodayProgress(state);
     prog.cardsReviewed = (prog.cardsReviewed || 0) + 1;
 
-    return _checkAndAwardGoal(state);
+    const updatedState = await _checkAndAwardGoal(state);
+    if (typeof runAchievementChecks === 'function') runAchievementChecks(updatedState).catch(() => {});
+    return updatedState;
   }
 
   async function getTodayProgress() {
@@ -227,21 +232,28 @@
 
   async function markNoteCreated() {
     try {
-      const state = await getGamificationState();
-      const prog  = ensureTodayProgress(state);
+      const state       = await getGamificationState();
+      state.totalNotes  = (state.totalNotes || 0) + 1;
+      const prog        = ensureTodayProgress(state);
       prog.notesCreated = (prog.notesCreated || 0) + 1;
-      return _checkAndAwardGoal(state);
+      const updatedState = await _checkAndAwardGoal(state);
+      if (typeof runAchievementChecks === 'function') runAchievementChecks(updatedState).catch(() => {});
+      return updatedState;
     } catch (e) {
       console.warn('[markNoteCreated]', e.message);
     }
   }
 
-  async function markQuizCompleted() {
+  async function markQuizCompleted(perfect = false) {
     try {
-      const state = await getGamificationState();
-      const prog  = ensureTodayProgress(state);
+      const state        = await getGamificationState();
+      state.totalQuizzes = (state.totalQuizzes || 0) + 1;
+      if (perfect) state.perfectQuizzes = (state.perfectQuizzes || 0) + 1;
+      const prog        = ensureTodayProgress(state);
       prog.quizzesCompleted = (prog.quizzesCompleted || 0) + 1;
-      return _checkAndAwardGoal(state);
+      const updatedState = await _checkAndAwardGoal(state);
+      if (typeof runAchievementChecks === 'function') runAchievementChecks(updatedState).catch(() => {});
+      return updatedState;
     } catch (e) {
       console.warn('[markQuizCompleted]', e.message);
     }
