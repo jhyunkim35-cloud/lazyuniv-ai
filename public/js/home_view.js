@@ -37,6 +37,12 @@ function buildFolderCard(folder, noteCount) {
       if (badgeEl) {
         badgeEl.textContent = `오늘 복습 ${dueCards.length}개`;
         badgeEl.style.display = '';
+        badgeEl.style.cursor = 'pointer';
+        badgeEl.title = '복습 시작';
+        badgeEl.addEventListener('click', e => {
+          e.stopPropagation();
+          if (typeof enterReviewMode === 'function') enterReviewMode(folder.id);
+        });
       }
     }).catch(() => {});
   }
@@ -114,7 +120,7 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     displayNotes = displayNotes.filter(n => !n.folderId);
   }
 
-  // Gamification streak/XP badge — home view only
+  // Gamification streak/XP badge + daily goal section — home view only
   const gamifBadge = document.getElementById('gamifStreakBadge');
   if (gamifBadge) {
     if (!isFolderView && typeof getGamificationState === 'function') {
@@ -128,9 +134,12 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
           `</span>`;
         gamifBadge.style.display = '';
         window.mountLucideIcons?.();
+        renderDailyEngagementSection(state);
       }).catch(() => { gamifBadge.style.display = 'none'; });
     } else {
       gamifBadge.style.display = 'none';
+      const existing = document.getElementById('gamifDailyGoal');
+      if (existing) existing.style.display = 'none';
     }
   }
 
@@ -636,4 +645,157 @@ function filterByFolder(folderId) {
 
 function createFolderFromSidebar() {
   showFolderEditModal(null);
+}
+
+/* ═══════════════════════════════════════════════
+   Daily goal progress bar + streak calendar
+═══════════════════════════════════════════════ */
+function renderDailyEngagementSection(state) {
+  const badge = document.getElementById('gamifStreakBadge');
+  if (!badge) return;
+
+  let section = document.getElementById('gamifDailyGoal');
+  if (!section) {
+    section = document.createElement('div');
+    section.id = 'gamifDailyGoal';
+    section.style.cssText =
+      'margin-bottom:1.25rem;padding:1rem 1.25rem;' +
+      'background:var(--surface2,#1a1a2e);border-radius:var(--radius,12px);' +
+      'border:1px solid var(--border,rgba(255,255,255,0.08));';
+    badge.insertAdjacentElement('afterend', section);
+  }
+  section.style.display = '';
+
+  const today = (function() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  })();
+
+  const goal = state.dailyGoal || 5;
+  const prog = (state.dailyProgress && state.dailyProgress[today]) ||
+    { cardsReviewed: 0, notesCreated: 0, quizzesCompleted: 0, completed: false };
+
+  const goalDone = prog.completed ||
+    (prog.cardsReviewed || 0) >= goal ||
+    (prog.notesCreated  || 0) >= 1  ||
+    (prog.quizzesCompleted || 0) >= 1;
+
+  const barPct = goalDone ? 100 : Math.min(100, Math.round(((prog.cardsReviewed || 0) / goal) * 100));
+
+  // Goal options for settings picker
+  const GOAL_OPTIONS = [3, 5, 10, 15];
+
+  // ── Top row: title + settings gear ──
+  const titleRow =
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">' +
+      '<span style="font-size:0.88rem;font-weight:700;">오늘의 목표</span>' +
+      '<div style="position:relative;">' +
+        '<button id="gamifGoalSettingsBtn" title="목표 변경" style="background:none;border:none;cursor:pointer;' +
+        'color:var(--text-muted,#888);padding:0.1rem 0.25rem;border-radius:4px;font-size:0.9rem;">⚙️</button>' +
+        '<div id="gamifGoalDropdown" style="display:none;position:absolute;right:0;top:1.6rem;' +
+        'background:var(--surface,#1e1e2e);border:1px solid var(--border,rgba(255,255,255,0.12));' +
+        'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.3);z-index:100;min-width:120px;">' +
+          GOAL_OPTIONS.map(n =>
+            '<div class="gamif-goal-opt" data-goal="' + n + '" style="padding:0.5rem 1rem;cursor:pointer;' +
+            'font-size:0.85rem;' + (n === goal ? 'color:var(--primary,#7c4dff);font-weight:700;' : '') + '">' +
+            n + '장 복습</div>'
+          ).join('') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  // ── Progress bar ──
+  const barColor = goalDone ? 'var(--success,#22c55e)' : 'var(--primary,#7c4dff)';
+  const progressBar =
+    '<div style="height:8px;background:var(--surface3,rgba(255,255,255,0.06));border-radius:999px;overflow:hidden;margin-bottom:0.4rem;">' +
+      '<div style="height:100%;width:' + barPct + '%;background:' + barColor + ';' +
+      'border-radius:999px;transition:width 0.4s ease;"></div>' +
+    '</div>';
+
+  const subtitle = goalDone
+    ? '<div style="font-size:0.78rem;color:var(--success,#22c55e);font-weight:600;">✅ 오늘 목표 달성! <span style="opacity:0.7;">(+50 XP 보너스)</span></div>'
+    : '<div style="font-size:0.78rem;color:var(--text-muted,#888);">' +
+        goal + '장 복습 또는 1개 노트 생성 &nbsp;·&nbsp; ' +
+        '<span style="color:var(--text,inherit);">' + (prog.cardsReviewed || 0) + '/' + goal + '</span>' +
+      '</div>';
+
+  // ── Streak calendar (last 7 days) ──
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    const dayProg = state.dailyProgress && state.dailyProgress[ymd];
+    const met = dayProg && (dayProg.completed || dayProg.cardsReviewed >= (state.dailyGoal||5) || dayProg.notesCreated >= 1 || dayProg.quizzesCompleted >= 1);
+    const isToday = ymd === today;
+    const label = ['일','월','화','수','목','금','토'][d.getDay()];
+    let tooltip = ymd;
+    if (dayProg && met) {
+      const parts = [];
+      if (dayProg.cardsReviewed) parts.push('복습 ' + dayProg.cardsReviewed + '장');
+      if (dayProg.notesCreated)  parts.push('노트 ' + dayProg.notesCreated + '개');
+      if (dayProg.quizzesCompleted) parts.push('퀴즈 ' + dayProg.quizzesCompleted + '회');
+      if (parts.length) tooltip += ' · ' + parts.join(', ');
+    }
+    days.push({ ymd, met, isToday, label, tooltip });
+  }
+
+  const calendarSquares = days.map(({ met, isToday, label, tooltip }) => {
+    const bg = met
+      ? 'background:var(--primary,#7c4dff);'
+      : 'background:var(--surface3,rgba(255,255,255,0.06));';
+    const pulse = isToday
+      ? 'outline:2px solid var(--primary,#7c4dff);outline-offset:2px;'
+      : '';
+    const animation = isToday && !met ? 'animation:gamifPulse 2s ease-in-out infinite;' : '';
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+      '<div title="' + tooltip + '" style="width:24px;height:24px;border-radius:5px;' +
+      bg + pulse + animation + '"></div>' +
+      '<span style="font-size:0.6rem;color:var(--text-muted,#888);">' + label + '</span>' +
+    '</div>';
+  }).join('');
+
+  const calendar =
+    '<div style="display:flex;gap:6px;margin-top:0.85rem;justify-content:flex-start;">' +
+      calendarSquares +
+    '</div>';
+
+  section.innerHTML = titleRow + progressBar + subtitle + calendar;
+
+  // Inject pulse keyframes once
+  if (!document.getElementById('gamifPulseStyle')) {
+    const style = document.createElement('style');
+    style.id = 'gamifPulseStyle';
+    style.textContent = '@keyframes gamifPulse{0%,100%{opacity:1}50%{opacity:0.45}}';
+    document.head.appendChild(style);
+  }
+
+  // Settings dropdown toggle
+  const settingsBtn  = section.querySelector('#gamifGoalSettingsBtn');
+  const dropdown     = section.querySelector('#gamifGoalDropdown');
+  if (settingsBtn && dropdown) {
+    settingsBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      dropdown.style.display = dropdown.style.display === 'none' ? '' : 'none';
+    });
+    document.addEventListener('click', () => { dropdown.style.display = 'none'; }, { once: true });
+
+    section.querySelectorAll('.gamif-goal-opt').forEach(opt => {
+      opt.addEventListener('mouseover', () => { opt.style.background = 'var(--surface2,#1a1a2e)'; });
+      opt.addEventListener('mouseout',  () => { opt.style.background = ''; });
+      opt.addEventListener('click', async () => {
+        dropdown.style.display = 'none';
+        const newGoal = parseInt(opt.dataset.goal, 10);
+        if (!newGoal || newGoal === goal) return;
+        if (typeof getGamificationState === 'function') {
+          try {
+            const st = await getGamificationState();
+            st.dailyGoal = newGoal;
+            await saveGamificationState(st);
+            renderDailyEngagementSection(st);
+          } catch(_) {}
+        }
+      });
+    });
+  }
 }

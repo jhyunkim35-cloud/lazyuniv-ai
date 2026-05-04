@@ -133,6 +133,7 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
       storedHighlightedTranscript = await highlightTranscript(apiKey, storedFilteredText, storedNotesText);
     }
     debugLog('PIPE', 'Pipeline complete');
+    if (typeof markNoteCreated === 'function') markNoteCreated().catch(() => {});
   } catch (err) {
     agentLog(0, `오류 발생: ${err.message}`);
     throw err;  // propagate to caller — single-mode and batch handlers both handle toasting

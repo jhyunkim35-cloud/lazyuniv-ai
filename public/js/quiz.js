@@ -1090,6 +1090,7 @@ async function _quizRunGrading(ctx) {
       }),
     };
     await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
+    if (typeof markQuizCompleted === 'function') markQuizCompleted().catch(() => {});
     if (noteId) updateNoteWeaknessBadges(noteId).catch(() => {}); // refresh h2 accuracy badges
 
     const histBtn = banner.querySelector('#quizHistInlineBtn');
