@@ -1,5 +1,39 @@
 const fetch = globalThis.fetch || require('node-fetch');
 const { getAdmin } = require('./_firebase-admin');
+const { recordUsage } = require('./_usage');
+
+// Decode JWT payload without verification — for usage observability only.
+// A spoofed uid would pollute that uid's stats, not bypass billing (which
+// verifies the token cryptographically). Acceptable for non-billable calls.
+function quickDecodeUid(idToken) {
+  try {
+    const parts = (idToken || '').split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+    return payload.user_id || payload.sub || null;
+  } catch { return null; }
+}
+
+// Extract token counts from accumulated SSE text.
+// message_start carries input/cache counts; message_delta carries output count.
+function parseTokensFromSse(sseText) {
+  let inputTokens = 0, outputTokens = 0, cachedTokens = 0;
+  for (const line of sseText.split('\n')) {
+    if (!line.startsWith('data: ')) continue;
+    try {
+      const j = JSON.parse(line.slice(6));
+      if (j.type === 'message_start' && j.message?.usage) {
+        const u = j.message.usage;
+        inputTokens  = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+        cachedTokens = u.cache_read_input_tokens || 0;
+      }
+      if (j.type === 'message_delta' && j.usage) {
+        outputTokens = j.usage.output_tokens || 0;
+      }
+    } catch { /* skip malformed events */ }
+  }
+  return { inputTokens, outputTokens, cachedTokens };
+}
 
 const rateLimit = new Map();
 const RATE_LIMIT = 10; // requests per minute
@@ -250,6 +284,14 @@ module.exports = async (req, res) => {
 
   req._billCtx = billCtx;
 
+  // Resolve uid for usage tracking. Billable path already verified the token;
+  // for non-billable features we decode without full verification (observability only).
+  const uidForUsage = (billCtx?.uid) || quickDecodeUid(req.body?.idToken);
+  const usageKind = feature === 'noteAnalysis' ? 'note'
+    : feature === 'quiz' ? 'quiz'
+    : (feature === 'classify' || feature === 'grade') ? 'classify'
+    : null;
+
   // Strip our custom fields before forwarding to Anthropic
   const upstreamBody = { ...req.body };
   delete upstreamBody.idToken;
@@ -372,19 +414,50 @@ module.exports = async (req, res) => {
       // error envelope and the user got nothing usable.
       const upstreamOk = response.ok;
 
+      let sseAccum = '';
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          res.write(decoder.decode(value, { stream: true }));
+          const chunk = decoder.decode(value, { stream: true });
+          res.write(chunk);
+          if (upstreamOk) sseAccum += chunk;
         }
-        if (upstreamOk) await billOnSuccess();
+        if (upstreamOk) {
+          await billOnSuccess();
+          if (uidForUsage) {
+            try {
+              const { inputTokens, outputTokens, cachedTokens } = parseTokensFromSse(sseAccum);
+              await recordUsage({ uid: uidForUsage, kind: usageKind, increments: { inputTokens, outputTokens, cachedTokens } });
+            } catch (e) {
+              console.error('[usage] stream record failed:', e.message);
+            }
+          }
+        }
       } finally {
         res.end();
       }
     } else {
       const data = await response.json();
-      if (response.ok) await billOnSuccess();
+      if (response.ok) {
+        await billOnSuccess();
+        if (uidForUsage) {
+          try {
+            const u = data.usage || {};
+            await recordUsage({
+              uid: uidForUsage,
+              kind: usageKind,
+              increments: {
+                inputTokens:  (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0),
+                outputTokens: u.output_tokens || 0,
+                cachedTokens: u.cache_read_input_tokens || 0,
+              },
+            });
+          } catch (e) {
+            console.error('[usage] record failed:', e.message);
+          }
+        }
+      }
       res.status(response.status).json(data);
     }
   } catch (error) {

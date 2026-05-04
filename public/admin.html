@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>lazyuniv 관리자 대시보드</title>
+  <style>
+    :root {
+      --bg: #07070f;
+      --surface: #0f0f1c;
+      --surface2: #16162a;
+      --surface3: #1e1e36;
+      --border: #252545;
+      --border-bright: #3a3a6a;
+      --primary: #7c4dff;
+      --primary-dim: rgba(124,77,255,0.15);
+      --secondary: #00b4d8;
+      --success: #4ade80;
+      --warning: #fbbf24;
+      --danger: #ef4444;
+      --text: #e2e2f2;
+      --text-muted: #8888aa;
+      --text-dim: #44445a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 18px;
+      color: var(--primary);
+      margin-bottom: 8px;
+      letter-spacing: 0.05em;
+    }
+
+    h2 { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; }
+
+    #auth-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 60vh;
+      gap: 16px;
+      text-align: center;
+    }
+
+    #signin-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      transition: opacity 0.15s;
+    }
+    #signin-btn:hover { opacity: 0.85; }
+
+    #loading {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 60px;
+    }
+
+    #error-msg {
+      color: var(--danger);
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+    }
+
+    #dashboard-section { display: none; }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .toolbar input[type="text"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      width: 220px;
+      outline: none;
+    }
+    .toolbar input[type="text"]:focus { border-color: var(--primary); }
+
+    .toolbar label { color: var(--text-muted); }
+
+    .toolbar select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    thead th {
+      background: var(--surface2);
+      color: var(--text-muted);
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { color: var(--text); }
+    thead th.sort-asc::after  { content: ' ▲'; color: var(--primary); }
+    thead th.sort-desc::after { content: ' ▼'; color: var(--primary); }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    tbody tr:nth-child(even) { background: var(--surface); }
+    tbody tr:hover { background: var(--primary-dim); }
+
+    tbody td {
+      padding: 7px 10px;
+      white-space: nowrap;
+      vertical-align: top;
+    }
+
+    .uid-short { color: var(--text-muted); font-size: 11px; }
+    .plan-monthly { color: var(--success); }
+    .plan-free    { color: var(--text-muted); }
+    .num          { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .detail-row td {
+      background: var(--surface3) !important;
+      padding: 0 !important;
+    }
+    .detail-inner {
+      padding: 12px 16px;
+      border-left: 2px solid var(--primary);
+      margin: 4px 8px;
+    }
+    .detail-inner table { font-size: 11px; }
+    .detail-inner thead th {
+      background: transparent;
+      color: var(--text-dim);
+      padding: 4px 8px;
+    }
+    .detail-inner tbody td { padding: 4px 8px; }
+    .detail-inner tbody tr { background: transparent !important; }
+
+    tfoot tr { background: var(--surface2) !important; }
+    tfoot td {
+      padding: 8px 10px;
+      color: var(--warning);
+      font-weight: bold;
+      border-top: 2px solid var(--border-bright);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .badge-monthly { background: rgba(74,222,128,0.15); color: var(--success); }
+    .badge-free    { background: rgba(136,136,170,0.15); color: var(--text-muted); }
+    .badge-single  { background: rgba(0,180,216,0.15); color: var(--secondary); }
+  </style>
+</head>
+<body>
+
+  <div id="loading">초기화 중...</div>
+
+  <div id="auth-section" style="display:none">
+    <h1>lazyuniv 관리자</h1>
+    <h2>관리자 로그인 필요</h2>
+    <button id="signin-btn">Google로 로그인</button>
+  </div>
+
+  <div id="error-msg" style="display:none"></div>
+
+  <div id="dashboard-section">
+    <h1>lazyuniv 관리자 대시보드</h1>
+    <div class="toolbar">
+      <input type="text" id="search-box" placeholder="이메일 또는 UID로 검색...">
+      <label>정렬:</label>
+      <select id="sort-select">
+        <option value="lastActivity">마지막 활동 ↓</option>
+        <option value="noteCount">이번달 노트 ↓</option>
+        <option value="paymentCount">결제건수 ↓</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table id="users-table">
+        <thead>
+          <tr>
+            <th data-sort="uid">UID</th>
+            <th data-sort="email">이메일</th>
+            <th data-sort="plan">플랜</th>
+            <th data-sort="createdAt">가입일</th>
+            <th data-sort="noteCount" class="num">이번달 노트</th>
+            <th data-sort="quizCount" class="num">이번달 퀴즈</th>
+            <th class="num">이번달 토큰 (in/out/cached)</th>
+            <th data-sort="sttSeconds" class="num">STT 분</th>
+            <th data-sort="paymentCount" class="num">결제건수</th>
+            <th data-sort="lastActivity">마지막 활동</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+        <tfoot id="users-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyC68aMiCvyfR3QycxUknmxB3z7NS0qRE2g",
+      authDomain: "lazyuniv-ai.firebaseapp.com",
+      projectId: "lazyuniv-ai",
+      storageBucket: "lazyuniv-ai.firebasestorage.app",
+      messagingSenderId: "152431469306",
+      appId: "1:152431469306:web:a7292a51bd41b31a229f43"
+    });
+  </script>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 const { getAdmin } = require('./_firebase-admin');
 const { FieldValue } = require('firebase-admin/firestore');
+const { recordUsage } = require('./_usage');
 
 module.exports = async function handler(req, res) {
   // CORS
@@ -66,6 +67,16 @@ module.exports = async function handler(req, res) {
       } catch (e) {
         console.error('Firestore write failed:', e);
         return res.status(500).json({ success: false, message: 'Plan update failed: ' + e.message });
+      }
+
+      try {
+        await recordUsage({
+          uid,
+          kind: 'payment',
+          increments: { paymentCount: 1, paymentTotalKRW: verifiedAmount },
+        });
+      } catch (e) {
+        console.error('[usage] payment record failed:', e.message);
       }
 
       return res.status(200).json({ success: true, data, plan: verifiedPlan });

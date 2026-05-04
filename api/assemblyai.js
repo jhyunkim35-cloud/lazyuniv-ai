@@ -12,6 +12,7 @@
 
 const fetch = globalThis.fetch || require('node-fetch');
 const { getAdmin } = require('./_firebase-admin');
+const { recordUsage } = require('./_usage');
 
 const ASSEMBLYAI_BASE = 'https://api.assemblyai.com/v2';
 
@@ -174,6 +175,18 @@ module.exports = async (req, res) => {
             .join('\n');
         } else {
           payload.text = (stJson.text || '').trim();
+        }
+        // Record STT usage — audio_duration is seconds (float) from AssemblyAI.
+        // This fires once per completed-status response; in normal polling the
+        // client stops on first 'completed', so double-counting is unlikely.
+        try {
+          await recordUsage({
+            uid: user.uid,
+            kind: 'stt',
+            increments: { sttSeconds: stJson.audio_duration || 0 },
+          });
+        } catch (e) {
+          console.error('[usage] stt record failed:', e.message);
         }
       } else if (stJson.status === 'error') {
         payload.error_msg = stJson.error || 'transcription_error';
