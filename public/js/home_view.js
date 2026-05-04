@@ -124,16 +124,36 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const gamifBadge = document.getElementById('gamifStreakBadge');
   if (gamifBadge) {
     if (!isFolderView && typeof getGamificationState === 'function') {
-      getGamificationState().then(state => {
+      getGamificationState().then(async state => {
+        let dueHtml = '';
+        if (typeof getTotalDueCount === 'function') {
+          try {
+            const dueCount = await getTotalDueCount();
+            if (dueCount > 0) {
+              dueHtml = `<span id="homeSrsDueBadge" style="display:inline-flex;align-items:center;gap:0.3rem;font-size:0.85rem;` +
+                `color:var(--primary);background:rgba(124,77,255,0.12);padding:0.3rem 0.75rem;border-radius:999px;` +
+                `cursor:pointer;border:1px solid rgba(124,77,255,0.25);" title="복습 시작">` +
+                `<i data-lucide="book-open" class="icon-sm"></i><span>오늘 ${dueCount}장 복습</span>` +
+                `</span>`;
+            }
+          } catch (e) {}
+        }
         gamifBadge.innerHTML =
+          `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.4rem;">` +
           `<span style="display:inline-flex;align-items:center;gap:0.35rem;font-size:0.85rem;` +
           `color:var(--text-muted);background:var(--surface2);padding:0.3rem 0.75rem;border-radius:999px;">` +
           `<i data-lucide="flame" class="icon-sm"></i><span>${state.streak}일 연속</span>` +
           `<span style="opacity:0.4;">·</span>` +
           `<i data-lucide="star" class="icon-sm"></i><span>${state.xp} XP</span>` +
-          `</span>`;
+          `</span>${dueHtml}</div>`;
         gamifBadge.style.display = '';
         window.mountLucideIcons?.();
+        const dueBadgeEl = document.getElementById('homeSrsDueBadge');
+        if (dueBadgeEl) {
+          dueBadgeEl.addEventListener('click', () => {
+            if (typeof enterReviewMode === 'function') enterReviewMode(null);
+          });
+        }
         renderDailyEngagementSection(state);
       }).catch(() => { gamifBadge.style.display = 'none'; });
     } else {

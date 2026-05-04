@@ -18,6 +18,9 @@ function openNotionNote(note) {
   const bodyContent = document.getElementById('notionBodyContent');
   bodyContent.innerHTML = renderMarkdown(note.markdownContent || '');
 
+  // Attach SRS card-add buttons to each h2 heading
+  _attachNotionSrsButtons(bodyContent, note);
+
   // Reset to body tab
   _switchNotionTab('body');
 
@@ -110,7 +113,8 @@ async function updateNotionWeaknessBadges(noteId) {
   const sectionMap = new Map(report.sections.map(s => [s.name, s]));
   h2s.forEach(h2 => {
     h2.querySelector('.weakness-badge')?.remove();
-    const text = h2.textContent.trim();
+    // Use stored clean title (set by _attachNotionSrsButtons) to avoid SRS-button text contamination
+    const text = h2.dataset.sectionTitle || h2.textContent.trim();
     const sec  = sectionMap.get(text) || [...sectionMap.values()].find(s => text.includes(s.name) || s.name.includes(text));
     if (!sec) return;
     const cls   = sec.accuracy >= 80 ? 'green' : sec.accuracy >= 50 ? 'yellow' : 'red';
@@ -118,5 +122,72 @@ async function updateNotionWeaknessBadges(noteId) {
     badge.className  = `weakness-badge ${cls}`;
     badge.textContent = sec.accuracy + '%';
     h2.appendChild(badge);
+  });
+}
+
+function _notionSrsToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
+function _attachNotionSrsButtons(container, note) {
+  if (typeof cardIdFor !== 'function' || typeof saveSrsCard !== 'function') return;
+  const folderId = note.folderId || '';
+  const noteId   = note.id;
+  const h2s      = Array.from(container.querySelectorAll('h2'));
+  h2s.forEach(h2 => {
+    // Strip any existing badge text to get the clean section title
+    const clone = h2.cloneNode(true);
+    clone.querySelectorAll('.weakness-badge, .srs-add-btn').forEach(el => el.remove());
+    const sectionTitle = clone.textContent.trim();
+    if (!sectionTitle) return;
+
+    // Store clean title so updateNotionWeaknessBadges can read it without button text
+    h2.dataset.sectionTitle = sectionTitle;
+
+    const cardId = cardIdFor(folderId, noteId, sectionTitle);
+    const btn = document.createElement('button');
+    btn.className = 'srs-add-btn';
+    btn.textContent = '+ 복습 추가';
+
+    const setActive = () => {
+      btn.textContent = '✓ 복습 중';
+      btn.disabled = true;
+      btn.classList.add('active');
+    };
+
+    if (typeof getSrsCard === 'function') {
+      getSrsCard(cardId).then(existing => {
+        if (existing) {
+          setActive();
+        } else {
+          btn.addEventListener('click', async e => {
+            e.stopPropagation();
+            await saveSrsCard({
+              id: cardId, folderId, noteId, sectionTitle,
+              nextReviewDate: _notionSrsToday(),
+              interval: 0, repetitions: 0, easeFactor: 2.5,
+            });
+            setActive();
+            if (typeof showToast === 'function') showToast('✓ 복습 카드에 추가됨');
+          });
+        }
+      }).catch(() => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          await saveSrsCard({
+            id: cardId, folderId, noteId, sectionTitle,
+            nextReviewDate: _notionSrsToday(),
+            interval: 0, repetitions: 0, easeFactor: 2.5,
+          }).catch(() => {});
+          setActive();
+          if (typeof showToast === 'function') showToast('✓ 복습 카드에 추가됨');
+        });
+      });
+    }
+
+    h2.appendChild(btn);
   });
 }

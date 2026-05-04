@@ -147,6 +147,7 @@ function switchSplitTab(tab) {
         }
       });
     }
+    if (currentNoteId) _attachAccordionSrsButtons(accordionEl, currentNoteId);
   }
 
   // Refresh weakness badges whenever notes tab is shown
@@ -328,4 +329,69 @@ function openPdfPopup(bodyEl) {
 </html>`);
   win.document.close();
   debugLog('PDF', 'Print-ready page opened');
+}
+
+function _accSrsToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
+async function _attachAccordionSrsButtons(container, noteId) {
+  if (!noteId || typeof cardIdFor !== 'function' || typeof saveSrsCard !== 'function') return;
+  let folderId = '';
+  try {
+    const note = await getNoteFS(noteId);
+    if (note) folderId = note.folderId || '';
+  } catch (e) {}
+
+  container.querySelectorAll('.acc-sub-header').forEach(header => {
+    const raw = header.textContent || '';
+    const sectionTitle = raw.replace(/^[►▶]\s*/, '').trim();
+    if (!sectionTitle) return;
+
+    const cardId = cardIdFor(folderId, noteId, sectionTitle);
+    const btn = document.createElement('button');
+    btn.className = 'srs-add-btn';
+    btn.textContent = '+ 복습 추가';
+
+    const setActive = () => {
+      btn.textContent = '✓ 복습 중';
+      btn.disabled = true;
+      btn.classList.add('active');
+    };
+
+    if (typeof getSrsCard === 'function') {
+      getSrsCard(cardId).then(existing => {
+        if (existing) {
+          setActive();
+        } else {
+          btn.addEventListener('click', async e => {
+            e.stopPropagation();
+            await saveSrsCard({
+              id: cardId, folderId, noteId, sectionTitle,
+              nextReviewDate: _accSrsToday(),
+              interval: 0, repetitions: 0, easeFactor: 2.5,
+            }).catch(() => {});
+            setActive();
+            if (typeof showToast === 'function') showToast('✓ 복습 카드에 추가됨');
+          });
+        }
+      }).catch(() => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation();
+          await saveSrsCard({
+            id: cardId, folderId, noteId, sectionTitle,
+            nextReviewDate: _accSrsToday(),
+            interval: 0, repetitions: 0, easeFactor: 2.5,
+          }).catch(() => {});
+          setActive();
+          if (typeof showToast === 'function') showToast('✓ 복습 카드에 추가됨');
+        });
+      });
+    }
+
+    header.appendChild(btn);
+  });
 }
