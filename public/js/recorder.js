@@ -267,6 +267,42 @@
         border: 1px solid var(--border, #252545);
       }
       .rec-btn-secondary:hover { background: var(--surface3, #1e1e36); }
+
+      /* ── STT background pill ─────────────────────────── */
+      .rec-pill-stt-spinner {
+        width: 14px; height: 14px;
+        border: 2px solid rgba(96,165,250,0.25);
+        border-top-color: #60a5fa;
+        border-radius: 50%;
+        animation: recSttSpin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+      .rec-pill-stt-label {
+        font-size: 13px; font-weight: 600;
+        flex: 1; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        color: #93c5fd;
+      }
+      .rec-pill-stt-elapsed {
+        font-size: 12px; font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+        color: rgba(147,197,253,0.7); flex-shrink: 0; white-space: nowrap;
+      }
+      .recorder-modal--minimized.recorder-modal--stt .recorder-panel {
+        background: #0c1424 !important;
+        border: 1px solid rgba(96,165,250,0.22) !important;
+      }
+      .recorder-modal--minimized.recorder-modal--stt-long .recorder-panel {
+        border-color: rgba(251,191,36,0.35) !important;
+      }
+      .recorder-modal--minimized.recorder-modal--stt-long .rec-pill-stt-label,
+      .recorder-modal--minimized.recorder-modal--stt-long .rec-pill-stt-elapsed {
+        color: #fbbf24;
+      }
+      .recorder-modal--minimized.recorder-modal--stt-long .rec-pill-stt-spinner {
+        border-top-color: #fbbf24;
+        border-color: rgba(251,191,36,0.25);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -403,20 +439,31 @@
 
         <!-- Compact pill content (visible only when minimized) -->
         <div class="recorder-pill" id="recorderPill">
-          <div class="rec-dot" id="recPillDot"></div>
-          <div class="rec-pill-timer" id="recPillTimer">00:00</div>
-          <button class="rec-pill-btn rec-pill-btn--pause"  id="recPillPauseBtn"  aria-label="일시정지"></button>
-          <button class="rec-pill-btn rec-pill-btn--stop"   id="recPillStopBtn"   aria-label="녹음 종료"></button>
-          <button class="rec-pill-btn rec-pill-btn--expand" id="recPillExpandBtn" aria-label="확장"></button>
+          <!-- Recording pill content -->
+          <div id="recPillRecContent" style="display:flex;align-items:center;gap:8px;width:100%">
+            <div class="rec-dot" id="recPillDot"></div>
+            <div class="rec-pill-timer" id="recPillTimer">00:00</div>
+            <button class="rec-pill-btn rec-pill-btn--pause"  id="recPillPauseBtn"  aria-label="일시정지"></button>
+            <button class="rec-pill-btn rec-pill-btn--stop"   id="recPillStopBtn"   aria-label="녹음 종료"></button>
+            <button class="rec-pill-btn rec-pill-btn--expand" id="recPillExpandBtn" aria-label="확장"></button>
+          </div>
+          <!-- STT pill content -->
+          <div id="recPillSttContent" style="display:none;align-items:center;gap:8px;width:100%">
+            <div class="rec-pill-stt-spinner"></div>
+            <div class="rec-pill-stt-label" id="recPillSttLabel">변환 중…</div>
+            <div class="rec-pill-stt-elapsed" id="recPillSttElapsed">00:00</div>
+            <button class="rec-pill-btn rec-pill-btn--expand" id="recPillSttExpandBtn" aria-label="확장"></button>
+          </div>
         </div>
       </div>
     `;
     document.body.appendChild(modalEl);
 
     // Set pill button icons (inline SVG — no lucide mounting needed)
-    modalEl.querySelector('#recPillPauseBtn').innerHTML  = SVG_PAUSE;
-    modalEl.querySelector('#recPillStopBtn').innerHTML   = SVG_STOP;
-    modalEl.querySelector('#recPillExpandBtn').innerHTML = SVG_EXPAND;
+    modalEl.querySelector('#recPillPauseBtn').innerHTML     = SVG_PAUSE;
+    modalEl.querySelector('#recPillStopBtn').innerHTML      = SVG_STOP;
+    modalEl.querySelector('#recPillExpandBtn').innerHTML    = SVG_EXPAND;
+    modalEl.querySelector('#recPillSttExpandBtn').innerHTML = SVG_EXPAND;
 
     // Wire static handlers
     modalEl.querySelector('#recCloseBtn').addEventListener('click', closeModalIfSafe);
@@ -427,7 +474,7 @@
     modalEl.querySelector('#recPauseBtn').addEventListener('click', togglePause);
     modalEl.querySelector('#recStopBtn').addEventListener('click', stopRecording);
     modalEl.querySelector('#recCancelLiveBtn').addEventListener('click', cancelLiveRecording);
-    modalEl.querySelector('#recHideSttBtn').addEventListener('click', hideModal);
+    modalEl.querySelector('#recHideSttBtn').addEventListener('click', minimizePill);
     modalEl.querySelector('#recDoneCloseBtn').addEventListener('click', hideModal);
     modalEl.querySelector('#recDoneGoNewBtn').addEventListener('click', () => {
       const file = modalState.pendingFile;
@@ -444,6 +491,7 @@
     modalEl.querySelector('#recPillPauseBtn').addEventListener('click', togglePause);
     modalEl.querySelector('#recPillStopBtn').addEventListener('click', stopRecording);
     modalEl.querySelector('#recPillExpandBtn').addEventListener('click', expandPill);
+    modalEl.querySelector('#recPillSttExpandBtn').addEventListener('click', expandPill);
 
     // Drag
     initPillDrag(
@@ -464,9 +512,9 @@
     return modalEl;
   }
 
-  // ── Backdrop click: auto-minimize during active recording ──
+  // ── Backdrop click: auto-minimize during active recording or STT ──
   function handleBackdropClick() {
-    if (modalState.phase === 'recording' || modalState.phase === 'paused') {
+    if (modalState.phase === 'recording' || modalState.phase === 'paused' || modalState.phase === 'transcribing') {
       minimizePill();
     } else {
       closeModalIfSafe();
@@ -515,19 +563,32 @@
 
   function updatePillUI() {
     if (!modalEl) return;
-    const dot      = modalEl.querySelector('#recPillDot');
-    const pauseBtn = modalEl.querySelector('#recPillPauseBtn');
-    if (!dot || !pauseBtn) return;
+    const phase      = modalState.phase;
+    const recContent = modalEl.querySelector('#recPillRecContent');
+    const sttContent = modalEl.querySelector('#recPillSttContent');
 
-    const paused = modalState.phase === 'paused';
-    dot.classList.toggle('rec-dot--paused', paused);
-    pauseBtn.innerHTML = paused ? SVG_PLAY : SVG_PAUSE;
-    pauseBtn.setAttribute('aria-label', paused ? '재개' : '일시정지');
+    if (phase === 'transcribing') {
+      if (recContent) recContent.style.display = 'none';
+      if (sttContent) sttContent.style.display = 'flex';
+      modalEl.classList.add('recorder-modal--stt');
+    } else {
+      if (recContent) recContent.style.display = 'flex';
+      if (sttContent) sttContent.style.display = 'none';
+      modalEl.classList.remove('recorder-modal--stt');
+      modalEl.classList.remove('recorder-modal--stt-long');
 
-    // Sync pill timer to main timer's current text
-    const mainTimer = document.getElementById('recTimer');
-    const pillTimer = document.getElementById('recPillTimer');
-    if (mainTimer && pillTimer) pillTimer.textContent = mainTimer.textContent;
+      const dot      = modalEl.querySelector('#recPillDot');
+      const pauseBtn = modalEl.querySelector('#recPillPauseBtn');
+      if (dot && pauseBtn) {
+        const paused = phase === 'paused';
+        dot.classList.toggle('rec-dot--paused', paused);
+        pauseBtn.innerHTML = paused ? SVG_PLAY : SVG_PAUSE;
+        pauseBtn.setAttribute('aria-label', paused ? '재개' : '일시정지');
+        const mainTimer = document.getElementById('recTimer');
+        const pillTimer = document.getElementById('recPillTimer');
+        if (mainTimer && pillTimer) pillTimer.textContent = mainTimer.textContent;
+      }
+    }
   }
 
   // ── Pill drag (mouse + touch) ────────────────────────────
@@ -635,11 +696,19 @@
     if (modalState.phase === 'uploading') {
       if (!confirm('업로드를 취소하시겠습니까?')) return;
     }
+    if (modalState.phase === 'transcribing') {
+      minimizePill();
+      return;
+    }
     hideModal();
   }
 
   // ── Live recording ──────────────────────────────────────
   async function startLiveRecording() {
+    if (modalState.phase === 'transcribing') {
+      window.showToast?.('⚠️ 이전 변환이 끝난 후 시작하세요.');
+      return;
+    }
     if (!currentUser) {
       window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
       return;
@@ -837,6 +906,10 @@
     const file = ev.target.files && ev.target.files[0];
     ev.target.value = '';
     if (!file) return;
+    if (modalState.phase === 'transcribing') {
+      window.showToast?.('⚠️ 이전 변환이 끝난 후 시작하세요.');
+      return;
+    }
     if (!currentUser) {
       window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
       return;
@@ -888,6 +961,7 @@
     }
 
     switchScreen('stt');
+    modalState.phase = 'transcribing';
     document.getElementById('recSttStatus').textContent = '텍스트 변환 시작 중…';
 
     // Track when polling started for elapsed display and long-wait warning
@@ -901,9 +975,12 @@
       const ss  = String(sec % 60).padStart(2, '0');
       const el  = document.getElementById('recSttElapsed');
       if (el) el.textContent = `경과 ${mm}:${ss}`;
+      const pillElapsed = document.getElementById('recPillSttElapsed');
+      if (pillElapsed) pillElapsed.textContent = `${mm}:${ss}`;
       if (sec >= 300) {
         const warn = document.getElementById('recSttLongWarn');
         if (warn) warn.style.display = '';
+        if (modalEl) modalEl.classList.add('recorder-modal--stt-long');
       }
     }, 1000);
 
@@ -946,15 +1023,18 @@
         if (!r.ok) {
           throw new Error(j.error || 'status_failed');
         }
-        const lbl = document.getElementById('recSttStatus');
-        const stLabel = document.getElementById('recSttStage2Label');
+        const lbl      = document.getElementById('recSttStatus');
+        const stLabel  = document.getElementById('recSttStage2Label');
+        const pillLbl  = document.getElementById('recPillSttLabel');
 
         if (j.status === 'queued') {
           lbl.textContent = '대기열에서 차례를 기다리는 중…';
-          if (stLabel) stLabel.textContent = '② 변환 대기 중';
+          if (stLabel)  stLabel.textContent = '② 변환 대기 중';
+          if (pillLbl)  pillLbl.textContent = '대기 중…';
         } else if (j.status === 'processing') {
           lbl.textContent = '텍스트 변환 중…';
-          if (stLabel) stLabel.textContent = '② 텍스트 변환 중';
+          if (stLabel)  stLabel.textContent = '② 텍스트 변환 중';
+          if (pillLbl)  pillLbl.textContent = '변환 중…';
         } else if (j.status === 'completed') {
           deliverTranscript(j.text || '', filename);
           return;
@@ -969,6 +1049,15 @@
       } catch (err) {
         console.error('[recorder] poll failed', err);
         if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
+        modalState.phase = 'error';
+        if (modalEl) {
+          modalEl.classList.remove('recorder-modal--minimized');
+          modalEl.classList.remove('recorder-modal--stt');
+          modalEl.classList.remove('recorder-modal--stt-long');
+          modalEl.classList.remove('hidden');
+          const panelEl = modalEl.querySelector('.recorder-panel');
+          if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
+        }
         switchScreen('error');
         document.getElementById('recErrorStatus').textContent =
           '변환 중 오류가 발생했습니다. (' + (err.message || 'unknown') + ')';
@@ -1021,6 +1110,7 @@
 
     // Clear STT elapsed interval now that we're done processing
     if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
+    modalState.phase = 'completed';
 
     // Briefly advance stage tracker: stage 2 → done, stage 3 → active
     const _st2 = document.getElementById('recSttStage2');
@@ -1074,10 +1164,12 @@
       if (closeBtn) { closeBtn.textContent = '닫기'; closeBtn.className = 'rec-btn rec-btn-secondary'; }
     }
 
-    // Surface the modal if the user had hidden it during background processing
-    if (modalEl && modalEl.classList.contains('hidden')) {
+    // Surface the modal if the user had hidden or minimized it during background processing
+    if (modalEl && (modalEl.classList.contains('hidden') || modalEl.classList.contains('recorder-modal--minimized'))) {
       modalEl.classList.remove('hidden');
       modalEl.classList.remove('recorder-modal--minimized');
+      modalEl.classList.remove('recorder-modal--stt');
+      modalEl.classList.remove('recorder-modal--stt-long');
       const panelEl = modalEl.querySelector('.recorder-panel');
       if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
     }
