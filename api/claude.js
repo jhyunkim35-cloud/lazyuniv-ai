@@ -164,6 +164,14 @@ module.exports = async (req, res) => {
   // burning their analysis count.
   const isBillable = feature === 'noteAnalysis';
 
+  // B1 strict mode: noteAnalysis MUST supply analysisId. Reject anything
+  // that arrives without it — covers both the isFirstCall:false bypass (no
+  // quota check at all) and the isFirstCall:true legacy path.
+  if (isBillable && !analysisId) {
+    console.warn(`[B1 strict] noteAnalysis rejected — missing analysisId (isFirstCall=${isFirstCall}, ip=${ip})`);
+    return res.status(400).json({ error: 'analysisId required for noteAnalysis (strict mode)' });
+  }
+
   if (isBillable && analysisId) {
     // New path: analysisId-driven idempotent billing.
     let admin;
