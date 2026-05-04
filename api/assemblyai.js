@@ -169,11 +169,47 @@ module.exports = async (req, res) => {
       };
       if (stJson.status === 'completed') {
         if (Array.isArray(stJson.utterances) && stJson.utterances.length) {
-          payload.text = stJson.utterances
-            .map(u => `[화자 ${u.speaker || '?'}] ${(u.text || '').trim()}`)
-            .filter(line => line.length > 8)
-            .join('\n');
+          // Sum speaking duration per speaker letter; word count is tiebreaker
+          const totals = {};
+          const wordCounts = {};
+          for (const u of stJson.utterances) {
+            const s = u.speaker || '?';
+            totals[s] = (totals[s] || 0) + ((u.end || 0) - (u.start || 0));
+            const wc = Array.isArray(u.words)
+              ? u.words.length
+              : (u.text || '').trim().split(/\s+/).filter(Boolean).length;
+            wordCounts[s] = (wordCounts[s] || 0) + wc;
+          }
+          // Most speech → speaker 1 (dominant speaker / lecturer)
+          const sorted = Object.keys(totals).sort((a, b) => {
+            const diff = totals[b] - totals[a];
+            return diff !== 0 ? diff : (wordCounts[b] || 0) - (wordCounts[a] || 0);
+          });
+          const remap = {};
+          sorted.forEach((letter, i) => { remap[letter] = i + 1; });
+
+          // Rebuild transcript with "발화자 N: " prefix; blank line on speaker change
+          const lines = [];
+          let prevNum = null;
+          for (const u of stJson.utterances) {
+            const num = remap[u.speaker || '?'] ?? '?';
+            const text = (u.text || '').trim();
+            if (prevNum !== null && num !== prevNum) lines.push('');
+            lines.push(`발화자 ${num}: ${text}`);
+            prevNum = num;
+          }
+          payload.text = lines.join('\n');
+          payload.utterances = stJson.utterances.map(u => ({
+            speaker: remap[u.speaker || '?'] ?? '?',
+            text: (u.text || '').trim(),
+            start: u.start,
+            end: u.end,
+          }));
+          payload.speaker_count = sorted.length;
         } else {
+          if (!stJson.utterances) {
+            console.warn('[assemblyai] no utterances field in completed response — returning raw text');
+          }
           payload.text = (stJson.text || '').trim();
         }
         // Record STT usage — audio_duration is seconds (float) from AssemblyAI.
