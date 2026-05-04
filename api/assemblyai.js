@@ -206,6 +206,22 @@ module.exports = async (req, res) => {
             end: u.end,
           }));
           payload.speaker_count = sorted.length;
+          // Debug: surface size discrepancies that hint at truncation.
+          // If raw .text is much longer than our rebuilt text, something
+          // dropped during utterance iteration; if utterances are short
+          // but raw .text is long, raw .text wins.
+          const rawLen = (stJson.text || '').length;
+          const rebuiltLen = payload.text.length;
+          console.log(`[assemblyai] completed: utterances=${stJson.utterances.length}, speakers=${sorted.length}, raw_text=${rawLen}chars, rebuilt=${rebuiltLen}chars, audio_duration=${stJson.audio_duration}s`);
+          // Safety net: if rebuilt is dramatically shorter than raw (>20%
+          // gap), the utterances field is incomplete and we'd lose data.
+          // Fall back to raw text in that case (loses speaker labels but
+          // preserves the lecture content).
+          if (rawLen > 0 && rebuiltLen < rawLen * 0.8) {
+            console.warn(`[assemblyai] rebuilt text only ${rebuiltLen}/${rawLen} chars — falling back to raw text`);
+            payload.text = (stJson.text || '').trim();
+            payload.fallback_to_raw = true;
+          }
         } else {
           if (!stJson.utterances) {
             console.warn('[assemblyai] no utterances field in completed response — returning raw text');

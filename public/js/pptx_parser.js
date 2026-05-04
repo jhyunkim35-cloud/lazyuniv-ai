@@ -730,10 +730,13 @@ async function extractPdfPageImages(file) {
 
 /* ═══════════════════════════════════════════════
    Speaker separation (client-side)
-   Clova format: optional [hh:mm:ss] prefix, then "참석자 N: text"
+   Supports two transcript formats:
+   - Clova STT:  "[hh:mm:ss] 참석자 N: text"
+   - AssemblyAI: "발화자 N: text"   (server already remaps so dominant speaker = 1)
 ═══════════════════════════════════════════════ */
 function separateSpeakers(rawText, professorNum) {
-  const speakerRe = /^(?:\[[\d:]+\]\s*)?참석자\s*(\d+)\s*:/;
+  // Match either "참석자 N:" or "발화자 N:" with optional [timestamp] prefix.
+  const speakerRe = /^(?:\[[\d:]+\]\s*)?(?:참석자|발화자)\s*(\d+)\s*:/;
   const lines = rawText.split('\n');
 
   const speakers = new Set();
@@ -757,11 +760,12 @@ function separateSpeakers(rawText, professorNum) {
 
   const profLines = lines.filter(line => {
     const stripped = line.replace(/^\[[\d:]+\]\s*/, '');
-    return stripped.startsWith(`참석자 ${professorNum}:`);
+    return stripped.startsWith(`참석자 ${professorNum}:`)
+        || stripped.startsWith(`발화자 ${professorNum}:`);
   });
 
   const extractedText = profLines
-    .map(line => line.replace(/^\[[\d:]+\]\s*/, '').replace(/^참석자\s*\d+\s*:\s*/, '').trim())
+    .map(line => line.replace(/^\[[\d:]+\]\s*/, '').replace(/^(?:참석자|발화자)\s*\d+\s*:\s*/, '').trim())
     .filter(t => t.length > 0)
     .join('\n');
 
