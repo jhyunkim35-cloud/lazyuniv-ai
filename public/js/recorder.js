@@ -606,6 +606,14 @@
       const bar = document.getElementById('recMeterBar');
       modalState.levelHandle = setInterval(() => {
         if (!modalState.analyser) return;
+        // While paused, freeze the meter at 0 so users see clearly that
+        // nothing is being captured. The MediaStream itself stays live
+        // (MediaRecorder.pause() doesn't stop the underlying track), so
+        // without this guard the bar would keep dancing despite pause.
+        if (modalState.phase === 'paused') {
+          if (bar) bar.style.width = '0%';
+          return;
+        }
         modalState.analyser.getByteTimeDomainData(buf);
         let sum = 0;
         for (let i = 0; i < buf.length; i++) {
