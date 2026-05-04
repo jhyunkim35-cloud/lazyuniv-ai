@@ -1,0 +1,369 @@
+<!-- TEMPLATE — 변호사 검토 필요. 운영자가 사업자등록 후 placeholder를 실제 정보로 교체할 것. -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>이용약관 · lazyuniv-ai</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231a1a2e'/%3E%3Ctext x='50' y='68' font-family='Georgia,serif' font-size='62' font-weight='600' text-anchor='middle' fill='%23e2e2f2'%3EL%3C/text%3E%3C/svg%3E" />
+  <style>
+    :root {
+      --bg: #07070f;
+      --surface: #0f0f1c;
+      --surface2: #16162a;
+      --surface3: #1e1e36;
+      --border: #252545;
+      --border-bright: #3a3a6a;
+      --primary: #7c4dff;
+      --primary-dim: rgba(124, 77, 255, 0.15);
+      --text: #e2e2f2;
+      --text-muted: #8888aa;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.75;
+    }
+
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem;
+    }
+
+    header {
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header a {
+      font-size: 0.85rem;
+      color: var(--primary);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      margin-bottom: 1.2rem;
+    }
+
+    header a:hover { text-decoration: underline; }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+
+    .meta {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    section {
+      margin-bottom: 2.5rem;
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.8rem;
+      padding-left: 0.75rem;
+      border-left: 3px solid var(--primary);
+    }
+
+    p {
+      font-size: 0.92rem;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+
+    ol, ul {
+      padding-left: 1.5rem;
+      font-size: 0.92rem;
+      margin-bottom: 0.75rem;
+    }
+
+    li { margin-bottom: 0.4rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem;
+      margin-bottom: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin-bottom: 0.75rem;
+    }
+
+    th {
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      background: var(--surface2);
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .placeholder {
+      color: var(--primary);
+      background: var(--primary-dim);
+      border-radius: 4px;
+      padding: 0 0.3rem;
+      font-style: italic;
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+
+    footer a:hover { color: var(--primary); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="/">← lazyuniv-ai 홈으로</a>
+    <h1>이용약관</h1>
+    <p class="meta">시행일: 2026-05-04 &nbsp;|&nbsp; lazyuniv-ai</p>
+  </header>
+
+  <!-- 제1조 -->
+  <section>
+    <h2>제1조 (목적)</h2>
+    <p>
+      본 약관은 <strong>lazyuniv-ai</strong>(이하 "서비스")를 운영하는 <span class="placeholder">[TBD — 운영자 본명]</span>(이하 "운영자")이 제공하는 AI 학습노트 서비스의 이용 조건 및 절차, 운영자와 회원 간의 권리·의무 사항을 규정함을 목적으로 합니다.
+    </p>
+  </section>
+
+  <!-- 제2조 -->
+  <section>
+    <h2>제2조 (정의)</h2>
+    <ol>
+      <li><strong>"서비스"</strong>란 운영자가 <code>lazyuniv-ai.vercel.app</code>을 통해 제공하는 AI 학습노트 생성, 퀴즈 자동 생성, 강의 녹취록 분석 등 일체의 기능을 말합니다.</li>
+      <li><strong>"회원"</strong>이란 본 약관에 동의하고 Google 계정을 통해 가입하여 서비스를 이용하는 자를 말합니다.</li>
+      <li><strong>"강의 자료"</strong>란 회원이 서비스에 업로드하는 PPT, PDF 파일 및 녹음 파일 등을 말합니다.</li>
+      <li><strong>"학습노트"</strong>란 서비스가 강의 자료를 분석하여 AI가 생성한 요약·정리 문서 및 퀴즈를 말합니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제3조 -->
+  <section>
+    <h2>제3조 (약관의 게시 및 효력)</h2>
+    <ol>
+      <li>본 약관은 서비스 화면 하단에 게시하며, 회원이 최초 로그인 시 동의함으로써 효력이 발생합니다.</li>
+      <li>운영자는 약관을 변경할 경우 변경 내용과 시행일을 서비스 내 공지사항에 7일 전 이상 게시합니다. 시행일 이후에도 서비스를 계속 이용하면 변경된 약관에 동의한 것으로 간주합니다.</li>
+      <li>본 약관에 명시되지 않은 사항은 「전자상거래 등에서의 소비자보호에 관한 법률」, 「정보통신망 이용촉진 및 정보보호 등에 관한 법률」 등 관계 법령에 따릅니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제4조 -->
+  <section>
+    <h2>제4조 (회원가입)</h2>
+    <ol>
+      <li>서비스는 Google OAuth 방식의 소셜 로그인만 지원합니다. 별도의 회원가입 양식은 없으며, 최초 로그인 시 본 약관 및 개인정보 처리방침 동의가 완료되면 회원으로 가입됩니다.</li>
+      <li>만 14세 미만은 서비스를 이용할 수 없습니다.</li>
+      <li>회원은 타인의 Google 계정을 무단으로 사용해서는 안 됩니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제5조 -->
+  <section>
+    <h2>제5조 (계정 관리)</h2>
+    <ol>
+      <li>회원은 자신의 계정 보안에 책임이 있으며, 계정 도용 또는 무단 사용이 발견된 경우 즉시 운영자에게 신고하여야 합니다.</li>
+      <li>운영자는 회원이 다음 각 호에 해당하는 경우 사전 통보 없이 서비스 이용을 제한하거나 계정을 삭제할 수 있습니다.
+        <ul>
+          <li>타인의 명예를 훼손하거나 개인정보를 침해하는 경우</li>
+          <li>서비스의 정상적인 운영을 방해하는 경우</li>
+          <li>저작권 침해 콘텐츠를 반복적으로 업로드하는 경우</li>
+          <li>관계 법령을 위반한 경우</li>
+        </ul>
+      </li>
+    </ol>
+  </section>
+
+  <!-- 제6조 -->
+  <section>
+    <h2>제6조 (회원 탈퇴)</h2>
+    <ol>
+      <li>회원은 서비스 내 설정 화면 또는 운영자 이메일(<span class="placeholder">[TBD — 이메일]</span>)을 통해 탈퇴를 요청할 수 있습니다.</li>
+      <li>탈퇴 시 업로드된 강의 자료, 생성된 학습노트 등 개인 데이터는 즉시 삭제되며, 단 결제 기록은 「전자상거래법」에 따라 5년간 보존됩니다.</li>
+      <li>남은 유료 이용 기간이 있는 경우 환불 규정(제9조)에 따라 처리됩니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제7조 -->
+  <section>
+    <h2>제7조 (서비스 내용)</h2>
+    <p>운영자는 다음 기능을 제공합니다.</p>
+    <div class="card">
+      <ol>
+        <li><strong>강의 자료 업로드</strong> — PPT(.pptx) 및 PDF 파일 업로드 후 텍스트 추출</li>
+        <li><strong>AI 학습노트 생성</strong> — Anthropic Claude API를 활용한 자동 요약 및 구조화</li>
+        <li><strong>퀴즈 자동 생성</strong> — 강의 내용 기반 객관식·주관식 문제 생성</li>
+        <li><strong>강의 녹음 분석 (STT)</strong> — AssemblyAI를 활용한 음성-텍스트 변환 및 요약</li>
+      </ol>
+    </div>
+    <p>서비스 내용은 운영자의 판단에 따라 사전 고지 후 변경될 수 있습니다.</p>
+  </section>
+
+  <!-- 제8조 -->
+  <section>
+    <h2>제8조 (요금 정책)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>요금제</th>
+          <th>내용</th>
+          <th>금액</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>무료</td>
+          <td>월 3강 한도로 학습노트 생성</td>
+          <td>무료</td>
+        </tr>
+        <tr>
+          <td>단건 결제</td>
+          <td>강의 1건당 학습노트 생성</td>
+          <td>500원 / 강의</td>
+        </tr>
+        <tr>
+          <td>무제한 구독</td>
+          <td>월 무제한 학습노트 생성</td>
+          <td>7,900원 / 월</td>
+        </tr>
+      </tbody>
+    </table>
+    <ol>
+      <li>결제는 Toss Payments를 통해 처리됩니다. 신용카드, 체크카드, 간편결제 등을 지원합니다.</li>
+      <li>구독 요금은 결제일로부터 매월 자동 갱신됩니다.</li>
+      <li>요금은 운영자의 정책에 따라 변경될 수 있으며, 변경 시 30일 전 공지합니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제9조 -->
+  <section>
+    <h2>제9조 (환불 규정)</h2>
+    <ol>
+      <li>디지털 콘텐츠의 특성상 학습노트가 생성된 건(단건 결제)은 원칙적으로 환불이 제한됩니다. 단, 서비스 오류로 인해 정상적으로 생성되지 않은 경우 전액 환불합니다.</li>
+      <li>무제한 구독의 경우:
+        <ul>
+          <li>결제 후 7일 이내이고 서비스를 전혀 이용하지 않은 경우: 전액 환불</li>
+          <li>결제 후 7일 이내이고 일부 이용한 경우: 이용 비율에 따른 차감 후 환불</li>
+          <li>결제 후 7일 초과: 환불 불가 (단, 서비스 장애·중단 시 예외 적용)</li>
+        </ul>
+      </li>
+      <li>환불 요청은 운영자 이메일(<span class="placeholder">[TBD — 이메일]</span>)로 접수하며, 접수일로부터 3영업일 이내 처리합니다.</li>
+      <li>본 환불 규정은 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조를 기준으로 합니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제10조 -->
+  <section>
+    <h2>제10조 (회원의 의무)</h2>
+    <ol>
+      <li>회원은 다음 행위를 해서는 안 됩니다.
+        <ul>
+          <li>타인의 저작권, 특허권, 상표권 등 지식재산권을 침해하는 콘텐츠 업로드</li>
+          <li>개인정보를 무단으로 수집하거나 타인의 정보를 도용하는 행위</li>
+          <li>서비스를 통해 불법적이거나 유해한 콘텐츠를 생성·유포하는 행위</li>
+          <li>서비스의 소스코드, AI 모델, 알고리즘을 역분석하거나 복제하는 행위</li>
+          <li>자동화된 방법으로 서비스에 과부하를 주는 행위</li>
+        </ul>
+      </li>
+      <li>회원은 업로드하는 강의 자료에 대한 저작권 및 이용 권한을 보유하거나 적법하게 취득하였음을 보증합니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제11조 -->
+  <section>
+    <h2>제11조 (지식재산권)</h2>
+    <ol>
+      <li>서비스가 생성한 학습노트의 저작권은 해당 콘텐츠를 업로드한 회원에게 귀속됩니다. 단, 운영자는 서비스 개선 목적으로 익명화된 통계 데이터를 활용할 수 있습니다.</li>
+      <li>서비스 자체(UI, 코드, 브랜드, 알고리즘 등)의 지식재산권은 운영자에게 귀속됩니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제12조 -->
+  <section>
+    <h2>제12조 (운영자의 책임 제한)</h2>
+    <ol>
+      <li>운영자는 천재지변, 전쟁, 테러, 해킹, 클라우드 인프라 장애 등 불가항력적 사유로 인한 서비스 중단에 대해 책임을 지지 않습니다.</li>
+      <li>AI가 생성하는 학습노트는 참고 자료이며, 그 정확성이나 완전성을 보증하지 않습니다. 학업 결과에 대한 최종 책임은 회원 본인에게 있습니다.</li>
+      <li>회원이 업로드한 콘텐츠로 인해 발생하는 제3자와의 분쟁에 대해 운영자는 책임을 지지 않습니다.</li>
+      <li>서비스 이용으로 발생한 손해가 운영자의 고의 또는 중과실에 의한 경우를 제외하고, 운영자의 배상 책임은 해당 회원이 서비스에 지급한 최근 1개월 요금 범위로 제한됩니다.</li>
+    </ol>
+  </section>
+
+  <!-- 제13조 -->
+  <section>
+    <h2>제13조 (분쟁 해결)</h2>
+    <ol>
+      <li>본 약관은 대한민국 법률에 따라 해석 및 적용됩니다.</li>
+      <li>서비스 이용과 관련하여 운영자와 회원 간에 분쟁이 발생한 경우, 상호 협의로 해결하는 것을 원칙으로 합니다.</li>
+      <li>협의가 이루어지지 않는 경우, 관할 법원은 <strong>서울중앙지방법원</strong>으로 합니다.</li>
+    </ol>
+  </section>
+
+  <!-- 부칙 -->
+  <section>
+    <h2>부칙</h2>
+    <p>본 약관은 <strong>2026-05-04</strong>부터 시행됩니다.</p>
+    <br />
+    <p><strong>운영자 정보</strong></p>
+    <div class="card">
+      <p>운영자/대표자: <span class="placeholder">[TBD — 운영자 본명]</span></p>
+      <p>사업자등록번호: <span class="placeholder">[TBD — 사업자등록번호]</span></p>
+      <p>통신판매업 신고번호: <span class="placeholder">[TBD — 신고번호]</span></p>
+      <p>사업장 주소: <span class="placeholder">[TBD — 주소]</span></p>
+      <p>연락 이메일: <span class="placeholder">[TBD — 이메일]</span></p>
+      <p>호스팅 사업자: Vercel Inc. (US)</p>
+    </div>
+  </section>
+
+  <footer>
+    <a href="/">홈</a>
+    <a href="/terms.html">이용약관</a>
+    <a href="/privacy.html">개인정보 처리방침</a>
+    <span>© 2026 lazyuniv-ai</span>
+  </footer>
+</div>
+</body>
+</html>
