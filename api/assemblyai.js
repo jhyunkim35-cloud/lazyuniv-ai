@@ -133,7 +133,7 @@ module.exports = async (req, res) => {
         body: JSON.stringify({
           audio_url,
           language_code: 'ko',
-          speech_model: 'universal',
+          speech_models: 'universal',
           speaker_labels: true,
           punctuate: true,
           format_text: true,
