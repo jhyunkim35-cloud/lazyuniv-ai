@@ -48,6 +48,22 @@ service cloud.firestore {
         allow read, write: if request.auth != null && request.auth.uid == uid;
       }
 
+      // STT entitlements (Toss-paid Google STT credits).
+      // Read-only for the owner (so the client can show "remaining credits").
+      // Writes go through Admin SDK (api/toss.js creates on payment confirm,
+      // api/google-stt.js marks consumed) — never from the client.
+      match /sttEntitlements/{entitlementId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+
+      // Per-month usage analytics (api/_usage.js writes via Admin SDK).
+      // Read-only for the owner (admin dashboard reads via Admin too).
+      match /usage/{ymd} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+
       // analysisSessions: Admin SDK + TTL only. No client reads or writes.
       match /analysisSessions/{sessionId} {
         allow read, write: if false;
