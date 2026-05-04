@@ -229,6 +229,30 @@ function checkReady() {
     const hasRecordings = txtFiles.some(s => s.file !== null);
     if (pptFile && !hasRecordings) notice.classList.add('visible');
     else notice.classList.remove('visible');
+
+    // Inject a hint (once) when a transcript is loaded but no PPT yet
+    let recOnlyHint = document.getElementById('recOnlyHint');
+    if (!recOnlyHint && notice && notice.parentNode) {
+      recOnlyHint = document.createElement('div');
+      recOnlyHint.id = 'recOnlyHint';
+      recOnlyHint.style.cssText = [
+        'display:none',
+        'font-size:0.82rem',
+        'color:var(--secondary,#00b4d8)',
+        'background:var(--secondary-dim,rgba(0,180,216,0.12))',
+        'border:1px solid rgba(0,180,216,0.22)',
+        'border-radius:6px',
+        'padding:0.45rem 0.9rem',
+        'margin-top:0.5rem',
+        'text-align:center',
+        'line-height:1.5',
+      ].join(';');
+      recOnlyHint.textContent = '💡 PPT/PDF를 함께 업로드하면 더 정확한 노트가 생성됩니다.';
+      notice.parentNode.insertBefore(recOnlyHint, notice.nextSibling);
+    }
+    if (recOnlyHint) {
+      recOnlyHint.style.display = (!pptFile && hasRecordings) ? '' : 'none';
+    }
   }
 }
 

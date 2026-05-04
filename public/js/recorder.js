@@ -173,6 +173,100 @@
       .rec-pill-btn--stop   { color: #ef4444; }
       .rec-pill-btn--expand { opacity: 0.65; }
       .rec-pill-btn--expand:hover { opacity: 1; }
+
+      /* ── STT 3-stage progress tracker ─────────── */
+      .rec-stt-stages {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin: 0 0 1.1rem;
+        width: 100%;
+      }
+      .rec-stt-stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        flex-shrink: 0;
+      }
+      .rec-stt-stage-line {
+        flex: 1;
+        height: 2px;
+        min-width: 14px;
+        max-width: 44px;
+        background: var(--border, #252545);
+      }
+      .rec-stt-stage-dot {
+        width: 30px; height: 30px;
+        border-radius: 50%;
+        background: var(--surface3, #1e1e36);
+        border: 2px solid var(--border, #252545);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 700;
+        color: var(--text-muted, #8888aa);
+        transition: border-color 0.3s, background 0.3s;
+        position: relative; overflow: hidden;
+      }
+      .rec-stt-stage--done .rec-stt-stage-dot {
+        background: rgba(74,222,128,0.15);
+        border-color: #4ade80; color: #4ade80;
+      }
+      .rec-stt-stage--active .rec-stt-stage-dot {
+        background: rgba(124,77,255,0.15);
+        border-color: var(--primary, #7c4dff);
+        color: transparent;
+      }
+      .rec-stt-stage-dot--spinner::after {
+        content: '';
+        position: absolute;
+        width: 14px; height: 14px;
+        border: 2.5px solid transparent;
+        border-top-color: var(--primary, #7c4dff);
+        border-radius: 50%;
+        animation: recSttSpin 0.8s linear infinite;
+      }
+      @keyframes recSttSpin { to { transform: rotate(360deg); } }
+      .rec-stt-stage-label {
+        font-size: 10px;
+        color: var(--text-muted, #8888aa);
+        white-space: nowrap; text-align: center;
+        max-width: 72px; line-height: 1.3;
+      }
+      .rec-stt-stage--active .rec-stt-stage-label {
+        color: var(--primary, #7c4dff); font-weight: 600;
+      }
+      .rec-stt-stage--done .rec-stt-stage-label { color: #4ade80; }
+
+      /* ── STT elapsed + hint strips ─────────────── */
+      .rec-stt-elapsed {
+        font-size: 0.95rem; font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--text, #e2e2f2);
+        margin-bottom: 0.55rem; letter-spacing: 0.04em;
+      }
+      .rec-stt-close-note {
+        font-size: 0.78rem;
+        color: var(--primary, #7c4dff);
+        background: rgba(124,77,255,0.10);
+        border-radius: 6px; padding: 0.4rem 0.75rem;
+        margin: 0.5rem 0; text-align: center; line-height: 1.4;
+      }
+      .rec-stt-long-warn {
+        display: none;
+        font-size: 0.78rem; color: #fbbf24;
+        background: rgba(251,191,36,0.10);
+        border-radius: 6px; padding: 0.4rem 0.75rem;
+        margin-top: 0.4rem; text-align: center;
+      }
+
+      /* ── Secondary button variant (done modal) ─── */
+      .rec-btn-secondary {
+        background: var(--surface2, #16162a);
+        color: var(--text, #e2e2f2);
+        border: 1px solid var(--border, #252545);
+      }
+      .rec-btn-secondary:hover { background: var(--surface3, #1e1e36); }
     `;
     document.head.appendChild(style);
   }
@@ -196,6 +290,9 @@
     objectUrl: null,
     audioStoragePath: null,
     recordingDurationSec: null,
+    pollStart: 0,           // timestamp when STT polling started (for elapsed display)
+    sttElapsedHandle: null, // setInterval handle for MM:SS elapsed display during STT
+    pendingFile: null,      // transcript File held for "다음: 강의 자료 추가하기" CTA
   };
 
   function ensureModal() {
@@ -259,9 +356,27 @@
 
           <!-- Transcribing (AssemblyAI polling) -->
           <div class="rec-screen rec-screen-stt" data-screen="stt">
-            <div class="rec-spinner"></div>
-            <div class="rec-status" id="recSttStatus">텍스트 변환 중…</div>
-            <div class="rec-stt-hint">강의 90분 기준 약 30~60분 소요됩니다. 이 창을 닫아도 처리는 계속됩니다.</div>
+            <div class="rec-stt-stages">
+              <div class="rec-stt-stage rec-stt-stage--done" id="recSttStage1">
+                <div class="rec-stt-stage-dot">✓</div>
+                <div class="rec-stt-stage-label">① 업로드</div>
+              </div>
+              <div class="rec-stt-stage-line"></div>
+              <div class="rec-stt-stage rec-stt-stage--active" id="recSttStage2">
+                <div class="rec-stt-stage-dot rec-stt-stage-dot--spinner"></div>
+                <div class="rec-stt-stage-label" id="recSttStage2Label">② 변환 대기 중</div>
+              </div>
+              <div class="rec-stt-stage-line"></div>
+              <div class="rec-stt-stage rec-stt-stage--pending" id="recSttStage3">
+                <div class="rec-stt-stage-dot">③</div>
+                <div class="rec-stt-stage-label">슬롯 채우기</div>
+              </div>
+            </div>
+            <div class="rec-status" id="recSttStatus">텍스트 변환 시작 중…</div>
+            <div class="rec-stt-elapsed" id="recSttElapsed">경과 00:00</div>
+            <div class="rec-stt-hint">보통 강의 길이의 30~50% 시간이 소요됩니다 (90분 강의 ≈ 30~45분)</div>
+            <div class="rec-stt-close-note">💡 이 창을 닫아도 변환은 계속됩니다. 결과는 자동으로 녹취록 슬롯에 추가됩니다.</div>
+            <div class="rec-stt-long-warn" id="recSttLongWarn">⚠️ 긴 강의는 시간이 더 걸릴 수 있습니다. 조금만 기다려주세요.</div>
             <button class="rec-cancel-link" id="recHideSttBtn">창 닫기 (백그라운드 진행)</button>
           </div>
 
@@ -269,9 +384,10 @@
           <div class="rec-screen rec-screen-done" data-screen="done">
             <div class="rec-done-icon"><i data-lucide="check"></i></div>
             <div class="rec-status" id="recDoneStatus">변환 완료</div>
-            <div class="rec-done-hint">녹취록 슬롯에 텍스트가 추가되었습니다. 분석을 시작하세요.</div>
+            <div class="rec-done-hint" id="recDoneHint">녹취록 슬롯에 텍스트가 추가되었습니다. 분석을 시작하세요.</div>
             <div class="rec-actions">
-              <button class="rec-btn rec-btn-primary" id="recDoneCloseBtn">확인</button>
+              <button class="rec-btn rec-btn-secondary" id="recDoneCloseBtn">확인</button>
+              <button class="rec-btn rec-btn-primary" id="recDoneGoNewBtn" style="display:none">다음: 강의 자료 추가하기 →</button>
             </div>
           </div>
 
@@ -313,6 +429,15 @@
     modalEl.querySelector('#recCancelLiveBtn').addEventListener('click', cancelLiveRecording);
     modalEl.querySelector('#recHideSttBtn').addEventListener('click', hideModal);
     modalEl.querySelector('#recDoneCloseBtn').addEventListener('click', hideModal);
+    modalEl.querySelector('#recDoneGoNewBtn').addEventListener('click', () => {
+      const file = modalState.pendingFile;
+      hideModal();
+      if (typeof switchView === 'function') switchView('new');
+      if (file && typeof addRecSlot === 'function') {
+        // Small delay so switchView finishes rendering before DOM manipulation
+        setTimeout(() => addRecSlot(file), 80);
+      }
+    });
     modalEl.querySelector('#recErrorRetryBtn').addEventListener('click', () => switchScreen('idle'));
 
     // Pill controls
@@ -765,6 +890,23 @@
     switchScreen('stt');
     document.getElementById('recSttStatus').textContent = '텍스트 변환 시작 중…';
 
+    // Track when polling started for elapsed display and long-wait warning
+    modalState.pollStart = Date.now();
+
+    // MM:SS elapsed counter — updates every second while STT is in progress
+    if (modalState.sttElapsedHandle) clearInterval(modalState.sttElapsedHandle);
+    modalState.sttElapsedHandle = setInterval(() => {
+      const sec = Math.floor((Date.now() - modalState.pollStart) / 1000);
+      const mm  = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss  = String(sec % 60).padStart(2, '0');
+      const el  = document.getElementById('recSttElapsed');
+      if (el) el.textContent = `경과 ${mm}:${ss}`;
+      if (sec >= 300) {
+        const warn = document.getElementById('recSttLongWarn');
+        if (warn) warn.style.display = '';
+      }
+    }, 1000);
+
     let transcriptId;
     try {
       const idToken = await currentUser.getIdToken();
@@ -789,7 +931,7 @@
       return;
     }
 
-    document.getElementById('recSttStatus').textContent = '텍스트 변환 중… (대기열)';
+    document.getElementById('recSttStatus').textContent = '대기열에서 차례를 기다리는 중…';
     const pollStart = Date.now();
     const POLL_INTERVAL = 6000;
     const MAX_POLL_MS = 90 * 60 * 1000;
@@ -804,13 +946,16 @@
         if (!r.ok) {
           throw new Error(j.error || 'status_failed');
         }
-        const elapsedSec = Math.floor((Date.now() - pollStart) / 1000);
-        const elapsedLabel = formatElapsed(elapsedSec);
         const lbl = document.getElementById('recSttStatus');
+        const stLabel = document.getElementById('recSttStage2Label');
 
-        if (j.status === 'queued')          lbl.textContent = `대기열에서 차례를 기다리는 중… (${elapsedLabel})`;
-        else if (j.status === 'processing') lbl.textContent = `텍스트 변환 중… (${elapsedLabel})`;
-        else if (j.status === 'completed') {
+        if (j.status === 'queued') {
+          lbl.textContent = '대기열에서 차례를 기다리는 중…';
+          if (stLabel) stLabel.textContent = '② 변환 대기 중';
+        } else if (j.status === 'processing') {
+          lbl.textContent = '텍스트 변환 중…';
+          if (stLabel) stLabel.textContent = '② 텍스트 변환 중';
+        } else if (j.status === 'completed') {
           deliverTranscript(j.text || '', filename);
           return;
         } else if (j.status === 'error') {
@@ -823,6 +968,7 @@
         modalState.pollHandle = setTimeout(poll, POLL_INTERVAL);
       } catch (err) {
         console.error('[recorder] poll failed', err);
+        if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
         switchScreen('error');
         document.getElementById('recErrorStatus').textContent =
           '변환 중 오류가 발생했습니다. (' + (err.message || 'unknown') + ')';
@@ -873,9 +1019,21 @@
       });
     }
 
+    // Clear STT elapsed interval now that we're done processing
+    if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
+
+    // Briefly advance stage tracker: stage 2 → done, stage 3 → active
+    const _st2 = document.getElementById('recSttStage2');
+    const _st3 = document.getElementById('recSttStage3');
+    if (_st2) _st2.className = 'rec-stt-stage rec-stt-stage--done';
+    if (_st3) _st3.className = 'rec-stt-stage rec-stt-stage--active';
+
     // Step 3: feed text into new-note slots (existing behavior)
     const baseName = (sourceFilename || 'recording').replace(/\.[^.]+$/, '');
     const file = new File([cleanText], baseName + '.txt', { type: 'text/plain' });
+
+    // Always keep a reference so the "다음" CTA can add it later if needed
+    modalState.pendingFile = file;
 
     let didFillSlot = false;
     if (modalState.targetSlotId != null && typeof setRecSlotFile === 'function') {
@@ -900,10 +1058,34 @@
       status.textContent = `변환 완료 · ${lenLabel}${savedLabel}`;
     }
 
+    // Tailor done-screen hint and CTA based on whether the slot was filled
+    const doneHint = document.getElementById('recDoneHint');
+    const goNewBtn = document.getElementById('recDoneGoNewBtn');
+    const closeBtn = document.getElementById('recDoneCloseBtn');
+    if (didFillSlot && _currentView === 'new') {
+      // User already on new-note view, slot populated → just confirm
+      if (doneHint) doneHint.textContent = 'PPT/PDF를 추가하면 AI 노트 분석을 바로 시작할 수 있습니다.';
+      if (goNewBtn) goNewBtn.style.display = 'none';
+      if (closeBtn) { closeBtn.textContent = '확인'; closeBtn.className = 'rec-btn rec-btn-primary'; }
+    } else {
+      // User on home/transcripts or slot not filled → show navigation CTA
+      if (doneHint) doneHint.textContent = '내 녹취록에 저장되었습니다. 새 노트에서 강의 자료와 함께 AI 분석을 시작해보세요.';
+      if (goNewBtn) goNewBtn.style.display = '';
+      if (closeBtn) { closeBtn.textContent = '닫기'; closeBtn.className = 'rec-btn rec-btn-secondary'; }
+    }
+
+    // Surface the modal if the user had hidden it during background processing
+    if (modalEl && modalEl.classList.contains('hidden')) {
+      modalEl.classList.remove('hidden');
+      modalEl.classList.remove('recorder-modal--minimized');
+      const panelEl = modalEl.querySelector('.recorder-panel');
+      if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
+    }
+
     if (didFillSlot && savedTranscript) {
       window.showToast?.('🎙️ 녹취록이 슬롯에 추가되고 내 녹취록에도 저장되었습니다.');
     } else if (savedTranscript) {
-      window.showToast?.('🎙️ 내 녹취록에 저장되었습니다.');
+      window.showToast?.('🎙️ 내 녹취록에 저장되었습니다. 새 노트에서 활용해보세요!');
     } else if (didFillSlot) {
       window.showToast?.('🎙️ 녹취록이 추가되었습니다.');
     }

@@ -107,13 +107,26 @@
         <span>· ${chars}자</span>
       </div>
       <div class="transcript-card-preview">${preview || '<span style="color:var(--text-muted)">(빈 녹취록)</span>'}</div>
+      <div style="margin-top:0.6rem;">
+        <button class="transcript-use-note-btn" style="font-size:0.78rem;padding:0.28rem 0.7rem;border-radius:6px;border:1px solid var(--primary,#7c4dff);background:var(--primary-dim,rgba(124,77,255,0.12));color:var(--primary,#7c4dff);cursor:pointer;font-weight:600;" title="이 녹취록으로 새 노트 만들기">+ 새 노트 만들기</button>
+      </div>
     `;
 
-    // Click anywhere except menu → open preview
+    // Click anywhere except menu or the use-note button → open preview
     card.addEventListener('click', (e) => {
       if (e.target.closest('.transcript-card-menu-btn')) return;
+      if (e.target.closest('.transcript-use-note-btn')) return;
       openTranscriptPreview(t.id);
     });
+
+    // "새 노트 만들기" inline button
+    const useNoteBtn = card.querySelector('.transcript-use-note-btn');
+    if (useNoteBtn) {
+      useNoteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        useTranscriptForNewNote(t);
+      });
+    }
 
     // Menu button → contextual menu
     const menuBtn = card.querySelector('.transcript-card-menu-btn');
@@ -143,6 +156,7 @@
     menu.className = 'transcript-card-menu';
     menu.innerHTML = `
       <button data-act="preview">미리보기</button>
+      <button data-act="new-note">새 노트 만들기</button>
       <button data-act="rename">이름 변경</button>
       <button data-act="copy">텍스트 복사</button>
       <button data-act="download">.txt 다운로드</button>
@@ -163,11 +177,12 @@
       if (!btn) return;
       const act = btn.dataset.act;
       closeCardMenu();
-      if (act === 'preview')  openTranscriptPreview(t.id);
-      else if (act === 'rename')   await renameTranscriptPrompt(t);
-      else if (act === 'copy')     await copyTranscriptText(t);
-      else if (act === 'download') downloadTranscriptTxt(t);
-      else if (act === 'delete')   await confirmDeleteTranscript(t);
+      if (act === 'preview')    openTranscriptPreview(t.id);
+      else if (act === 'new-note')  useTranscriptForNewNote(t);
+      else if (act === 'rename')    await renameTranscriptPrompt(t);
+      else if (act === 'copy')      await copyTranscriptText(t);
+      else if (act === 'download')  downloadTranscriptTxt(t);
+      else if (act === 'delete')    await confirmDeleteTranscript(t);
     });
 
     // Close on outside click — defer to next tick so the click that opened
@@ -233,6 +248,23 @@
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
+  function useTranscriptForNewNote(t) {
+    const text = t.text || '';
+    if (!text) {
+      window.showToast?.('녹취록 내용이 없습니다.');
+      return;
+    }
+    const safeName = (t.title || 'transcript').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+    const file = new File([text], safeName + '.txt', { type: 'text/plain' });
+    hidePreviewModal();
+    if (typeof switchView === 'function') switchView('new');
+    // Slight delay so switchView finishes rendering before DOM manipulation
+    setTimeout(() => {
+      if (typeof addRecSlot === 'function') addRecSlot(file);
+    }, 80);
+    window.showToast?.('📝 녹취록을 새 노트 슬롯에 추가했습니다.');
+  }
+
   async function confirmDeleteTranscript(t) {
     if (!confirm(`"${t.title}" 녹취록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
     try {
@@ -271,6 +303,7 @@
         </header>
         <div id="transcriptPreviewBody" class="transcript-preview-body"></div>
         <footer class="transcript-preview-footer">
+          <button id="transcriptPreviewUseNoteBtn"  class="action-btn" style="border-color:var(--primary,#7c4dff);color:var(--primary,#7c4dff);"><i data-lucide="file-plus" class="icon-sm"></i><span>새 노트 만들기</span></button>
           <button id="transcriptPreviewRenameBtn"   class="action-btn"><i data-lucide="pencil" class="icon-sm"></i><span>이름 변경</span></button>
           <button id="transcriptPreviewCopyBtn"     class="action-btn"><i data-lucide="copy" class="icon-sm"></i><span>텍스트 복사</span></button>
           <button id="transcriptPreviewDownloadBtn" class="action-btn"><i data-lucide="download" class="icon-sm"></i><span>.txt 다운로드</span></button>
@@ -290,6 +323,9 @@
       const cached = _previewEl._currentTranscript;
       return cached && cached.id === id ? cached : null;
     }
+    document.getElementById('transcriptPreviewUseNoteBtn').addEventListener('click', () => {
+      const t = currentTranscript(); if (t) useTranscriptForNewNote(t);
+    });
     document.getElementById('transcriptPreviewRenameBtn').addEventListener('click', () => {
       const t = currentTranscript(); if (t) renameTranscriptPrompt(t);
     });
