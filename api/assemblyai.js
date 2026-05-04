@@ -199,12 +199,12 @@ module.exports = async (req, res) => {
             prevNum = num;
           }
           payload.text = lines.join('\n');
-          payload.utterances = stJson.utterances.map(u => ({
-            speaker: remap[u.speaker || '?'] ?? '?',
-            text: (u.text || '').trim(),
-            start: u.start,
-            end: u.end,
-          }));
+          // NOTE: We DO NOT include utterances in the response. On long
+          // lectures (90+ min) the utterances array can balloon to 2-5 MB,
+          // which combined with text pushes the Vercel response past the
+          // 4.5 MB serverless body cap → response truncated mid-JSON →
+          // client sees only the beginning of `text`. The client only uses
+          // `text` anyway, so dropping utterances is lossless for the user.
           payload.speaker_count = sorted.length;
           // Debug: surface size discrepancies that hint at truncation.
           // If raw .text is much longer than our rebuilt text, something
