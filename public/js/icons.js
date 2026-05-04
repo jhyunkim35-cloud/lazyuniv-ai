@@ -25,8 +25,41 @@
 // in the document head before this file).
 
 (function () {
+  // Names we already tried and lucide didn't have. Caching avoids the
+  // console-flood scenario where MutationObserver fires every render and
+  // lucide.createIcons() warns about the same missing icon every time —
+  // because a missing icon never gets its data-lucide attribute stripped,
+  // it stays in the DOM forever and re-triggers on every pass.
+  const _knownMissing = new Set();
+
+  function kebabToPascal(s) {
+    return s.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase());
+  }
+
+  function stripUnknownIcons() {
+    if (!window.lucide || !window.lucide.icons) return;
+    const nodes = document.querySelectorAll('[data-lucide]');
+    for (const node of nodes) {
+      const name = node.getAttribute('data-lucide');
+      if (!name) continue;
+      if (_knownMissing.has(name)) {
+        // Already known-missing; remove attribute so this node is silent
+        // forever. (Visual fallback: empty <i> — acceptable.)
+        node.removeAttribute('data-lucide');
+        continue;
+      }
+      const pascal = kebabToPascal(name);
+      if (!(pascal in window.lucide.icons || {}) && !window.lucide[pascal]) {
+        _knownMissing.add(name);
+        console.warn('[lucide] unknown icon (will be silent after this):', name);
+        node.removeAttribute('data-lucide');
+      }
+    }
+  }
+
   function mount() {
     if (!window.lucide || !window.lucide.createIcons) return;
+    stripUnknownIcons();
     try {
       window.lucide.createIcons();
     } catch (e) {
