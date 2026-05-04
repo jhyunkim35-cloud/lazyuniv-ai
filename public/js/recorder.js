@@ -18,8 +18,6 @@
 
 (function () {
   // ── Audio MIME detection (browser quirks) ───────────────
-  // Chrome/FF/Edge usually do webm/opus. iOS Safari only does mp4/aac.
-  // We let MediaRecorder pick a default it actually supports.
   function pickMimeType() {
     const candidates = [
       'audio/webm;codecs=opus',
@@ -32,7 +30,7 @@
     for (const t of candidates) {
       if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
     }
-    return ''; // browser default
+    return '';
   }
 
   function extFromMime(mime) {
@@ -47,16 +45,145 @@
 
   function isiOS() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent)
-      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS desktop UA
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  // ── Pill drag state ─────────────────────────────────────
+  let pillPos = null; // {x, y} pixels from viewport top-left, or null for default
+
+  function loadPillPos() {
+    try {
+      const s = localStorage.getItem('recorder.pillPos');
+      if (s) pillPos = JSON.parse(s);
+    } catch (e) {}
+  }
+
+  function savePillPos(x, y) {
+    pillPos = { x, y };
+    try { localStorage.setItem('recorder.pillPos', JSON.stringify({ x, y })); } catch (e) {}
+  }
+
+  // ── Inline SVG icons for pill buttons (no lucide dependency) ──
+  const SVG_PAUSE  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+  const SVG_PLAY   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+  const SVG_STOP   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
+  const SVG_EXPAND = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+
+  // ── CSS injection ────────────────────────────────────────
+  function injectPillStyles() {
+    if (document.getElementById('recorder-pill-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'recorder-pill-styles';
+    style.textContent = `
+      /* Minimized: whole modal wrapper becomes click-through */
+      .recorder-modal--minimized {
+        pointer-events: none !important;
+      }
+
+      /* Minimized: backdrop is invisible + click-through */
+      .recorder-modal--minimized .recorder-backdrop {
+        background: transparent !important;
+        pointer-events: none !important;
+      }
+
+      /* Minimized: panel becomes a compact floating pill */
+      .recorder-modal--minimized .recorder-panel {
+        position: fixed !important;
+        width: 280px !important;
+        min-height: 0 !important;
+        height: auto !important;
+        border-radius: 999px !important;
+        padding: 0 !important;
+        transform: none !important;
+        z-index: 10001 !important;
+        box-shadow: 0 4px 28px rgba(0,0,0,0.28) !important;
+        display: flex !important;
+        align-items: center !important;
+        overflow: hidden !important;
+        cursor: grab !important;
+        flex-direction: row !important;
+        pointer-events: auto !important;
+      }
+      .recorder-modal--minimized .recorder-panel:active {
+        cursor: grabbing !important;
+      }
+
+      /* Hide full modal chrome while minimized */
+      .recorder-modal--minimized .recorder-head,
+      .recorder-modal--minimized .recorder-body {
+        display: none !important;
+      }
+
+      /* Pill content — hidden in full mode, shown in minimized mode */
+      .recorder-pill {
+        display: none;
+      }
+      .recorder-modal--minimized .recorder-pill {
+        display: flex !important;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        width: 100%;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .rec-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #ef4444;
+        flex-shrink: 0;
+        animation: recDotBlink 1.2s ease-in-out infinite;
+      }
+      .rec-dot--paused {
+        animation: none !important;
+        opacity: 0.35;
+      }
+      @keyframes recDotBlink {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.2; }
+      }
+
+      .rec-pill-timer {
+        font-size: 13px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+      }
+
+      .rec-pill-btn {
+        background: none;
+        border: none;
+        padding: 5px;
+        cursor: pointer;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: background 0.12s;
+        line-height: 0;
+      }
+      .rec-pill-btn:hover { background: rgba(128,128,128,0.15); }
+      .rec-pill-btn svg   { width: 15px; height: 15px; }
+      .rec-pill-btn--stop   { color: #ef4444; }
+      .rec-pill-btn--expand { opacity: 0.65; }
+      .rec-pill-btn--expand:hover { opacity: 1; }
+    `;
+    document.head.appendChild(style);
   }
 
   // ── Modal singleton ─────────────────────────────────────
   let modalEl = null;
   let modalState = {
     phase: 'idle', // idle | requesting | recording | paused | uploading | transcribing | completed | error
-    rec: null,            // MediaRecorder
-    chunks: [],           // Blob[]
-    stream: null,         // MediaStream
+    rec: null,
+    chunks: [],
+    stream: null,
     mime: '',
     startTime: 0,
     elapsedAtPause: 0,
@@ -65,20 +192,16 @@
     audioCtx: null,
     analyser: null,
     pollHandle: null,
-    targetSlotId: null,   // existing rec slot id, if user clicked '녹음' on an empty slot
-    objectUrl: null,      // for preview playback
-    // ── Recorded-audio bookkeeping (new in transcript-store flow) ──
-    // We hold onto Storage path + total recording duration so that, after
-    // STT completes, we can:
-    //   1. save the transcript to the user's transcript store with metadata
-    //   2. delete the original audio (per user's "audio: delete after STT"
-    //      decision — saves a lot of Storage quota)
-    audioStoragePath: null,   // 'users/{uid}/recordings/{ts}_..._name.ext'
-    recordingDurationSec: null, // null for file uploads (no duration knowable cheaply)
+    targetSlotId: null,
+    objectUrl: null,
+    audioStoragePath: null,
+    recordingDurationSec: null,
   };
 
   function ensureModal() {
     if (modalEl) return modalEl;
+    injectPillStyles();
+
     modalEl = document.createElement('div');
     modalEl.id = 'recorderModal';
     modalEl.className = 'recorder-modal hidden';
@@ -87,6 +210,7 @@
       <div class="recorder-panel" role="dialog" aria-modal="true" aria-label="녹음">
         <div class="recorder-head">
           <div class="recorder-title" id="recTitle">녹음하기</div>
+          <button class="recorder-minimize" id="recMinimizeBtn" aria-label="최소화" style="display:none"><i data-lucide="minimize-2" class="icon-sm"></i></button>
           <button class="recorder-close" id="recCloseBtn" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </div>
 
@@ -160,13 +284,28 @@
             </div>
           </div>
         </div>
+
+        <!-- Compact pill content (visible only when minimized) -->
+        <div class="recorder-pill" id="recorderPill">
+          <div class="rec-dot" id="recPillDot"></div>
+          <div class="rec-pill-timer" id="recPillTimer">00:00</div>
+          <button class="rec-pill-btn rec-pill-btn--pause"  id="recPillPauseBtn"  aria-label="일시정지"></button>
+          <button class="rec-pill-btn rec-pill-btn--stop"   id="recPillStopBtn"   aria-label="녹음 종료"></button>
+          <button class="rec-pill-btn rec-pill-btn--expand" id="recPillExpandBtn" aria-label="확장"></button>
+        </div>
       </div>
     `;
     document.body.appendChild(modalEl);
 
-    // Wire static handlers — only need to do this once
+    // Set pill button icons (inline SVG — no lucide mounting needed)
+    modalEl.querySelector('#recPillPauseBtn').innerHTML  = SVG_PAUSE;
+    modalEl.querySelector('#recPillStopBtn').innerHTML   = SVG_STOP;
+    modalEl.querySelector('#recPillExpandBtn').innerHTML = SVG_EXPAND;
+
+    // Wire static handlers
     modalEl.querySelector('#recCloseBtn').addEventListener('click', closeModalIfSafe);
-    modalEl.querySelector('.recorder-backdrop').addEventListener('click', closeModalIfSafe);
+    modalEl.querySelector('.recorder-backdrop').addEventListener('click', handleBackdropClick);
+    modalEl.querySelector('#recMinimizeBtn').addEventListener('click', minimizePill);
     modalEl.querySelector('#recPickLive').addEventListener('click', startLiveRecording);
     modalEl.querySelector('#recFileInput').addEventListener('change', onFilePicked);
     modalEl.querySelector('#recPauseBtn').addEventListener('click', togglePause);
@@ -176,29 +315,178 @@
     modalEl.querySelector('#recDoneCloseBtn').addEventListener('click', hideModal);
     modalEl.querySelector('#recErrorRetryBtn').addEventListener('click', () => switchScreen('idle'));
 
+    // Pill controls
+    modalEl.querySelector('#recPillPauseBtn').addEventListener('click', togglePause);
+    modalEl.querySelector('#recPillStopBtn').addEventListener('click', stopRecording);
+    modalEl.querySelector('#recPillExpandBtn').addEventListener('click', expandPill);
+
+    // Drag
+    initPillDrag(
+      modalEl.querySelector('#recorderPill'),
+      modalEl.querySelector('.recorder-panel')
+    );
+
+    // Block ESC while minimized — prevents accidental cancel via any external handler
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape'
+          && modalEl
+          && !modalEl.classList.contains('hidden')
+          && modalEl.classList.contains('recorder-modal--minimized')) {
+        e.stopImmediatePropagation();
+      }
+    }, true);
+
     return modalEl;
   }
 
+  // ── Backdrop click: auto-minimize during active recording ──
+  function handleBackdropClick() {
+    if (modalState.phase === 'recording' || modalState.phase === 'paused') {
+      minimizePill();
+    } else {
+      closeModalIfSafe();
+    }
+  }
+
+  // ── Pill minimize / expand ───────────────────────────────
+  function minimizePill() {
+    ensureModal();
+    loadPillPos();
+
+    const panelEl = modalEl.querySelector('.recorder-panel');
+
+    modalEl.classList.add('recorder-modal--minimized');
+    modalEl.classList.remove('hidden');
+
+    // Position after the CSS `position: fixed` has taken effect
+    requestAnimationFrame(function () {
+      const pillWidth  = 280;
+      const pillHeight = panelEl.offsetHeight || 52;
+      let x, y;
+      if (pillPos && typeof pillPos.x === 'number' && typeof pillPos.y === 'number') {
+        x = Math.max(0, Math.min(window.innerWidth  - pillWidth,  pillPos.x));
+        y = Math.max(0, Math.min(window.innerHeight - pillHeight, pillPos.y));
+      } else {
+        x = window.innerWidth  - pillWidth  - 24;
+        y = window.innerHeight - pillHeight - 24;
+      }
+      panelEl.style.left = x + 'px';
+      panelEl.style.top  = y + 'px';
+    });
+
+    updatePillUI();
+  }
+
+  function expandPill() {
+    ensureModal();
+    const panelEl = modalEl.querySelector('.recorder-panel');
+
+    modalEl.classList.remove('recorder-modal--minimized');
+    panelEl.style.left = '';
+    panelEl.style.top  = '';
+
+    updatePillUI();
+  }
+
+  function updatePillUI() {
+    if (!modalEl) return;
+    const dot      = modalEl.querySelector('#recPillDot');
+    const pauseBtn = modalEl.querySelector('#recPillPauseBtn');
+    if (!dot || !pauseBtn) return;
+
+    const paused = modalState.phase === 'paused';
+    dot.classList.toggle('rec-dot--paused', paused);
+    pauseBtn.innerHTML = paused ? SVG_PLAY : SVG_PAUSE;
+    pauseBtn.setAttribute('aria-label', paused ? '재개' : '일시정지');
+
+    // Sync pill timer to main timer's current text
+    const mainTimer = document.getElementById('recTimer');
+    const pillTimer = document.getElementById('recPillTimer');
+    if (mainTimer && pillTimer) pillTimer.textContent = mainTimer.textContent;
+  }
+
+  // ── Pill drag (mouse + touch) ────────────────────────────
+  function initPillDrag(pillEl, panelEl) {
+    let dragging  = false;
+    let startX    = 0, startY    = 0;
+    let startLeft = 0, startTop  = 0;
+
+    function dragStart(clientX, clientY) {
+      dragging   = true;
+      startX     = clientX;
+      startY     = clientY;
+      const rect = panelEl.getBoundingClientRect();
+      startLeft  = rect.left;
+      startTop   = rect.top;
+      panelEl.style.transition  = 'none';
+      document.body.style.userSelect = 'none';
+    }
+
+    function dragMove(clientX, clientY) {
+      if (!dragging) return;
+      const w = panelEl.offsetWidth  || 280;
+      const h = panelEl.offsetHeight || 52;
+      const newLeft = Math.max(0, Math.min(window.innerWidth  - w, startLeft + (clientX - startX)));
+      const newTop  = Math.max(0, Math.min(window.innerHeight - h, startTop  + (clientY - startY)));
+      panelEl.style.left = newLeft + 'px';
+      panelEl.style.top  = newTop  + 'px';
+    }
+
+    function dragEnd() {
+      if (!dragging) return;
+      dragging = false;
+      document.body.style.userSelect = '';
+      panelEl.style.transition = '';
+      const rect = panelEl.getBoundingClientRect();
+      savePillPos(rect.left, rect.top);
+    }
+
+    // Mouse events
+    pillEl.addEventListener('mousedown', function (e) {
+      if (e.button !== 0 || e.target.closest('button')) return;
+      e.preventDefault();
+      dragStart(e.clientX, e.clientY);
+    });
+    document.addEventListener('mousemove', function (e) { if (dragging) dragMove(e.clientX, e.clientY); });
+    document.addEventListener('mouseup',   function ()  { dragEnd(); });
+
+    // Touch events
+    pillEl.addEventListener('touchstart', function (e) {
+      if (e.target.closest('button')) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      dragStart(t.clientX, t.clientY);
+    }, { passive: false });
+    document.addEventListener('touchmove', function (e) {
+      if (!dragging) return;
+      const t = e.touches[0];
+      dragMove(t.clientX, t.clientY);
+    }, { passive: true });
+    document.addEventListener('touchend', function () { dragEnd(); });
+  }
+
+  // ── Screen switching ─────────────────────────────────────
   function switchScreen(name) {
     if (!modalEl) return;
     modalEl.querySelectorAll('.rec-screen').forEach(el => {
       el.classList.toggle('active', el.dataset.screen === name);
     });
-    modalState.screen = name; // track which screen is visible (separate from recording phase)
-    // Note: do NOT touch modalState.phase here. switchScreen('live') used to
-    // overwrite the 'recording' phase set by startTimer(), which made the
-    // setInterval timer always read elapsedAtPause=0 and freeze at 00:00.
-    // phase is owned by startTimer/pauseRecording/resumeRecording.
+    modalState.screen = name;
 
-    // Lucide skips data-lucide nodes inside hidden parents, so screens that
-    // were never visible at modal-build time arrive with un-mounted <i> tags
-    // (the <svg> swap only happens once a screen is actually shown).
-    // We poke the mount fn now that the target screen is .active.
+    // Show minimize button only on the live (recording) screen
+    const minimizeBtn = modalEl.querySelector('#recMinimizeBtn');
+    if (minimizeBtn) minimizeBtn.style.display = (name === 'live') ? '' : 'none';
+
     window.mountLucideIcons?.();
   }
 
   function showModal(targetSlotId = null) {
     ensureModal();
+    // If already minimized (recording in background), just surface it
+    if (modalEl.classList.contains('recorder-modal--minimized')) {
+      expandPill();
+      return;
+    }
     modalState.targetSlotId = targetSlotId;
     modalEl.classList.remove('hidden');
     document.getElementById('recIosWarn').style.display = isiOS() ? 'block' : 'none';
@@ -206,12 +494,14 @@
   }
 
   function hideModal() {
-    if (modalEl) modalEl.classList.add('hidden');
+    if (!modalEl) return;
+    modalEl.classList.add('hidden');
+    modalEl.classList.remove('recorder-modal--minimized');
+    const panelEl = modalEl.querySelector('.recorder-panel');
+    if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
   }
 
   function closeModalIfSafe() {
-    // Don't let user close while recording — would lose audio. They have to
-    // hit "녹음 종료" or "취소".
     if (modalState.phase === 'recording' || modalState.phase === 'paused') {
       if (!confirm('녹음을 취소하시겠습니까? 현재까지 녹음한 내용은 사라집니다.')) return;
       cancelLiveRecording();
@@ -271,8 +561,7 @@
     });
     modalState.rec.addEventListener('stop', onRecorderStopped);
 
-    // Use a small timeslice so dataavailable fires periodically — keeps memory
-    // bounded and lets us recover something if the tab crashes mid-record.
+    // Small timeslice keeps memory bounded and enables partial-crash recovery
     modalState.rec.start(5000);
     modalState.startTime = Date.now();
     modalState.elapsedAtPause = 0;
@@ -294,10 +583,14 @@
       const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
       const s = String(totalSec % 60).padStart(2, '0');
       const h = Math.floor(totalSec / 3600);
+      const timeStr = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
       const el = document.getElementById('recTimer');
-      if (el) el.textContent = h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+      if (el) el.textContent = timeStr;
+      // Mirror to pill timer while minimized
+      const pillTimer = document.getElementById('recPillTimer');
+      if (pillTimer) pillTimer.textContent = timeStr;
     }, 250);
-    // Re-set phase to recording so the timer math above works
+    // Must set phase AFTER wiring the interval — phase drives the ms calculation above
     modalState.phase = 'recording';
   }
 
@@ -314,7 +607,6 @@
       modalState.levelHandle = setInterval(() => {
         if (!modalState.analyser) return;
         modalState.analyser.getByteTimeDomainData(buf);
-        // RMS amplitude
         let sum = 0;
         for (let i = 0; i < buf.length; i++) {
           const v = (buf[i] - 128) / 128;
@@ -344,10 +636,15 @@
       document.getElementById('recPauseBtn').textContent = '일시정지';
       document.getElementById('recLiveStatus').textContent = '녹음 중…';
     }
+    updatePillUI();
   }
 
   function stopRecording() {
     if (!modalState.rec) return;
+    // Expand first so the user can see upload/STT progress
+    if (modalEl && modalEl.classList.contains('recorder-modal--minimized')) {
+      expandPill();
+    }
     if (modalState.rec.state !== 'inactive') {
       modalState.rec.stop(); // triggers onRecorderStopped
     }
@@ -355,7 +652,7 @@
 
   function cancelLiveRecording() {
     if (modalState.rec && modalState.rec.state !== 'inactive') {
-      // Detach the stop handler so we don't try to upload a half-blob
+      // Detach stop handler so we don't try to upload a half-blob
       modalState.rec.removeEventListener('stop', onRecorderStopped);
       try { modalState.rec.stop(); } catch (e) {}
     }
@@ -392,8 +689,7 @@
       return;
     }
 
-    // Capture total duration (paused chunks already accumulated into elapsedAtPause;
-    // if we stopped while still recording, add the final running segment).
+    // Capture total duration; paused time already in elapsedAtPause
     const finalMs = modalState.phase === 'recording'
       ? modalState.elapsedAtPause + (Date.now() - modalState.startTime)
       : modalState.elapsedAtPause;
@@ -406,14 +702,12 @@
   // ── File upload entry ───────────────────────────────────
   function onFilePicked(ev) {
     const file = ev.target.files && ev.target.files[0];
-    ev.target.value = ''; // allow picking same file again later
+    ev.target.value = '';
     if (!file) return;
     if (!currentUser) {
       window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
       return;
     }
-    // Cap at 500 MB — AssemblyAI accepts huge files but our UX assumes
-    // one lecture at a time.
     if (file.size > 500 * 1024 * 1024) {
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
@@ -437,7 +731,6 @@
                + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
                + '_' + filename.replace(/[^\w.-]/g, '_');
 
-    // Remember path so deliverTranscript can delete the audio after STT.
     modalState.audioStoragePath = path;
 
     let downloadUrl;
@@ -461,7 +754,6 @@
       return;
     }
 
-    // Kick off transcription
     switchScreen('stt');
     document.getElementById('recSttStatus').textContent = '텍스트 변환 시작 중…';
 
@@ -489,11 +781,10 @@
       return;
     }
 
-    // Poll status
     document.getElementById('recSttStatus').textContent = '텍스트 변환 중… (대기열)';
     const pollStart = Date.now();
     const POLL_INTERVAL = 6000;
-    const MAX_POLL_MS = 90 * 60 * 1000; // 90 min hard cap
+    const MAX_POLL_MS = 90 * 60 * 1000;
 
     async function poll() {
       try {
@@ -509,7 +800,7 @@
         const elapsedLabel = formatElapsed(elapsedSec);
         const lbl = document.getElementById('recSttStatus');
 
-        if (j.status === 'queued')         lbl.textContent = `대기열에서 차례를 기다리는 중… (${elapsedLabel})`;
+        if (j.status === 'queued')          lbl.textContent = `대기열에서 차례를 기다리는 중… (${elapsedLabel})`;
         else if (j.status === 'processing') lbl.textContent = `텍스트 변환 중… (${elapsedLabel})`;
         else if (j.status === 'completed') {
           deliverTranscript(j.text || '', filename);
@@ -529,7 +820,7 @@
           '변환 중 오류가 발생했습니다. (' + (err.message || 'unknown') + ')';
       }
     }
-    modalState.pollHandle = setTimeout(poll, 1500); // first poll quickly
+    modalState.pollHandle = setTimeout(poll, 1500);
   }
 
   function formatElapsed(sec) {
@@ -550,11 +841,7 @@
       return;
     }
 
-    // ── Step 1: persist to the user's transcript store ───────────────
-    // This MUST happen before we touch the new-note slots, because the
-    // user's primary expectation now is "every recording I make ends up
-    // in 내 녹취록". Slot integration is a secondary convenience and
-    // will silently no-op when nobody's on the new-note page.
+    // Step 1: persist to transcript store
     let savedTranscript = null;
     if (typeof saveTranscriptFS === 'function') {
       try {
@@ -564,18 +851,12 @@
           durationSec: modalState.recordingDurationSec,
         });
       } catch (err) {
-        // Non-fatal — we still want to deliver the text into a slot below
-        // so the user can at least analyze it right now. We just couldn't
-        // save it for later. Surface this loudly though, because losing a
-        // 90-min lecture's transcript silently would be terrible.
         console.error('[recorder] saveTranscriptFS failed:', err);
         window.showToast?.('⚠️ 녹취록 자동 저장에 실패했습니다. 슬롯에는 추가됩니다.');
       }
     }
 
-    // ── Step 2: delete the original audio from Storage ───────────────
-    // User chose "delete after STT" for cost reasons. Best-effort —
-    // a stray audio file is fine, just chews quota.
+    // Step 2: delete original audio from Storage (best-effort)
     if (modalState.audioStoragePath) {
       const pathToDelete = modalState.audioStoragePath;
       modalState.audioStoragePath = null;
@@ -584,28 +865,20 @@
       });
     }
 
-    // ── Step 3: feed text into the new-note slots (existing behavior) ─
-    // Wrap as a File so the existing pipeline (which reads .file.text())
-    // accepts it transparently.
+    // Step 3: feed text into new-note slots (existing behavior)
     const baseName = (sourceFilename || 'recording').replace(/\.[^.]+$/, '');
     const file = new File([cleanText], baseName + '.txt', { type: 'text/plain' });
 
-    // Find an empty slot to fill, or push a new one.
     let didFillSlot = false;
     if (modalState.targetSlotId != null && typeof setRecSlotFile === 'function') {
       setRecSlotFile(modalState.targetSlotId, file);
       didFillSlot = true;
     } else {
-      // Try to fill the first empty existing slot — feels more natural than always appending.
       const emptySlot = (typeof txtFiles !== 'undefined') ? txtFiles.find(s => !s.file) : null;
       if (emptySlot && typeof setRecSlotFile === 'function') {
         setRecSlotFile(emptySlot.id, file);
         didFillSlot = true;
       } else if (typeof addRecSlot === 'function' && _currentView === 'new') {
-        // Only auto-append a new slot when the user is actually on the
-        // new-note page — otherwise this would silently mutate slot
-        // state for a future analysis and surprise the user. When they
-        // recorded from home, the transcript is already in the store.
         addRecSlot(file);
         didFillSlot = true;
       }
@@ -614,7 +887,7 @@
     switchScreen('done');
     const status = document.getElementById('recDoneStatus');
     if (status) {
-      const lenLabel = `${cleanText.length.toLocaleString()}자`;
+      const lenLabel   = `${cleanText.length.toLocaleString()}자`;
       const savedLabel = savedTranscript ? ' · 내 녹취록에 저장됨' : '';
       status.textContent = `변환 완료 · ${lenLabel}${savedLabel}`;
     }
