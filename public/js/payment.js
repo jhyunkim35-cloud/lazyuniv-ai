@@ -1,6 +1,101 @@
 // Payment: usage quota, plan management, Toss payment flow.
 // Depends on: constants.js (currentUser, db, DEVELOPER_EMAILS), ui.js (showToast).
 
+/* ═══════════════════════════════════════════════
+   STT per-use pricing
+═══════════════════════════════════════════════ */
+
+function priceFor(audioMinutes) {
+  const n = Math.max(1, Math.ceil(audioMinutes / 30));
+  const minutes = n * 30;
+  let priceKRW;
+  if (n <= 5) {
+    priceKRW = 500 + n * 1000;
+  } else if (n === 6) {
+    priceKRW = 6600;
+  } else {
+    priceKRW = 6600 + (n - 6) * 1000;
+  }
+  return { minutes, priceKRW };
+}
+
+function payForSttEntitlement(audioMinutes) {
+  return new Promise(function (resolve, reject) {
+    var _ref = priceFor(audioMinutes);
+    var minutes = _ref.minutes;
+    var priceKRW = _ref.priceKRW;
+    var orderId = 'stt_' + currentUser.uid.substring(0, 8) + '_' + Date.now();
+
+    var popupUrl = window.location.origin + '/stt-pay.html'
+      + '?orderId=' + encodeURIComponent(orderId)
+      + '&amount=' + priceKRW
+      + '&minutes=' + minutes
+      + '&ck=' + encodeURIComponent(currentUser.uid)
+      + '&email=' + encodeURIComponent(currentUser.email || '')
+      + '&name=' + encodeURIComponent(currentUser.displayName || '사용자');
+
+    var popup = window.open(popupUrl, 'stt_payment_popup', 'width=700,height=600,scrollbars=yes');
+    if (!popup) {
+      reject(new Error('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.'));
+      return;
+    }
+
+    var settled = false;
+
+    function cleanup() {
+      window.removeEventListener('message', onMessage);
+      clearInterval(popupCheckInterval);
+    }
+
+    function onMessage(event) {
+      if (event.origin !== window.location.origin) return;
+      var d = event.data || {};
+      if (d.orderId !== orderId) return;
+
+      if (d.type === 'stt_payment_done') {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        fetch('/api/toss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paymentKey: d.paymentKey,
+            orderId: orderId,
+            amount: d.amount,
+            uid: currentUser.uid,
+            kind: 'sttEntitlement',
+            minutes: minutes,
+          }),
+        }).then(function (r) { return r.json(); }).then(function (result) {
+          if (result.success) resolve({ minutes: minutes, priceKRW: priceKRW });
+          else reject(new Error(result.message || '결제 확인 실패'));
+        }).catch(reject);
+
+      } else if (d.type === 'stt_payment_cancelled' || d.type === 'stt_payment_error') {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        var err = new Error(d.type === 'stt_payment_cancelled' ? 'USER_CANCEL' : (d.message || '결제 실패'));
+        err.code = d.type === 'stt_payment_cancelled' ? 'USER_CANCEL' : 'PAYMENT_ERROR';
+        reject(err);
+      }
+    }
+
+    window.addEventListener('message', onMessage);
+
+    var popupCheckInterval = setInterval(function () {
+      if (popup.closed && !settled) {
+        settled = true;
+        cleanup();
+        var err = new Error('USER_CANCEL');
+        err.code = 'USER_CANCEL';
+        reject(err);
+      }
+    }, 500);
+  });
+}
+
 function showPaymentModal() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';

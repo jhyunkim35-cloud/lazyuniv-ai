@@ -260,6 +260,30 @@
         margin-top: 0.4rem; text-align: center;
       }
 
+      /* ── Engine selector ─────────────────────────── */
+      .rec-engine-header {
+        font-size: 1.05rem; font-weight: 700;
+        color: var(--text, #e2e2f2); margin-bottom: 0.35rem;
+      }
+      .rec-engine-duration {
+        font-size: 0.82rem; color: var(--text-muted, #8888aa); margin-bottom: 1.1rem;
+      }
+      .rec-engine-options { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 1.2rem; }
+      .rec-engine-option {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.85rem 1rem; border: 2px solid var(--border, #252545);
+        border-radius: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      }
+      .rec-engine-option--selected {
+        border-color: var(--primary, #7c4dff);
+        background: rgba(124,77,255,0.07);
+      }
+      .rec-engine-option input[type="radio"] {
+        flex-shrink: 0; accent-color: var(--primary, #7c4dff); width: 16px; height: 16px; cursor: pointer;
+      }
+      .rec-engine-option-title { font-weight: 600; font-size: 0.93rem; color: var(--text, #e2e2f2); }
+      .rec-engine-option-desc  { font-size: 0.78rem; color: var(--text-muted, #8888aa); margin-top: 0.18rem; }
+
       /* ── Secondary button variant (done modal) ─── */
       .rec-btn-secondary {
         background: var(--surface2, #16162a);
@@ -329,6 +353,9 @@
     pollStart: 0,           // timestamp when STT polling started (for elapsed display)
     sttElapsedHandle: null, // setInterval handle for MM:SS elapsed display during STT
     pendingFile: null,      // transcript File held for "다음: 강의 자료 추가하기" CTA
+    sttEngine: 'assemblyai', // 'assemblyai' | 'google' — set by engine selector
+    pendingBlob: null,       // audio Blob held between engine selector and handleAudioBlob
+    pendingFilename: null,
   };
 
   function ensureModal() {
@@ -380,6 +407,32 @@
               <button class="rec-btn rec-btn-stop" id="recStopBtn">녹음 종료</button>
             </div>
             <button class="rec-cancel-link" id="recCancelLiveBtn">취소</button>
+          </div>
+
+          <!-- Engine selector (live recording only) -->
+          <div class="rec-screen rec-screen-engine-select" data-screen="engine-select">
+            <div class="rec-engine-header">STT 엔진 선택</div>
+            <div class="rec-engine-duration" id="recEngineDurationLabel">녹음 시간: 계산 중…</div>
+            <div class="rec-engine-options">
+              <label class="rec-engine-option rec-engine-option--selected" id="recEngineOptAAI">
+                <input type="radio" name="sttEngine" value="assemblyai" id="recEngineAssemblyAI" checked>
+                <div>
+                  <div class="rec-engine-option-title">기본 (AssemblyAI)</div>
+                  <div class="rec-engine-option-desc">무료 · 빠름 · 정확도 보통</div>
+                </div>
+              </label>
+              <label class="rec-engine-option" id="recEngineOptGoogle">
+                <input type="radio" name="sttEngine" value="google" id="recEngineGoogle">
+                <div>
+                  <div class="rec-engine-option-title">Google STT (Chirp_2)</div>
+                  <div class="rec-engine-option-desc">한국어 정확도 최상 · <span id="recEnginePriceLabel">1,500원~</span></div>
+                </div>
+              </label>
+            </div>
+            <div class="rec-actions">
+              <button class="rec-btn rec-btn-primary" id="recEngineProceedBtn">계속 →</button>
+            </div>
+            <button class="rec-cancel-link" id="recEngineCancelBtn">취소 (녹음 파기)</button>
           </div>
 
           <!-- Uploading -->
@@ -487,6 +540,18 @@
       }
     });
     modalEl.querySelector('#recErrorRetryBtn').addEventListener('click', () => switchScreen('idle'));
+
+    // Engine selector
+    modalEl.querySelector('#recEngineProceedBtn').addEventListener('click', onEngineProceed);
+    modalEl.querySelector('#recEngineCancelBtn').addEventListener('click', cancelFromEngineSelect);
+    modalEl.querySelectorAll('input[name="sttEngine"]').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        modalEl.querySelector('#recEngineOptAAI').classList.toggle('rec-engine-option--selected',
+          modalEl.querySelector('#recEngineAssemblyAI').checked);
+        modalEl.querySelector('#recEngineOptGoogle').classList.toggle('rec-engine-option--selected',
+          modalEl.querySelector('#recEngineGoogle').checked);
+      });
+    });
 
     // Pill controls
     modalEl.querySelector('#recPillPauseBtn').addEventListener('click', togglePause);
@@ -899,7 +964,76 @@
     modalState.recordingDurationSec = Math.max(1, Math.floor(finalMs / 1000));
 
     const filename = 'recording_' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+
+    // Store pending audio, reset engine choice, show selector
+    modalState.pendingBlob = blob;
+    modalState.pendingFilename = filename;
+    modalState.sttEngine = 'assemblyai';
+    showEngineSelector();
+  }
+
+  // ── Engine selector (live recording only) ──────────────
+  function showEngineSelector() {
+    const durationMin = Math.ceil(modalState.recordingDurationSec / 60);
+    const { minutes, priceKRW } = (typeof priceFor === 'function')
+      ? priceFor(durationMin)
+      : { minutes: Math.ceil(durationMin / 30) * 30, priceKRW: 1500 };
+
+    const durLbl = document.getElementById('recEngineDurationLabel');
+    if (durLbl) durLbl.textContent = '녹음 시간: ' + durationMin + '분';
+
+    const priceLbl = document.getElementById('recEnginePriceLabel');
+    if (priceLbl) priceLbl.textContent = priceKRW.toLocaleString() + '원~';
+
+    // Reset to default
+    const aaiRadio = document.getElementById('recEngineAssemblyAI');
+    if (aaiRadio) aaiRadio.checked = true;
+    if (modalEl) {
+      modalEl.querySelector('#recEngineOptAAI')?.classList.add('rec-engine-option--selected');
+      modalEl.querySelector('#recEngineOptGoogle')?.classList.remove('rec-engine-option--selected');
+    }
+
+    switchScreen('engine-select');
+  }
+
+  async function onEngineProceed() {
+    const selected = modalEl?.querySelector('input[name="sttEngine"]:checked')?.value || 'assemblyai';
+    modalState.sttEngine = selected;
+
+    if (selected === 'google') {
+      const durationMin = Math.ceil(modalState.recordingDurationSec / 60);
+      const { minutes, priceKRW } = (typeof priceFor === 'function')
+        ? priceFor(durationMin)
+        : { minutes: Math.ceil(durationMin / 30) * 30, priceKRW: 1500 };
+
+      const confirmed = confirm(
+        `이 강의는 ${minutes}분입니다.\nGoogle STT 변환 비용: ${priceKRW.toLocaleString()}원\n결제하시겠습니까?`
+      );
+      if (!confirmed) return; // stay on engine selector
+
+      try {
+        if (typeof payForSttEntitlement !== 'function') throw new Error('결제 모듈이 로드되지 않았습니다.');
+        await payForSttEntitlement(durationMin);
+        // payment succeeded — sttEngine stays 'google'
+      } catch (e) {
+        // payment cancelled or failed — fall back to assemblyai automatically
+        modalState.sttEngine = 'assemblyai';
+        window.showToast?.('결제 취소 — 기본 STT로 진행합니다');
+      }
+    }
+
+    const blob = modalState.pendingBlob;
+    const filename = modalState.pendingFilename;
+    modalState.pendingBlob = null;
+    modalState.pendingFilename = null;
     handleAudioBlob(blob, filename);
+  }
+
+  function cancelFromEngineSelect() {
+    modalState.pendingBlob = null;
+    modalState.pendingFilename = null;
+    modalState.sttEngine = 'assemblyai';
+    hideModal();
   }
 
   // ── File upload entry ───────────────────────────────────
@@ -921,6 +1055,7 @@
         '파일이 너무 큽니다 (최대 500MB). 더 작은 파일을 사용해주세요.';
       return;
     }
+    modalState.sttEngine = 'assemblyai'; // file uploads always use free AssemblyAI path
     handleAudioBlob(file, file.name);
   }
 
@@ -965,6 +1100,9 @@
     modalState.phase = 'transcribing';
     document.getElementById('recSttStatus').textContent = '텍스트 변환 시작 중…';
 
+    // Determine STT endpoint based on selected engine
+    const sttApi = modalState.sttEngine === 'google' ? '/api/google-stt' : '/api/assemblyai';
+
     // Track when polling started for elapsed display and long-wait warning
     modalState.pollStart = Date.now();
 
@@ -988,7 +1126,7 @@
     let transcriptId;
     try {
       const idToken = await currentUser.getIdToken();
-      const tr = await fetch('/api/assemblyai?action=transcribe', {
+      const tr = await fetch(sttApi + '?action=transcribe', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -1017,7 +1155,7 @@
     async function poll() {
       try {
         const idToken = await currentUser.getIdToken();
-        const r = await fetch('/api/assemblyai?action=status&id=' + encodeURIComponent(transcriptId), {
+        const r = await fetch(sttApi + '?action=status&id=' + encodeURIComponent(transcriptId), {
           headers: { 'authorization': 'Bearer ' + idToken },
         });
         const j = await r.json();

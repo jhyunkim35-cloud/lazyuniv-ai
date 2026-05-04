@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google STT 결제</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: #0d0d1a; color: #e2e2f2;
+    }
+    #msg { text-align: center; font-size: 1rem; line-height: 1.6; }
+    #msg p { margin-top: 0.5rem; font-size: 0.85rem; color: #8888aa; }
+  </style>
+</head>
+<body>
+  <div id="msg">결제 창을 준비 중입니다...<p>잠시만 기다려 주세요.</p></div>
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+  <script>
+    (async function () {
+      var params = new URLSearchParams(window.location.search);
+      var status = params.get('status');
+      var orderId = params.get('orderId');
+
+      // ── Handle redirect-back after payment ──────────────
+      if (status === 'success') {
+        var paymentKey = params.get('paymentKey');
+        var amount = params.get('amount');
+        if (window.opener) {
+          window.opener.postMessage(
+            { type: 'stt_payment_done', paymentKey: paymentKey, orderId: orderId, amount: Number(amount) },
+            window.location.origin
+          );
+        }
+        window.close();
+        return;
+      }
+      if (status === 'fail') {
+        if (window.opener) {
+          window.opener.postMessage(
+            { type: 'stt_payment_cancelled', orderId: orderId },
+            window.location.origin
+          );
+        }
+        window.close();
+        return;
+      }
+
+      // ── Initiate payment ────────────────────────────────
+      var amount = parseInt(params.get('amount'));
+      var minutes = parseInt(params.get('minutes'));
+      var customerKey = params.get('ck');
+      var customerEmail = params.get('email') || '';
+      var customerName = params.get('name') || '사용자';
+
+      if (!orderId || !amount || !customerKey) {
+        document.getElementById('msg').textContent = '잘못된 요청입니다.';
+        return;
+      }
+
+      var successUrl = window.location.origin + '/stt-pay.html?status=success&orderId=' + encodeURIComponent(orderId);
+      var failUrl    = window.location.origin + '/stt-pay.html?status=fail&orderId='    + encodeURIComponent(orderId);
+
+      try {
+        var tossPayments = TossPayments('test_ck_mBZ1gQ4YVXBjEx6651Wj8l2KPoqN');
+        var payment = tossPayments.payment({ customerKey: customerKey });
+        await payment.requestPayment({
+          method: 'CARD',
+          amount: { currency: 'KRW', value: amount },
+          orderId: orderId,
+          orderName: 'Google STT ' + minutes + '분',
+          customerEmail: customerEmail,
+          customerName: customerName,
+          successUrl: successUrl,
+          failUrl: failUrl,
+        });
+      } catch (e) {
+        if (window.opener) {
+          var type = (e.code === 'USER_CANCEL') ? 'stt_payment_cancelled' : 'stt_payment_error';
+          window.opener.postMessage(
+            { type: type, orderId: orderId, message: e.message },
+            window.location.origin
+          );
+        }
+        window.close();
+      }
+    })();
+  </script>
+</body>
+</html>

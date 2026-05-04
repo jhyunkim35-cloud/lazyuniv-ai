@@ -10,7 +10,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { paymentKey, orderId, amount, uid } = req.body;
+  const { paymentKey, orderId, amount, uid, kind, minutes } = req.body;
   if (!paymentKey || !orderId || !amount) {
     return res.status(400).json({ success: false, message: 'Missing parameters' });
   }
@@ -32,8 +32,43 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
 
     if (response.ok && data.status === 'DONE') {
-      // Derive plan from Toss-verified amount — client URL param is not trusted
       const verifiedAmount = data.totalAmount;
+
+      // ── STT per-use entitlement ──────────────────────────────────
+      if (kind === 'sttEntitlement') {
+        const n = Math.max(1, Math.ceil((Number(minutes) || 0) / 30));
+        const expectedPrice = n <= 5 ? 500 + n * 1000 : n === 6 ? 6600 : 6600 + (n - 6) * 1000;
+        if (verifiedAmount !== expectedPrice) {
+          console.error('STT entitlement amount mismatch:', verifiedAmount, 'expected:', expectedPrice);
+          return res.status(400).json({ success: false, message: 'Amount mismatch for STT entitlement' });
+        }
+        try {
+          const admin = getAdmin();
+          const db = admin.firestore();
+          await db.collection('users').doc(uid)
+            .collection('sttEntitlements').doc(paymentKey)
+            .set({
+              minutes: n * 30,
+              priceKRW: verifiedAmount,
+              paidAt: FieldValue.serverTimestamp(),
+              consumed: false,
+              consumedAt: null,
+              transcriptId: null,
+              orderId,
+              paymentKey,
+            });
+        } catch (e) {
+          console.error('Firestore sttEntitlement write failed:', e);
+          return res.status(500).json({ success: false, message: 'Entitlement creation failed: ' + e.message });
+        }
+        try {
+          await recordUsage({ uid, kind: 'sttPayment', increments: { sttPaymentCount: 1, sttPaymentTotalKRW: verifiedAmount } });
+        } catch (e) { console.error('[usage] stt payment record failed:', e.message); }
+        return res.status(200).json({ success: true, data, minutes: n * 30, priceKRW: verifiedAmount });
+      }
+
+      // ── Plan purchase (monthly / single) ────────────────────────
+      // Derive plan from Toss-verified amount — client URL param is not trusted
       let verifiedPlan;
       if (verifiedAmount === 7900) verifiedPlan = 'monthly';
       else if (verifiedAmount === 500) verifiedPlan = 'single';
