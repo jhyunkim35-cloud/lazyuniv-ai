@@ -1,0 +1,19 @@
+// Audited 2026-05-04 by Claude — verified per-user isolation
+// recordings/ is locked to request.auth.uid == uid.
+// Users may upload, download, and delete their own recordings (delete-after-STT flow).
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Explicit default deny.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Per-user audio recordings: upload (put), download (getDownloadURL), delete (after STT).
+    match /users/{uid}/recordings/{filename} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

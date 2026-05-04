@@ -1,0 +1,53 @@
+// Audited 2026-05-04 by Claude — verified per-user isolation
+// All collections under users/{uid} are locked to request.auth.uid == uid.
+// analysisSessions are written exclusively via Admin SDK (api/claude.js);
+// TTL deletes are system-managed — both bypass rules. No client access permitted.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Explicit default deny — nothing is readable/writable unless matched below.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /users/{uid} {
+      // User profile doc (payment state, singlePurchases, etc.)
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /notes/{noteId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /folders/{folderId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /transcripts/{transcriptId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /srsCards/{cardId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /timetable/{entryId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /gamification/state {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      match /quizResults/{resultId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+
+      // analysisSessions: Admin SDK + TTL only. No client reads or writes.
+      match /analysisSessions/{sessionId} {
+        allow read, write: if false;
+      }
+    }
+  }
+}
