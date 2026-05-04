@@ -188,14 +188,25 @@ module.exports = async (req, res) => {
           const remap = {};
           sorted.forEach((letter, i) => { remap[letter] = i + 1; });
 
-          // Rebuild transcript with "발화자 N: " prefix; blank line on speaker change
+          // Rebuild transcript with "[hh:mm:ss] 발화자 N:" prefix.
+          // Timestamps help the lecturer + student review specific moments,
+          // and are also matched by separateSpeakers() (the same pattern
+          // it expects from Clova STT). Times are derived from u.start (ms).
+          function fmtTs(ms) {
+            const total = Math.floor((ms || 0) / 1000);
+            const h = Math.floor(total / 3600);
+            const m = Math.floor((total % 3600) / 60);
+            const s = total % 60;
+            const pad = (n) => String(n).padStart(2, '0');
+            return `[${pad(h)}:${pad(m)}:${pad(s)}]`;
+          }
           const lines = [];
           let prevNum = null;
           for (const u of stJson.utterances) {
             const num = remap[u.speaker || '?'] ?? '?';
             const text = (u.text || '').trim();
             if (prevNum !== null && num !== prevNum) lines.push('');
-            lines.push(`발화자 ${num}: ${text}`);
+            lines.push(`${fmtTs(u.start)} 발화자 ${num}: ${text}`);
             prevNum = num;
           }
           payload.text = lines.join('\n');
