@@ -470,6 +470,10 @@
       cursor: not-allowed;
       pointer-events: none;
     }
+    .action-btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+    }
 
     #splitSlides img { width:100%; border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem; display:block; }
     #splitSlides .slide-label { text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; }
@@ -1462,6 +1466,10 @@
     .mode-btn:hover:not(.active) {
       border-color: var(--border-bright);
       color: var(--text);
+    }
+    .mode-btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
     }
 
     /* ── Batch Section ───────────────────────────── */
@@ -2731,14 +2739,15 @@
       border-radius: 12px;
       padding: 0.95rem 1rem 0.85rem;
       cursor: pointer;
-      transition: box-shadow 0.15s, border-color 0.15s, transform 0.08s;
+      transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
       display: flex;
       flex-direction: column;
       gap: 0.45rem;
     }
     .transcript-card:hover {
       border-color: var(--primary-dim, var(--primary));
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      transform: translateY(-1px);
     }
     .transcript-card-head {
       display: flex;
@@ -3786,7 +3795,9 @@
     #gamifAchievements > div > span:first-child {
       font-family: 'Noto Serif KR', 'Pretendard', Georgia, serif;
       letter-spacing: -0.01em;
+      line-height: 1.25;
     }
+    #recentSection { margin-bottom: 2rem !important; }
   </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
