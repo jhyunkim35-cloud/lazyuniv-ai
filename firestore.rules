@@ -64,6 +64,14 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Payment idempotency log — server seals each paymentKey here so
+      // retries are no-ops. Owner can read (e.g. payment history view).
+      // Server-only writes via Admin SDK in api/toss.js.
+      match /paymentLog/{paymentKey} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+
       // analysisSessions: Admin SDK + TTL only. No client reads or writes.
       match /analysisSessions/{sessionId} {
         allow read, write: if false;

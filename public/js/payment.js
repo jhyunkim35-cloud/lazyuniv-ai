@@ -56,17 +56,23 @@ function payForSttEntitlement(audioMinutes) {
         if (settled) return;
         settled = true;
         cleanup();
-        fetch('/api/toss', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            paymentKey: d.paymentKey,
-            orderId: orderId,
-            amount: d.amount,
-            uid: currentUser.uid,
-            kind: 'sttEntitlement',
-            minutes: minutes,
-          }),
+        // Get fresh Firebase ID token — backend verifies and uses it
+        // as the canonical uid; we no longer trust currentUser.uid alone.
+        currentUser.getIdToken().then(function (idToken) {
+          return fetch('/api/toss', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + idToken,
+            },
+            body: JSON.stringify({
+              paymentKey: d.paymentKey,
+              orderId: orderId,
+              amount: d.amount,
+              kind: 'sttEntitlement',
+              minutes: minutes,
+            }),
+          });
         }).then(function (r) { return r.json(); }).then(function (result) {
           if (result.success) resolve({ minutes: minutes, priceKRW: priceKRW });
           else reject(new Error(result.message || '결제 확인 실패'));

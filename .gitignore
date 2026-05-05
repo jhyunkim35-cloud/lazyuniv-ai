@@ -11,3 +11,6 @@ node_modules/
 # old html backups (already in repo but stop adding new ones)
 index_backup*.html
 index_new.html
+
+# sub-claude prompt files (operator-only scratch, not product code)
+.*_prompt.txt

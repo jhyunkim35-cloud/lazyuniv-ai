@@ -3,18 +3,59 @@ const { FieldValue } = require('firebase-admin/firestore');
 const { recordUsage } = require('./_usage');
 
 module.exports = async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', 'https://lazyuniv-ai.vercel.app');
+  // CORS — both legacy and post-rebrand origins until DNS swap is complete
+  const origin = req.headers.origin || '';
+  const allowedOrigins = [
+    'https://lazyuniv-ai.vercel.app',
+    'https://notyx.vercel.app',
+  ];
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { paymentKey, orderId, amount, uid, kind, minutes } = req.body;
+  // ─── Auth: verify Firebase ID token; the uid comes from the *token*,
+  //          NEVER the request body. Without this, any client could pass
+  //          someone else's uid and cause STT entitlements / plan upgrades
+  //          to be written to that user's record. ──────────────────────
+  const authHeader = req.headers.authorization || '';
+  const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!idToken) return res.status(401).json({ success: false, message: 'auth_required' });
+  let uid;
+  try {
+    const adminSdk = getAdmin();
+    const decoded = await adminSdk.auth().verifyIdToken(idToken);
+    uid = decoded.uid;
+  } catch (e) {
+    return res.status(401).json({ success: false, message: 'invalid_token' });
+  }
+
+  const { paymentKey, orderId, amount, kind, minutes } = req.body;
   if (!paymentKey || !orderId || !amount) {
     return res.status(400).json({ success: false, message: 'Missing parameters' });
   }
-  if (!uid) return res.status(400).json({ success: false, message: 'uid required' });
+
+  // ─── Idempotency: refuse to re-process the same paymentKey. Without
+  //          this, a client retry between Toss confirm and our response
+  //          would re-increment singlePurchases or duplicate the
+  //          entitlement. Toss itself rejects the same paymentKey twice
+  //          after DONE, but we double-guard at our layer. ─────────────
+  try {
+    const adminSdk = getAdmin();
+    const db = adminSdk.firestore();
+    const idemRef = db.collection('users').doc(uid).collection('paymentLog').doc(paymentKey);
+    const idemSnap = await idemRef.get();
+    if (idemSnap.exists) {
+      // Already processed — return cached result so retries are no-ops.
+      return res.status(200).json({ success: true, idempotent: true, ...idemSnap.data() });
+    }
+  } catch (e) {
+    // Idempotency check failure shouldn't block payment — log and continue.
+    console.warn('[toss] idempotency precheck skipped:', e.message);
+  }
 
   const secretKey = process.env.TOSS_SECRET_KEY;
   const encoded = Buffer.from(secretKey + ':').toString('base64');
@@ -64,6 +105,21 @@ module.exports = async function handler(req, res) {
         try {
           await recordUsage({ uid, kind: 'sttPayment', increments: { sttPaymentCount: 1, sttPaymentTotalKRW: verifiedAmount } });
         } catch (e) { console.error('[usage] stt payment record failed:', e.message); }
+        // Seal idempotency — future retries with same paymentKey return immediately.
+        try {
+          const adminSdk = getAdmin();
+          await adminSdk.firestore()
+            .collection('users').doc(uid)
+            .collection('paymentLog').doc(paymentKey)
+            .set({
+              kind: 'sttEntitlement',
+              orderId,
+              paymentKey,
+              priceKRW: verifiedAmount,
+              minutes: n * 30,
+              processedAt: FieldValue.serverTimestamp(),
+            });
+        } catch (e) { console.warn('[toss] paymentLog seal failed:', e.message); }
         return res.status(200).json({ success: true, data, minutes: n * 30, priceKRW: verifiedAmount });
       }
 
@@ -113,6 +169,21 @@ module.exports = async function handler(req, res) {
       } catch (e) {
         console.error('[usage] payment record failed:', e.message);
       }
+
+      // Seal idempotency for plan purchases too.
+      try {
+        const adminSdk = getAdmin();
+        await adminSdk.firestore()
+          .collection('users').doc(uid)
+          .collection('paymentLog').doc(paymentKey)
+          .set({
+            kind: verifiedPlan,
+            orderId,
+            paymentKey,
+            priceKRW: verifiedAmount,
+            processedAt: FieldValue.serverTimestamp(),
+          });
+      } catch (e) { console.warn('[toss] paymentLog seal failed:', e.message); }
 
       return res.status(200).json({ success: true, data, plan: verifiedPlan });
     } else {

@@ -68,13 +68,20 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
         if (currentUser) resolve();
         else auth.onAuthStateChanged(u => { if (u) resolve(); });
       });
-      const uid = currentUser.uid;
+
+      // Get fresh Firebase ID token — backend now requires this and
+      // ignores any uid in the body. Without the header the server
+      // would reject the request with 401 auth_required.
+      const idToken = await currentUser.getIdToken();
 
       // Verify payment on server — server derives plan from Toss-verified amount and writes Firestore
       const res = await fetch('/api/toss', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount), uid })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + idToken,
+        },
+        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) })
       });
       const result = await res.json();
 
