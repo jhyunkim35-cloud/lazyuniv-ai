@@ -1,0 +1,41 @@
+B1 strict mode for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai. Vercel auto-deploys on push to main.
+
+CONTEXT (from project memory):
+B1 was the server-side analysisId quota gating system shipped earlier. The api/claude.js proxy auto-injects analysisId, pipeline.js sets/clears it, Firestore transaction is idempotent. CURRENTLY: server still allows requests without analysisId (legacy fallback) so the system is in lenient mode for safety during ramp.
+
+SPEC for strict mode (from memory):
+- For requests with feature='noteAnalysis' that arrive WITHOUT analysisId → REJECT with 400 + clear error
+- Block isFirstCall:false legacy fallback path that bypasses quota gating
+- Keep all other features (quiz, classify, grade) working as before — strict mode is noteAnalysis-only
+
+FILES TO LOOK AT:
+- /api/claude.js — main proxy with quota gating
+- /public/js/pipeline.js — sets/clears analysisId on client side
+- /public/js/api.js — auto-inject analysisId on client side
+- Anywhere that handles incoming feature='noteAnalysis' requests
+
+YOUR TASK:
+1. Read api/claude.js carefully and find the noteAnalysis branch + the quota check
+2. Identify the lenient paths (where analysisId is missing or isFirstCall:false legacy)
+3. Add strict rejection: missing analysisId on noteAnalysis → 400 with `{error: 'analysisId required for noteAnalysis (strict mode)'}`
+4. Also block isFirstCall:false on noteAnalysis — same 400 if it's used to bypass gating
+5. Other features unaffected — only the noteAnalysis branch becomes strict
+6. Add a server-side log line when strict rejection happens for observability
+7. Single commit, descriptive message, push to main
+8. If git push is rejected (sister sub-claudes pushing in parallel), do `git pull --rebase origin main` and try push again
+
+CONSTRAINTS:
+- Don't touch firestore.rules (sister sub-claude is auditing those)
+- Don't create or touch /public/terms.html, /public/privacy.html (other sub-claude generating those)
+- Read your own diff before commit
+- node --check api/claude.js before commit
+
+VERIFY:
+- After push, your strict mode is active in Vercel within 1-2 min
+- (Optional) curl test: `curl -X POST https://lazyuniv-ai.vercel.app/api/claude -H 'content-type: application/json' -d '{"feature":"noteAnalysis","messages":[]}'` should now return 400 (no analysisId)
+- Don't run that curl unless you have a valid Firebase ID token; just confirm the code path is correct by reading.
+
+Output the LAST line as exactly:
+  DONE: <commit_hash>
+or:
+  FAILED: <one-line reason>

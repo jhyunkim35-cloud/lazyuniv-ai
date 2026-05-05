@@ -1,0 +1,98 @@
+Google Cloud Speech-to-Text (Chirp_2) integration for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+CONTEXT:
+Currently STT goes through api/assemblyai.js (AssemblyAI universal model, mediocre Korean accuracy). User wants to add Google Cloud Speech-to-Text with the Chirp_2 model as a HIGHER-QUALITY paid option, while AssemblyAI stays as the default/cheaper option.
+
+Pricing model the user defined:
+- 0~30분 → 30분 단위 (1,500원)
+- 31~60분 → 60분 단위 (2,500원)
+- 61~90분 → 90분 단위 (3,500원)
+- ... +1,000원 per 30 min, fixed 500원 margin (Chirp_2 cost: ~1,000원/30min)
+
+So Google STT becomes a per-use paid feature (Toss). User must pay before transcription starts, payment confirmed, then STT runs.
+
+═══ DELIVERABLE ═══
+
+A new server endpoint /api/google-stt.js that:
+1. Verifies Firebase ID token (same pattern as api/assemblyai.js)
+2. Verifies the user has a paid Google STT entitlement for THIS specific transcription (server-side check against Firestore — see Pricing/Entitlement section below)
+3. POST ?action=transcribe — accepts {audio_url, expectedMinutes} and triggers Google Cloud Speech long-running recognition. Returns {operation_id}
+4. GET ?action=status&id=... — polls operation status. Returns {status: queued|processing|completed|error, text?, error_msg?}
+
+Use Google Cloud Speech-to-Text REST API directly (no SDK; call REST endpoints with a service-account JWT). Reuse the FIREBASE_SERVICE_ACCOUNT env var if it has speech.googleapis.com scope, OR add a new env GOOGLE_STT_SERVICE_ACCOUNT.
+
+Long-running recognition endpoint: https://speech.googleapis.com/v1/speech:longrunningrecognize
+Status endpoint: https://speech.googleapis.com/v1/operations/{operation_id}
+
+Config:
+- model: 'chirp_2'
+- languageCode: 'ko-KR'
+- enableSpeakerDiarization: true (chirp_2 supports diarization)
+- diarizationConfig: { minSpeakerCount: 1, maxSpeakerCount: 6 }
+- enableWordTimeOffsets: true (we use these to build timestamps in the text)
+
+The audio_url passed in is a Firebase Storage signed URL — same as AssemblyAI flow. Google STT can fetch from a publicly accessible HTTPS URL via the `uri` field (gs:// or https://). For Firebase Storage HTTPS download URLs, use:
+  config: {...},
+  audio: { uri: audio_url }
+
+Or if uri-via-https doesn't work for Google (it sometimes requires gs://), download the audio to memory in the function and POST as inlineContent (base64). For long lectures (>1min) inline isn't an option (10MB limit), so use the URI path. If uri fetching fails, log and surface the error.
+
+═══ Pricing / Entitlement ═══
+
+After payment via Toss (handled by sub-claude Y in parallel), the user gets a Firestore record:
+  users/{uid}/sttEntitlements/{entitlementId}: {
+    minutes: number,        // 30, 60, 90, ...
+    paidAt: serverTimestamp,
+    consumed: boolean,      // false initially, true after STT starts
+    consumedAt: serverTimestamp | null,
+    transcriptId: string | null,
+  }
+
+Your /api/google-stt.js transcribe endpoint must:
+1. Read the latest unconsumed entitlement for this uid: where('consumed', '==', false), orderBy('paidAt', 'desc'), limit(1)
+2. If no entitlement, return 402 {error: 'no_entitlement'}
+3. If entitlement.minutes < expectedMinutes (audio too long for what they paid), return 400 {error: 'audio_exceeds_paid_minutes', paid: X, requested: Y}
+4. Mark entitlement.consumed = true, transcriptId = (operation_id), consumedAt = now
+5. Trigger STT
+6. If STT fails to start, ROLL BACK consumed = false (so user doesn't lose payment)
+
+═══ Output formatting ═══
+
+Same as AssemblyAI: rebuild transcript with [hh:mm:ss] timestamps + 발화자 N: prefix. Use word-level timestamps from chirp_2's wordInfo[] to compute speaker boundaries and start times.
+
+Apply the same speaker-numbering logic: dominant speaker (most words/duration) = 1, etc.
+
+Apply the same Vercel 4.5MB body cap defense: do NOT include word-level details in the response, only the rebuilt text + speaker_count + audio_duration.
+
+═══ Wiring ═══
+
+After this endpoint exists, sub-claude Y wires the recorder UI to:
+- Show "Google STT (정확도 높음)" option in addition to default
+- On selection, calculate audio length, charge user via Toss for the right tier
+- After payment, call /api/google-stt instead of /api/assemblyai
+- Same poll loop (already exists)
+
+You don't need to do the UI wiring — that's sub-claude Y. Just build the endpoint cleanly.
+
+═══ CONSTRAINTS ═══
+
+- New file: /api/google-stt.js
+- DO NOT modify /api/assemblyai.js, /api/toss.js, recorder.js, or any UI file. UI wiring is a separate sub-claude.
+- Reuse the Firebase Admin pattern from api/_firebase-admin.js
+- Reuse the rate-limit pattern from api/assemblyai.js
+- Single commit. Message: "feat(stt): add Google Cloud Speech-to-Text (Chirp_2) endpoint for paid high-accuracy transcription"
+- Push to origin main; if rejected, git pull --rebase and retry.
+
+═══ VERIFY ═══
+
+- node --check api/google-stt.js
+- Read your own diff
+- Confirm: 401 for no auth, 402 for no entitlement, 400 for audio too long, then proceeds to longrunningrecognize
+- Confirm: status endpoint returns {status, text?} compatible with what recorder.js expects (so future wiring is simple)
+
+═══ OUTPUT ═══
+
+Last line of your response, exactly one of:
+  DONE: <commit_hash> | google-stt endpoint live
+or:
+  FAILED: <reason>

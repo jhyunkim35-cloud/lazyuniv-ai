@@ -1,0 +1,44 @@
+Firestore Security Rules audit + harden for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+CONTEXT:
+This is a multi-tenant SaaS — each user has notes, folders, transcripts, srsCards, gamification state, timetable entries, analysisSessions, and payment records. CRITICAL: users must NEVER be able to read or write each other's data. This audit makes sure that's actually true at the rules level.
+
+DATA MODEL (from project memory + recent commits):
+- users/{uid} — user profile doc (lastOrderId, lastPaymentAt, singlePurchases, etc.)
+- users/{uid}/folders/{folderId}
+- users/{uid}/notes/{noteId}
+- users/{uid}/transcripts/{transcriptId}
+- users/{uid}/srsCards/{cardId}
+- users/{uid}/timetable/{entryId}
+- users/{uid}/gamification/state (single doc id="state")
+- users/{uid}/analysisSessions/{sessionId}  (TTL: expireAt 7 days)
+
+YOUR TASK:
+1. Find the existing firestore.rules file (or wherever security rules are stored — likely /firestore.rules at repo root)
+2. Read it carefully
+3. Check whether each path is locked to `request.auth.uid == uid`
+4. If anything is missing or overly permissive (e.g. `allow read, write: if true`, or `if request.auth != null` without uid check), tighten to strict per-user isolation
+5. Allow Firestore-managed deletion of analysisSessions via TTL (TTL deletes happen as the system, not user — your rules don't need to allow user deletes there, but ensure the system deletion path isn't blocked)
+6. If api/claude.js writes to analysisSessions via Admin SDK (server-side), Admin SDK bypasses rules so don't worry about that path
+7. Make sure storage.rules is also looked at briefly — same per-user isolation for users/{uid}/recordings/
+
+If everything is already correct, write a comment in the rules file documenting the audit ("Audited YYYY-MM-DD by Claude — verified per-user isolation"), commit, push, and report DONE.
+
+If anything is wrong, fix it, commit with a clear message describing what was loosened that you tightened, push, and report DONE.
+
+CONSTRAINTS:
+- Don't touch /api/claude.js (sister sub-claude is in there for B1 strict mode)
+- Don't create or touch /public/terms.html, /public/privacy.html (other sub-claude generating those)
+- Single commit, descriptive message
+- Push to origin main
+- If git push rejected: `git pull --rebase origin main` and retry
+- Do NOT introduce changes that would break existing legitimate access (a user reading their own data must still work)
+
+VERIFY:
+- Read your own diff before commit
+- If you made changes, mentally walk through one read+one write per collection from a logged-in user's perspective and confirm rules permit it
+
+Output the LAST line as exactly:
+  DONE: <commit_hash> | <verdict>   (verdict = "rules already strict" or "tightened N path(s)")
+or:
+  FAILED: <one-line reason>

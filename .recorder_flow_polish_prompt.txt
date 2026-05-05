@@ -1,0 +1,73 @@
+Recording → transcript → note flow audit + STT progress UI improvement for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+CONTEXT:
+The recorder produces an STT transcript (already auto-saved to "내 녹취록" via transcripts_store.js, then fed into a "rec slot" on the new-note view). On the new-note view, a user normally has:
+- PPT/PDF slot (slides + extracted text)
+- 녹취록 slot (transcript text)
+
+When both are present, the AI pipeline (pipeline.js → api/claude.js) generates a study note that fuses both. So in theory: "녹음하기" → STT → 녹취록 슬롯 자동 채움 → 사용자가 PPT 추가 → 분석 시작 → 노트 생성.
+
+The OPERATOR's concern: "녹음-녹취록 생성기능이랑 기존 PPT 정리본이랑 연결이 깔끔한지 점검하고, 아니면 거기에 맞게 바꿔줘" — i.e. is the wiring clean and intuitive? Audit + improve where rough.
+
+═══ Part 1: Audit ═══
+
+Read and trace the flow end-to-end:
+- /public/js/recorder.js (deliverTranscript function — how it routes the transcript File into setRecSlotFile / addRecSlot / no-op)
+- /public/js/pptx_parser.js (addRecSlot, setRecSlotFile signatures + how slots are rendered)
+- /public/js/note_creation.js (how slots are joined for the AI pipeline)
+- /public/js/pipeline.js (how recText + pptText interleave in the prompt)
+- /public/js/transcripts_store.js (how saved transcripts can be reused — does the user have a way to drag a saved transcript into a new note?)
+- /public/index.html — the new-note view's slot UI
+
+Things to check:
+1. After STT completes from recorder, does the transcript actually land in a slot the user CAN see (and tied to the correct currentView)? If user is on "home", recorder doesn't append slot — is that explained well?
+2. Can users START a recording while ALREADY on the new-note view with a PPT loaded? Does the recording/STT flow pause anything?
+3. Does "내 녹취록" page allow the user to pick an existing transcript and attach it to a new note? If not, that's a gap.
+4. Are there UI labels that conflict? (e.g. is the slot title clearly "녹취록" vs "강의 자료"?)
+5. After STT done modal closes, is the user smoothly returned to the new-note view, or do they have to navigate manually?
+
+═══ Part 2: Fixes ═══
+
+Implement clean wiring for whatever you found rough. Likely fixes (you decide based on audit):
+
+A. After STT 'done' modal closes via 확인 button, if a slot was filled and user is currently on home view, navigate them to the new-note view automatically so they can immediately start the AI analysis. Add a smooth "다음: 강의 자료 추가하기" CTA in the done modal.
+
+B. On the "내 녹취록" page (transcripts_store UI), add a button on each transcript: "이 녹취록으로 새 노트 만들기" → navigates to new-note view, populates the rec slot with that transcript.
+
+C. On the new-note view, when only a 녹취록 slot is filled (no PPT), show a small hint: "💡 PPT/PDF를 함께 업로드하면 더 정확한 노트가 생성됩니다." But still allow analysis without PPT.
+
+D. After recording completes, the user might have BEEN on a different view when they started the recording. The recorder pill stays floating during STT processing, then on completion fires a toast — but the action they need to take next (분석 시작) requires being on new-note. Make the floating pill, on STT complete, expand to a "확인 + 분석 시작하기" action card if there's at least one slot filled.
+
+═══ Part 3: STT progress UI improvement (separate but related) ═══
+
+Currently the STT screen shows a spinner + "텍스트 변환 중… (대기열)" / "텍스트 변환 중… (33초)". User has no sense of progress or expected duration.
+
+Improvements:
+1. Stage indicator (3-step):
+   ① 업로드 ✓
+   ② 변환 대기 / 변환 중 (현재 단계 highlighted with spinner)
+   ③ 노트 슬롯 채우기
+2. Add a subtle estimated duration: "보통 강의 길이의 약 30~50% 시간이 소요됩니다 (90분 강의 ≈ 30~45분)"
+3. Stronger note that the user can close the modal: "💡 이 창을 닫아도 변환은 계속됩니다. 결과는 자동으로 녹취록 슬롯에 추가됩니다."
+4. Show elapsed in MM:SS format (already there but ensure it's clearly visible)
+5. After 5 minutes still queued/processing, show a yellow "긴 강의는 시간이 더 걸릴 수 있습니다" warning
+
+CONSTRAINTS:
+- Edit /public/js/recorder.js (mostly), and possibly /public/js/transcripts_store.js (UI tweak for "이 녹취록으로 새 노트") and /public/js/home_view.js (route from STT done modal).
+- DO NOT edit /api/assemblyai.js — sister sub-claude is touching that for speaker labeling.
+- DO NOT edit /public/index.html if you can avoid it. Use inline style injection / dynamic DOM where possible.
+- DO NOT edit pipeline.js, api/claude.js, firestore.rules, storage.rules, vercel.json.
+- Single commit. Message: "feat(recorder+stt): cleaner transcript→note wiring + 3-stage STT progress UI"
+- Push to origin main; if rejected, git pull --rebase and retry.
+
+VERIFY:
+- node --check on each .js file you touch
+- Read your own diff carefully
+- Walk through both flows mentally:
+  - User on home → 녹음하기 → 1시간 강의 → 종료 → STT 변환 중 (3단계 표시) → 완료 → "다음: 강의 자료 추가" CTA → 새 노트 view로 이동 → 슬롯에 transcript 들어있음, PPT만 추가하면 분석 가능
+  - User on 내 녹취록 → 기존 녹취록 옆 "새 노트 만들기" 클릭 → 새 노트 view로 이동, 녹취록 슬롯 미리 채워짐
+
+OUTPUT (LAST line of your response):
+  DONE: <commit_hash>
+or:
+  FAILED: <one-line reason>

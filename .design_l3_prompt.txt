@@ -1,0 +1,82 @@
+Notyx Level 3 design refresh. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai (Vercel auto-deploys on push to main).
+
+CONTEXT:
+The brand was just renamed to "Notyx" (commit 68981c0). The design needs subtle refinement to match the new brand identity, but the user is firm that the current minimalist feel must be preserved. This is a SMALL polish, not a redesign.
+
+═══ ABSOLUTE RULES ═══
+
+DO NOT change:
+- Page layout (no rearranging cards, no new sections, no removing anything)
+- Base background color (stays white / very light)
+- Card structure (border radius, padding, shadow style — keep current)
+- Spacing/sizing of components
+- Sidebar structure
+- Any functional code (JS, API endpoints, business logic)
+- Component HTML structure
+- Anything in /api/, /public/js/* logic, firestore.rules, etc.
+
+The user must look at before/after and think "feels slightly more refined" — NOT "this is a different site."
+
+═══ EXACT CHANGES (Level 3 only) ═══
+
+1) PRIMARY COLOR shift: purple → indigo
+   - Find the primary brand color in the CSS (likely --primary or similar, value around #7c3aed / #8b5cf6 / similar purple)
+   - Change to indigo #6366f1 (or near: #4f46e5 if 6366f1 looks too light)
+   - Update its --primary-hover / --primary-light variants to match (one step darker / lighter on the indigo scale)
+   - Use grep to find ALL hardcoded uses of the old purple hex outside CSS variables and replace them too — but be SURGICAL, don't change colors that aren't the brand purple (e.g. don't touch streak orange, achievement gold, etc.)
+
+2) HEADING SERIF ACCENT: subtle Korean-friendly serif on key headings only
+   - Add Google Fonts link in <head>: Noto Serif KR (weights 500, 700) — Korean serif that pairs well with sans body
+   - Apply to: page-level titles only (the big headings users land on)
+     * The "오늘의 목표" / "내 업적" / "최근 노트" / "모든 노트" section headers
+     * The home view's "Notyx" wordmark (if rendered as text near the logo)
+     * The note title on the note view
+     * The split viewer's note panel heading
+   - DO NOT apply serif to:
+     * Body text
+     * Card titles (note name in cards stays sans)
+     * Buttons / labels / form fields
+     * Anything inside cards that isn't a section header
+   - Use font-family: 'Noto Serif KR', 'Pretendard', serif; with letter-spacing slight tighten (-0.01em)
+
+3) LOGO ICON refresh: SVG monogram replacing the old PPT/slide gradient icon
+   - Find the current logo icon SVG in public/index.html (it's near the brand text in the topbar / sidebar)
+   - Replace with a clean N monogram. Keep it simple:
+     * 32×32 viewBox
+     * A stylized "N" letterform, with the right diagonal stroke extending slightly past the bottom baseline (suggests motion / depth — subtle Nautilus reference, but mainly looks like a refined N)
+     * Single color via currentColor so it inherits the new indigo
+     * Minimal — no gradients, no extra decoration
+   - The old icon may appear in 2 places (topbar + favicon). Replace topbar SVG, leave favicon for the user to update separately (favicon would need a real .ico/.png file regenerated)
+
+4) CARD HOVER refinement (optional, minimal)
+   - If cards already have a hover transition, soften the shadow slightly to feel more like paper:
+     * Hover shadow: rgba(0,0,0,0.06) blur 18px → close to current but slightly larger blur for softer edges
+     * Transition: ensure transition: box-shadow 0.2s ease, transform 0.2s ease is present
+   - Skip this if it looks fine already — don't over-engineer
+
+═══ PROCESS ═══
+
+1) Read public/index.html — find the <style> block(s), the logo SVG, the topbar markup
+2) grep -rn "#7c3aed\|#8b5cf6\|#a78bfa\|--primary" public/ — locate primary color usages
+3) Categorize: CSS var (change), hardcoded hex (carefully replace), unrelated purple (leave)
+4) Make changes
+5) node --check on any JS files you touched (you shouldn't be touching JS, but verify if you did)
+6) Read the diff. Verify only the 4 categories above changed.
+7) Single commit:
+     style(design): Level 3 polish — indigo primary, serif headings, N monogram logo
+   With body explaining what changed and what stayed (mention the preservation rules above)
+8) Push origin main; pull --rebase if rejected
+
+═══ VERIFY ═══
+
+After commit, run:
+   grep -n "#7c3aed\|#8b5cf6" public/index.html
+
+If any old purple hex remains, it should be intentional (e.g. a different non-primary purple used for some specific accent that wasn't part of the brand color).
+
+═══ OUTPUT ═══
+
+Last line, exactly one of:
+  DONE: <commit_hash> | Level 3 design polish live (indigo + serif headings + N monogram)
+or:
+  FAILED: <reason>

@@ -1,0 +1,41 @@
+STT v2 Phase 1 (timetable data model) for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai. Vercel auto-deploys on push to main.
+
+CONTEXT: From project memory backlog:
+> STT 녹음 v2 백로그 (베타 후): 시간표 시스템 — 강의별 요일/시간/이름 데이터 모델 + 자동 스케줄러(강의 시작/종료에 녹음 auto on/off)
+
+THIS PHASE 1: Just the data layer + minimal placeholder UI hook. NO scheduler, NO Wake Lock, NO PWA, NO Web Push, NO AssemblyAI webhook (those are later phases).
+
+DATA MODEL (Firestore + IDB mirror):
+- users/{uid}/timetable/{entryId}
+- Fields:
+  - entryId: stable id (use crypto.randomUUID() or similar)
+  - courseName: string (e.g. "산업심리학")
+  - folderId: string | null (optional link to existing folder so timetable entry can map to that folder's notes)
+  - dayOfWeek: 0-6 (0=Sun, 6=Sat)
+  - startTime: 'HH:MM'
+  - endTime: 'HH:MM'
+  - autoRecord: boolean (default false; future: scheduler hook)
+  - createdAt, updatedAt: ISO strings
+
+NEW FILE /public/js/timetable.js exposing window.* functions:
+- saveTimetableEntry(entry) -- writes to FS users/{uid}/timetable/{entryId} with merge:true; mirrors to IDB. Call userTimetableRef pattern matching existing firestore_sync helpers (see firestore_sync.js for the FS path / db ref pattern).
+- getTimetableEntry(entryId) -- reads one entry, FS first with IDB fallback.
+- listTimetableEntries() -- returns array of all entries for current user, sorted by dayOfWeek ASC then startTime ASC.
+- deleteTimetableEntry(entryId) -- deletes from FS and IDB.
+- newTimetableEntry(partial) -- creates a fresh entry with defaults: dayOfWeek=1 (Mon), startTime='09:00', endTime='10:30', autoRecord=false. Spreads partial on top. Returns entry object (NOT saved yet).
+
+CONSTRAINTS:
+- Pure data layer for this commit. NO scheduler, NO Wake Lock, NO PWA, NO Web Push.
+- Add timetable.js script tag to /public/index.html in correct load order — after firestore_sync.js, before home_view.js (look at existing order).
+- DO NOT modify home_view.js, srs.js, gamification.js, or any other shared file (Phase 2 SRS gamification sub-claude is working on those in parallel).
+- If git push is rejected due to remote update, run `git pull --rebase origin main` and try push again.
+- Single descriptive commit, push to main.
+
+VERIFY:
+- node --check /public/js/timetable.js
+- Read your own diff before commit.
+
+Output the LAST line as exactly:
+  DONE: <commit_hash> | <files_changed> files
+or:
+  FAILED: <one-line reason>

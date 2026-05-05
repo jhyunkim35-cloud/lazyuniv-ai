@@ -1,0 +1,40 @@
+Goal: Refactor the runInlineQuiz function in /c/Users/김준현/meeting-app/public/js/quiz.js — currently 539 lines in a single function. Break it into smaller, named, single-purpose helpers. Pure refactor — NO behavior change.
+
+Working directory: /c/Users/김준현/meeting-app
+Repo: jhyunkim35-cloud/lazyuniv-ai (Vercel auto-deploys on push to main)
+
+Phase 1: Read and understand
+1. Locate runInlineQuiz function in /public/js/quiz.js
+2. Identify natural seams in the function (it's 539 lines — there are obvious chunks: setup, render question, handle answer, scoring, advance, finish, etc.)
+3. Map every variable and closure dependency before extracting
+
+Phase 2: Refactor in steps
+- Extract each logical chunk into a named helper function (e.g. `renderQuestion`, `handleAnswerSubmit`, `scoreQuestion`, `advanceToNext`, `finishQuiz`)
+- Helpers should be defined in the same IIFE scope or as module-private functions — preserve the existing scoping pattern in quiz.js
+- runInlineQuiz becomes a thin orchestrator (~50-100 lines max) that wires up state and calls helpers
+- Preserve EXACT behavior: same DOM updates, same network calls (Claude API), same Firestore writes, same toast messages, same edge cases
+
+Phase 3: Verify behavior preserved
+- `node --check public/js/quiz.js` for syntax
+- Read your own diff and trace through 2-3 representative scenarios:
+  - User clicks "퀴즈" tab, quiz loads → renders first question
+  - User selects answer → scored, advances
+  - Last question answered → finishQuiz triggers, summary shown
+  - Make sure each path through the code still works
+
+Phase 4: Commit and push
+- Single commit on main with descriptive message
+- Push to origin main (Vercel will auto-deploy)
+- Commit message should explain: function extracted, helper names, lines before/after, that it's a pure refactor with no behavior change
+
+Constraints:
+- DO NOT use PowerShell tool. Bash only.
+- DO NOT add new features
+- DO NOT change Firestore schema, API calls, or DOM IDs
+- DO NOT modify other files unless absolutely required (e.g. if a global is referenced from another file, leave the export shape unchanged)
+- Toast emoji strings stay as-is
+
+Output the LAST line as exactly:
+  DONE: <commit_hash> | <lines_before>→<lines_after> in runInlineQuiz | <helpers_extracted> helpers
+or:
+  FAILED: <one-line reason>

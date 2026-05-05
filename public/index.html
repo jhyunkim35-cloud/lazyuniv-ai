@@ -48,10 +48,10 @@
       --border: #252545;
       --border-bright: #3a3a6a;
       /* Notyx primary: deep indigo (Nautilus-depth + knowledge) */
-      --primary: #6366f1;
-      --primary-dim: rgba(99, 102, 241, 0.15);
-      --primary-bright: #818cf8;
-      --primary-deep: #4338ca;
+      --primary: #7c3aed;
+      --primary-dim: rgba(124, 58, 237, 0.15);
+      --primary-bright: #a78bfa;
+      --primary-deep: #5b21b6;
       /* Secondary: kept as a complementary cool tone for accents in
          gradients (logo mark, illustrations). Slightly cooler indigo
          instead of the cyan we had before — keeps the palette unified. */
@@ -107,7 +107,7 @@
       color: var(--text);
       min-height: 100vh;
       background-image:
-        radial-gradient(ellipse 60% 40% at 15% 15%, rgba(99, 102, 241, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 15% 15%, rgba(124, 58, 237, 0.18) 0%, transparent 60%),
         radial-gradient(ellipse 50% 35% at 85% 85%, rgba(0, 180, 216, 0.12) 0%, transparent 60%);
     }
 
@@ -138,7 +138,7 @@
     header h1 {
       font-size: clamp(1.8rem, 4vw, 2.8rem);
       font-weight: 800;
-      background: linear-gradient(135deg, #818cf8, #6366f1, #00b4d8);
+      background: linear-gradient(135deg, #a78bfa, #7c3aed, #00b4d8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -196,7 +196,7 @@
 
     .api-input:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
     }
 
     .api-input::placeholder { color: var(--text-dim); }
@@ -230,7 +230,7 @@
     }
 
     .upload-zone.ppt-zone::before {
-      background: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.08), transparent 70%);
+      background: radial-gradient(ellipse at 50% 0%, rgba(124, 58, 237, 0.08), transparent 70%);
     }
 
     .upload-zone.txt-zone::before {
@@ -315,7 +315,7 @@
     .analyze-btn {
       width: 100%;
       padding: 0.95rem;
-      background: linear-gradient(135deg, #6366f1, #5b8ef7, #00b4d8);
+      background: linear-gradient(135deg, #7c3aed, #5b8ef7, #00b4d8);
       background-size: 200% 200%;
       animation: gradShift 4s ease infinite;
       border: none;
@@ -337,7 +337,7 @@
     .analyze-btn:hover:not(:disabled) {
       opacity: 0.92;
       transform: translateY(-2px);
-      box-shadow: 0 10px 40px rgba(99, 102, 241, 0.35);
+      box-shadow: 0 10px 40px rgba(124, 58, 237, 0.35);
     }
 
     .analyze-btn:disabled {
@@ -387,16 +387,16 @@
 
     .status-dot.loading {
       background: var(--primary);
-      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+      box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.6);
       animation: dotPulse 1.2s ease-out infinite;
     }
 
     .status-dot.done { background: var(--success); }
 
     @keyframes dotPulse {
-      0%   { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
-      70%  { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+      0%   { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.6); }
+      70%  { box-shadow: 0 0 0 8px rgba(124, 58, 237, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
     }
 
     .copy-btn {
@@ -492,7 +492,7 @@
     #splitAccordion .acc-body .acc-extra { font-size:0.82rem; color:var(--text-muted); line-height:1.7; padding:0.2rem 0 0.2rem 0.8rem; }
     #splitAccordion .acc-sub { border-left:3px solid var(--primary); margin:0.3rem 0; border-radius:4px; }
     #splitAccordion .acc-sub-header { padding:0.4rem 0.8rem; cursor:pointer; font-size:0.88rem; font-weight:600; color:var(--secondary); user-select:none; }
-    #splitAccordion .acc-sub-header:hover { background:rgba(99,102,241,0.06); }
+    #splitAccordion .acc-sub-header:hover { background:rgba(124,58,237,0.06); }
     #splitAccordion .acc-sub-body { display:none; padding:0.3rem 0.8rem 0.5rem 1.2rem; font-size:0.84rem; line-height:1.7; color:var(--text); }
     #splitAccordion .acc-sub.open .acc-sub-body { display:block; }
     #splitAccordion .acc-sub.open .acc-sub-header { color:var(--primary); }
@@ -500,8 +500,8 @@
 
     /* ── Mind map tab ──────────────────────────── */
 
-    .transcript-content mark { background:rgba(99,102,241,0.25); color:var(--text); border-radius:2px; padding:0 2px; cursor:pointer; }
-    .transcript-content mark:hover { background:rgba(99,102,241,0.4); }
+    .transcript-content mark { background:rgba(124,58,237,0.25); color:var(--text); border-radius:2px; padding:0 2px; cursor:pointer; }
+    .transcript-content mark:hover { background:rgba(124,58,237,0.4); }
     .transcript-content mark.user-removed { background:transparent; text-decoration:none; }
 
     /* ── Filter disclosure (collapsible diff) ───── */
@@ -634,7 +634,7 @@
     .md-table th, .md-table td { border: 1px solid var(--border-bright); padding: 0.4rem 0.7rem; text-align: left; min-width: 60px; }
     .md-table th { background: var(--surface3); color: var(--secondary); font-weight: 600; }
     .md-table td { background: var(--surface2); }
-    .md-table tr:hover td { background: rgba(99, 102, 241, 0.06); }
+    .md-table tr:hover td { background: rgba(124, 58, 237, 0.06); }
 
     .md-content table, #splitAccordion .md-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
     .md-content th, .md-content td, #splitAccordion .md-content th, #splitAccordion .md-content td { min-width: 60px; white-space: nowrap; }
@@ -899,7 +899,7 @@
       transition: box-shadow 0.15s;
     }
     #batchBuddy:hover #batchBuddySpeech {
-      box-shadow: 0 2px 16px rgba(99,102,241,0.35);
+      box-shadow: 0 2px 16px rgba(124,58,237,0.35);
       border-color: var(--primary);
     }
     #batchBuddySpeech::after {
@@ -968,7 +968,7 @@
     .progress-fill {
       height: 100%;
       border-radius: 99px;
-      background: linear-gradient(90deg, #6366f1, #5b8ef7, #00b4d8);
+      background: linear-gradient(90deg, #7c3aed, #5b8ef7, #00b4d8);
       background-size: 200% 100%;
       width: 0%;
       transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1046,7 +1046,7 @@
     .agent-section-title {
       font-size: 1.1rem;
       font-weight: 700;
-      background: linear-gradient(135deg, #818cf8, #00b4d8);
+      background: linear-gradient(135deg, #a78bfa, #00b4d8);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -1098,7 +1098,7 @@
 
     .agent-node.loading {
       border-color: var(--primary);
-      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+      box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.6);
       animation: dotPulse 1.2s ease-out infinite;
     }
 
@@ -1270,7 +1270,7 @@
       height: 8px;
       border-radius: 50%;
       background: var(--primary);
-      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+      box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.6);
       animation: dotPulse 1.2s ease-out infinite;
       flex-shrink: 0;
       transition: background 0.3s;
@@ -1637,7 +1637,7 @@
     }
 
     .batch-item-status.waiting  { background: var(--surface3); color: var(--text-dim); border: 1px solid var(--border); }
-    .batch-item-status.processing { background: var(--primary-dim); color: var(--primary); border: 1px solid rgba(99,102,241,0.3); }
+    .batch-item-status.processing { background: var(--primary-dim); color: var(--primary); border: 1px solid rgba(124,58,237,0.3); }
     .batch-item-status.done  { background: var(--success-dim); color: var(--success); border: 1px solid rgba(74,222,128,0.3); }
     .batch-item-status.error { background: rgba(248,113,113,0.1); color: #fca5a5; border: 1px solid rgba(248,113,113,0.3); }
 
@@ -1691,7 +1691,7 @@
       gap: 0.75rem;
       padding: 0.75rem 1.1rem;
       background: var(--primary-dim);
-      border: 1px solid rgba(99,102,241,0.3);
+      border: 1px solid rgba(124,58,237,0.3);
       border-radius: var(--radius-sm);
       font-size: 0.9rem;
       font-weight: 600;
@@ -1968,14 +1968,14 @@
     .quiz-seg-group { display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; }
     .quiz-seg-btn { padding:0.3rem 0.75rem; background:var(--surface3); border:none; border-right:1px solid var(--border); color:var(--text-muted); font-size:0.82rem; cursor:pointer; transition:all 0.12s; white-space:nowrap; }
     .quiz-seg-btn:last-child { border-right:none; }
-    .quiz-seg-btn.active { background:#6366f1; color:#fff; font-weight:600; }
+    .quiz-seg-btn.active { background:#7c3aed; color:#fff; font-weight:600; }
     .quiz-seg-btn:hover:not(.active) { background:var(--surface); color:var(--text); }
     .quiz-inline-loading { display:flex; align-items:center; gap:0.7rem; padding:1.5rem 0; color:var(--text-muted); font-size:0.9rem; }
-    .qi-spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border-bright); border-top-color:#6366f1; border-radius:50%; animation:spin 0.7s linear infinite; flex-shrink:0; }
+    .qi-spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--border-bright); border-top-color:#7c3aed; border-radius:50%; animation:spin 0.7s linear infinite; flex-shrink:0; }
     .quiz-dot-anim::after { content:''; animation:quiz-dots 1.4s steps(4,end) infinite; }
     @keyframes quiz-dots { 0%{content:''} 25%{content:'.'} 50%{content:'..'} 75%{content:'...'} }
     .quiz-loading-container { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; padding:2.5rem 1rem; }
-    .quiz-loading-spinner { width:40px; height:40px; border:3px solid var(--border-bright); border-top-color:#6366f1; border-radius:50%; animation:spin 0.8s linear infinite; }
+    .quiz-loading-spinner { width:40px; height:40px; border:3px solid var(--border-bright); border-top-color:#7c3aed; border-radius:50%; animation:spin 0.8s linear infinite; }
     .quiz-loading-msg { font-size:0.92rem; color:var(--text-muted); transition:opacity 0.35s ease; }
     .quiz-loading-msg.fade-out { opacity:0; }
     .quiz-loading-timer { font-size:0.78rem; color:var(--text-muted); opacity:0.6; }
@@ -1986,20 +1986,20 @@
     .quiz-card-q { font-size:0.95rem; font-weight:600; color:var(--text); line-height:1.65; }
     .quiz-card-choices { display:flex; flex-direction:column; gap:0.38rem; }
     .qi-choice { width:100%; text-align:left; padding:0.6rem 0.9rem; border:1px solid var(--border); border-radius:7px; background:var(--surface3); color:var(--text); font-size:0.88rem; cursor:pointer; transition:border-color 0.12s, background 0.12s; line-height:1.5; }
-    .qi-choice:hover:not(:disabled) { border-color:#6366f1; background:rgba(99,102,241,0.08); }
+    .qi-choice:hover:not(:disabled) { border-color:#7c3aed; background:rgba(124,58,237,0.08); }
     .qi-choice:disabled { cursor:default; }
-    .qi-choice.qi-selected { border-color:#6366f1; background:rgba(99,102,241,0.1); font-weight:600; }
+    .qi-choice.qi-selected { border-color:#7c3aed; background:rgba(124,58,237,0.1); font-weight:600; }
     .qi-choice.qi-correct { border-color:#22c55e !important; background:rgba(34,197,94,0.1) !important; color:#22c55e; font-weight:600; }
     .qi-choice.qi-wrong   { border-color:#ef4444 !important; background:rgba(239,68,68,0.08) !important; color:#ef4444; }
-    .qi-explanation { padding:0.65rem 0.9rem; background:var(--surface); border-radius:7px; border-left:3px solid #6366f1; font-size:0.83rem; color:var(--text-muted); line-height:1.6; display:none; }
+    .qi-explanation { padding:0.65rem 0.9rem; background:var(--surface); border-radius:7px; border-left:3px solid #7c3aed; font-size:0.83rem; color:var(--text-muted); line-height:1.6; display:none; }
     .quiz-card-open { display:flex; flex-direction:column; }
     .qi-text-input { padding:0.6rem 0.9rem; border:1px solid var(--border); border-radius:7px; background:var(--surface3); color:var(--text); font-size:0.88rem; outline:none; transition:border-color 0.12s; }
-    .qi-text-input:focus { border-color:#6366f1; }
+    .qi-text-input:focus { border-color:#7c3aed; }
     .qi-text-input:disabled { opacity:0.6; cursor:default; }
     .qi-essay-input { padding:0.6rem 0.9rem; border:1px solid var(--border); border-radius:7px; background:var(--surface3); color:var(--text); font-size:0.88rem; resize:vertical; outline:none; font-family:inherit; line-height:1.6; transition:border-color 0.12s; }
-    .qi-essay-input:focus { border-color:#6366f1; }
+    .qi-essay-input:focus { border-color:#7c3aed; }
     .qi-essay-input:disabled { opacity:0.6; cursor:default; }
-    .quiz-grade-btn { padding:0.6rem 1.5rem; border-radius:7px; border:none; background:#6366f1; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer; transition:filter 0.15s; }
+    .quiz-grade-btn { padding:0.6rem 1.5rem; border-radius:7px; border:none; background:#7c3aed; color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer; transition:filter 0.15s; }
     .quiz-grade-btn:hover:not(:disabled) { filter:brightness(1.1); }
     .quiz-grade-btn:disabled { opacity:0.38; cursor:default; }
     .quiz-results-banner { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; display:flex; flex-direction:column; gap:0.5rem; }
@@ -2020,7 +2020,7 @@
     .quiz-debug-label { font-family:monospace; font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-top:0.25rem; }
     .quiz-debug-pre { font-family:monospace; font-size:0.75rem; color:var(--text-muted); background:var(--surface2); border:1px solid var(--border); border-radius:5px; padding:0.55rem 0.7rem; white-space:pre-wrap; word-break:break-all; margin:0; }
     .quiz-debug-full-wrap { margin-top:0.25rem; }
-    .quiz-debug-full-toggle { font-family:monospace; font-size:0.75rem; color:#6366f1; cursor:pointer; list-style:none; padding:0.2rem 0; }
+    .quiz-debug-full-toggle { font-family:monospace; font-size:0.75rem; color:#7c3aed; cursor:pointer; list-style:none; padding:0.2rem 0; }
     .quiz-sc-container { display:flex; flex-direction:column; gap:0.75rem; }
     .quiz-sc-status { display:flex; justify-content:space-between; font-size:0.82rem; color:var(--text-muted); padding:0.25rem 0.5rem; }
     .quiz-sc-card-area { min-height:280px; }
@@ -2065,7 +2065,7 @@
     .weakness-preview-pct { font-weight:700; min-width:38px; text-align:right; font-size:0.85rem; }
     .weakness-preview-stats { font-weight:700; min-width:78px; text-align:right; font-size:0.82rem; white-space:nowrap; }
     .weakness-preview-review-btn { padding:0.3rem 0.7rem; border-radius:5px; border:1px solid var(--border); background:var(--surface); color:var(--primary); font-size:0.78rem; font-weight:600; cursor:pointer; transition:background 0.15s; }
-    .weakness-preview-review-btn:hover { background:var(--primary-dim, rgba(99,102,241,0.15)); }
+    .weakness-preview-review-btn:hover { background:var(--primary-dim, rgba(124,58,237,0.15)); }
     #importNoteBody:empty::before { content:attr(data-placeholder); color:var(--text-muted); pointer-events:none; }
     .import-preview-item { display:flex; align-items:flex-start; gap:0.6rem; padding:0.6rem 0.8rem; background:var(--surface2); border:1px solid var(--border); border-radius:8px; }
     .import-preview-item input[type=checkbox] { margin-top:2px; flex-shrink:0; accent-color:var(--primary); width:15px; height:15px; cursor:pointer; }
@@ -2947,8 +2947,8 @@
       border-radius: 4px;
       margin-left: 5px;
       vertical-align: middle;
-      background: rgba(99, 102, 241, 0.16);
-      color: #6366f1;
+      background: rgba(124, 58, 237, 0.16);
+      color: #7c3aed;
       letter-spacing: 0.02em;
     }
 
@@ -3925,13 +3925,13 @@
   <div id="batchBuddyChar">
     <svg viewBox="0 0 64 64" width="64" height="64" xmlns="http://www.w3.org/2000/svg">
       <!-- Body: notebook shape -->
-      <rect x="10" y="8" width="36" height="42" rx="4" fill="#6366f1"/>
+      <rect x="10" y="8" width="36" height="42" rx="4" fill="#7c3aed"/>
       <!-- Notebook spine -->
-      <rect x="10" y="8" width="6" height="42" rx="2" fill="#4338ca"/>
+      <rect x="10" y="8" width="6" height="42" rx="2" fill="#5b21b6"/>
       <!-- Notebook lines -->
-      <line x1="22" y1="20" x2="42" y2="20" stroke="#818cf8" stroke-width="2" stroke-linecap="round"/>
-      <line x1="22" y1="27" x2="42" y2="27" stroke="#818cf8" stroke-width="2" stroke-linecap="round"/>
-      <line x1="22" y1="34" x2="42" y2="34" stroke="#818cf8" stroke-width="2" stroke-linecap="round"/>
+      <line x1="22" y1="20" x2="42" y2="20" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+      <line x1="22" y1="27" x2="42" y2="27" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+      <line x1="22" y1="34" x2="42" y2="34" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
       <!-- Eyes wrapped in group for blink animation -->
       <g class="buddy-eyes">
         <circle class="buddy-eye-normal" cx="24" cy="14" r="2.5" fill="white"/>
@@ -3942,8 +3942,8 @@
       <!-- Smile -->
       <path class="buddy-mouth" d="M22 18 Q29 22 36 18" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>
       <!-- Legs -->
-      <rect x="16" y="50" width="8" height="10" rx="3" fill="#6366f1"/>
-      <rect x="32" y="50" width="8" height="10" rx="3" fill="#6366f1"/>
+      <rect x="16" y="50" width="8" height="10" rx="3" fill="#7c3aed"/>
+      <rect x="32" y="50" width="8" height="10" rx="3" fill="#7c3aed"/>
       <!-- Pencil (held to the right, animated) -->
       <g class="buddy-pencil">
         <rect x="44" y="28" width="5" height="20" rx="1.5" fill="#fbbf24" transform="rotate(20 46 38)"/>
@@ -3962,14 +3962,14 @@
   <!-- ═══ LANDING VIEW (non-logged-in) ═══ -->
   <div id="landingView" style="display:none; text-align:center; padding:4rem 2rem; max-width:600px; margin:0 auto;">
     <div style="font-size:3.5rem; margin-bottom:1rem;">📝</div>
-    <h1 style="font-size:1.8rem; font-weight:800; background:linear-gradient(135deg, #818cf8, #6366f1, #00b4d8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:0.6rem;">Notyx</h1>
+    <h1 style="font-size:1.8rem; font-weight:800; background:linear-gradient(135deg, #a78bfa, #7c3aed, #00b4d8); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:0.6rem;">Notyx</h1>
     <p style="color:var(--text-muted); font-size:1rem; line-height:1.7; margin-bottom:2rem;">PPT 슬라이드와 강의 녹취록을 업로드하면<br>AI가 시험 대비에 최적화된 학습 노트를 자동 생성합니다.</p>
     <div style="display:flex; flex-direction:column; gap:0.8rem; align-items:center; margin-bottom:2.5rem;">
       <div style="display:flex; align-items:center; gap:0.6rem; color:var(--text-muted); font-size:0.9rem;">✅ PPT/PDF + 녹취록 → 구조화된 학습 가이드</div>
       <div style="display:flex; align-items:center; gap:0.6rem; color:var(--text-muted); font-size:0.9rem;">✅ 교수님 강조 사항 자동 추출</div>
       <div style="display:flex; align-items:center; gap:0.6rem; color:var(--text-muted); font-size:0.9rem;">✅ 슬라이드 + 노트 분할 뷰어</div>
     </div>
-    <button onclick="loginWithGoogle()" style="padding:0.85rem 2.5rem; background:linear-gradient(135deg, #6366f1, #5b8ef7); border:none; border-radius:12px; color:#fff; font-size:1rem; font-weight:700; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 20px rgba(99,102,241,0.3);">🔑 Google로 시작하기</button>
+    <button onclick="loginWithGoogle()" style="padding:0.85rem 2.5rem; background:linear-gradient(135deg, #7c3aed, #5b8ef7); border:none; border-radius:12px; color:#fff; font-size:1rem; font-weight:700; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 20px rgba(124,58,237,0.3);">🔑 Google로 시작하기</button>
     <p style="color:var(--text-dim); font-size:0.78rem; margin-top:1rem;">Google 계정으로 간편하게 로그인</p>
   </div>
 
@@ -5336,7 +5336,7 @@ window.addEventListener('beforeunload', e => {
     전체 선택
   </label>
   <span id="bulkSelectCount" style="color:var(--text);font-weight:600;">0개 선택됨</span>
-  <button class="action-btn" onclick="bulkNotionCopy()" style="border-color:#6366f1;color:#6366f1;background:rgba(99,102,241,0.1);">📋 노션</button>
+  <button class="action-btn" onclick="bulkNotionCopy()" style="border-color:#7c3aed;color:#7c3aed;background:rgba(124,58,237,0.1);">📋 노션</button>
   <button class="action-btn" onclick="bulkExportPdf()" style="border-color:#2563eb;color:#2563eb;background:rgba(37,99,235,0.1);">📄 PDF</button>
   <button class="action-btn" onclick="bulkDeleteSelected()" style="border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,0.1);">🗑 선택 삭제</button>
   <button class="action-btn" onclick="toggleBulkSelectMode()">취소</button>

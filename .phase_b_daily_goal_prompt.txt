@@ -1,0 +1,80 @@
+Daily Goal + Streak Calendar UI for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+CONTEXT: Phase A (SRS review UI) just shipped. Now add Duolingo-style daily engagement loops.
+
+Currently public/js/gamification.js tracks streakDays + xpTotal but only shows them as a single static badge. Users have no concrete daily target and no visual proof of consistency. Add:
+
+═══ Part 1: Daily Goal mechanic ═══
+
+Extend gamification.js state schema:
+- dailyGoal (number, default 5 — interpreted as "review N cards OR generate 1 note")
+- dailyProgress: { ymd: { cardsReviewed, notesCreated, quizzesCompleted, completed (bool) } }
+- dailyHistory (array of last 30 ymds with progress for streak calendar)
+
+Add functions:
+- getTodayProgress() → returns today's progress object
+- markNoteCreated() — call from pipeline.js when noteAnalysis succeeds
+- markQuizCompleted() — call from quiz.js when user finishes a quiz
+- onCardReviewed already exists — extend it to also update dailyProgress.cardsReviewed
+- checkDailyGoalCompleted() — returns true if cardsReviewed >= dailyGoal OR notesCreated >= 1 OR quizzesCompleted >= 1; if newly completed, fire celebration
+
+═══ Part 2: Home view — Daily Goal progress bar ═══
+
+In public/js/home_view.js, near the existing streak/XP badge, add a new "오늘의 목표" section:
+- Title: "오늘의 목표"
+- Progress bar (cardsReviewed / dailyGoal, or 100% if note/quiz done)
+- Subtitle: "5장 복습 또는 1개 노트 생성" (configurable via settings)
+- ✅ "오늘 목표 달성!" 표시 if completed (green check + XP bonus shown)
+
+Settings: a "⚙️" icon next to the goal lets user change dailyGoal (3, 5, 10, 15) — store in gamification state.
+
+═══ Part 3: Streak Calendar (last 7 days) ═══
+
+Below the daily goal, add a streak heatmap:
+- 7 small squares for last 7 days
+- Filled (--primary color) if that day's goal was met
+- Empty (gray) if not
+- Today's square pulsing/highlighted
+- Hover: shows ymd + what was achieved that day
+
+Use simple inline SVG or styled divs. No external lib.
+
+═══ Part 4: Goal completion celebration ═══
+
+When user completes daily goal for the first time today, show a centered modal/toast:
+- Big confetti emoji or check icon
+- "🎉 오늘의 목표 달성!"
+- "+50 XP 보너스!"
+- Streak count: "🔥 N일 연속"
+- "확인" button
+
+Award 50 XP bonus on first completion of the day (track to prevent double-award).
+
+═══ Constraints ═══
+
+- File scope:
+  - EDIT: /public/js/gamification.js (extend schema + add functions)
+  - EDIT: /public/js/home_view.js (render goal progress + calendar)
+  - EDIT: /public/js/pipeline.js (call markNoteCreated on success — find the right hook point)
+  - EDIT: /public/js/quiz.js (call markQuizCompleted)
+- DO NOT touch: api/*, firestore.rules, storage.rules, vercel.json, recorder.js, payment.js, public/index.html (use inline style injection or existing CSS)
+- Single commit, message: "feat(gamif): daily goal + streak calendar + completion celebration"
+- Push to origin main; if rejected, git pull --rebase and retry
+
+═══ Verify ═══
+
+- node --check
+- Read diffs
+- Walk through:
+  - User completes 1 review → progress 1/5
+  - Generates 1 note → progress jumps to "달성!"
+  - Modal pops with +50 XP bonus
+  - Tomorrow comes → progress resets, streak +1
+  - Streak calendar shows yesterday filled, today empty (until goal met)
+
+═══ Output ═══
+
+Last line of your response, exactly one of:
+  DONE: <commit_hash> | daily goal + streak calendar live
+or:
+  FAILED: <one-line reason>

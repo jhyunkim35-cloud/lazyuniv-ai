@@ -1421,7 +1421,7 @@ function renderExamReviewHTML(data, _closeModal) {
   // ── Stats bar ──
   const statsBar = `
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.2rem;">
-      ${badge(data.totalNotes + '개 노트', '#6366f1')}
+      ${badge(data.totalNotes + '개 노트', '#7c3aed')}
       ${badge(data.totalQuizQuestions + '문제 분석', '#0ea5e9')}
       ${badge('약점 ' + data.weakSections.length + '개', data.weakSections.length ? '#ef4444' : '#22c55e')}
     </div>`;
@@ -1452,7 +1452,7 @@ function renderExamReviewHTML(data, _closeModal) {
       <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0.7rem;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:0.35rem;">
         <span style="flex:1;font-size:0.85rem;font-weight:600;color:var(--text);">${escHtml(s.sectionName)}</span>
         ${noteTag(s.noteTitle)}
-        ${badge(s.questionCount + '문제', '#6366f1')}
+        ${badge(s.questionCount + '문제', '#7c3aed')}
         ${badge(pct(s.accuracy), clr(s.accuracy))}
         ${gotoBtn(s.noteId, s.sectionName)}
       </div>`).join('');
@@ -1488,7 +1488,7 @@ function renderExamReviewHTML(data, _closeModal) {
     ${statsBar}
     ${sec('trending-down', '#ef4444', '약점 섹션 (정답률 70% 미만)', weakHTML)}
     ${sec('star',          '#eab308', '중요 섹션 (출제 빈도 상위)', importantHTML)}
-    ${sec('bar-chart-3',   '#6366f1', '전체 섹션 정답률', allHTML)}`;
+    ${sec('bar-chart-3',   '#7c3aed', '전체 섹션 정답률', allHTML)}`;
 }
 
 function renderWeaknessReport(containerEl, report, quizCount) {

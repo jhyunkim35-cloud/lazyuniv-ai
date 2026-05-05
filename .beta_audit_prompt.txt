@@ -1,0 +1,68 @@
+Beta launch readiness audit for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+You are auditing a Korean SaaS for university students that's about to launch beta. Service: PPT/PDF + STT lecture audio → AI study notes + quizzes. Pricing: 무료 월3강 / 강의당 500원 / 무제한 월7,900원.
+
+YOUR JOB: Produce a single markdown report at /BETA_AUDIT.md that the operator (Junhyun) can act on. Don't fix anything yet — just audit. The report should be comprehensive but practical (no fluff).
+
+REPORT STRUCTURE (Korean — operator reads in Korean):
+
+## 1. 핵심 기능 점검
+For each major feature, walk through the code and flag concrete defects, not "looks fine":
+- 인증 (Firebase Google OAuth) — login/logout/session edge cases
+- 파일 업로드 (PPT/PDF) — size limits, malformed input, OOM
+- AI 노트 생성 (api/claude.js → Anthropic) — error paths, retry, partial completion
+- AI 퀴즈 생성 — undergeneration, timeouts, max_tokens
+- STT 녹음 (recorder.js + AssemblyAI) — timer, backdrop, pause/resume, long lectures
+- 결제 (Toss Payments — api/toss.js) — failure modes, double-charge risk, webhook reliability
+- 노트 CRUD + Firestore sync — multi-device consistency, offline → online merge
+- 폴더/검색/태그/시험 plan / SRS — recently added, may have rough edges
+
+For each feature, output:
+- ✅ 정상 / ⚠️ 잠재 위험 (구체적인 코드 위치) / ❌ 버그 (재현 시나리오 + 코드 위치)
+- 우선순위: P0 (출시 막아야 함) / P1 (출시 후 1주 내) / P2 (여유 있게)
+
+## 2. 이용자 증가 시 리스크 (스케일링 + 비용)
+This is the most important section. Junhyun will be paying real money on Anthropic + AssemblyAI + Firebase the moment users start coming in. List every risk + concrete mitigation.
+
+- AI API 비용 폭주: token 사용량 추정 (강의당 평균 토큰 × 사용자수 × 강의수)
+- Firestore read/write 비용: 어떤 path가 가장 비싼가? listener 폭주 가능성?
+- Firebase Storage 비용: 슬라이드 이미지 + 녹음 파일 (메모리에 "녹음은 STT 후 삭제" 정책 있음 — 진짜 작동하는지 코드 확인)
+- AssemblyAI 비용: 강의 길이 × 사용자수
+- Vercel 함수 실행 시간 한도: 10초 (Hobby) / 60초 (Pro) — 초과 위험 paths?
+- Firestore 1MB doc 한도: 메모리에 "extractedImages base64로 4MB 발생" 이력 있음. 다른 곳에도 위험?
+- 동시성 race conditions: 결제 race, quota race, 같은 노트 동시 편집
+- DDoS / abuse: 무료 티어 어뷰징 (계정 여러 개 만들기), 큰 파일 반복 업로드, AI API 무료 우회
+- Rate limiting 부재: 사용자당 / IP당 limit이 있나?
+
+각 리스크에 대해:
+- 영향 (낮음 / 중간 / 높음)
+- 비용 추정 (가능하면 원/달러 단위 계산)
+- 완화 방안 (구체적 — "rate limit 추가" 같은 vague는 X, "api/claude.js에 user-level rate limiter middleware 추가, 60req/hour 무료 / 600req/hour 유료" 같은 구체적)
+- P0 / P1 / P2
+
+## 3. 데이터 무결성 / 보안
+- Firestore Security Rules 상태 (memory: sister sub-claude가 audit 중 — 그 sub-claude가 commit 했는지 확인 후 그 결과를 여기 요약)
+- API key leak 위험: 클라이언트 코드에 Anthropic key 노출 없는지, 프록시 우회 가능한지
+- 사용자 데이터 격리: 다른 사용자 데이터 접근 가능 path 있나?
+- B1 strict mode 상태 (memory: 다른 sister sub-claude가 enable 중)
+
+## 4. 베타 출시 전 권장 액션
+우선순위 정렬한 체크리스트. P0 → P1 → P2 순. 각 항목은:
+- 무엇을 / 어떤 파일을 / 예상 작업량 (분 단위)
+- sub-claude로 자동화 가능 / 사용자 직접 처리 필요 표시
+
+## 5. 베타 후 우선 개선 (post-launch backlog)
+audit 중에 발견했지만 베타 막는 건 아닌 것들.
+
+CONSTRAINTS:
+- DO NOT modify any code. Audit only. Output is /BETA_AUDIT.md.
+- DO NOT touch /api/claude.js, firestore.rules, /public/index.html, /public/js/recorder.js, /public/terms.html, /public/privacy.html — sister sub-claudes are working on those right now.
+- Read code thoroughly. Open multiple files. Trace flows end-to-end.
+- Be specific. "에러 처리가 약하다" is useless. "api/claude.js line 234, 401 응답 시 client-side에서 throw하지 않고 빈 응답 그대로 노트 생성 → 사용자한테 빈 노트 출력" is useful.
+- 메모리에 있는 backlog/known issue 활용: M4 (이미 fix됨), Firestore-first reads, Storage list-all 복구, B1 strict mode, TTL etc.
+- Single commit when done. Push to main. The .md file should be in the repo root.
+
+OUTPUT: Last line of your response:
+  DONE: <commit_hash> | /BETA_AUDIT.md ready
+or:
+  FAILED: <one-line reason>

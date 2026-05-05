@@ -1,0 +1,97 @@
+Per-user usage analytics dashboard for lazyuniv-ai beta operator. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+CONTEXT:
+The operator wants to see per-user usage analytics during beta — who's signing up, how many notes/quizzes they generate, AI token consumption, STT minutes, payment status. Currently there's no tracking and no admin view. Add both:
+
+(A) Usage tracking middleware — record usage to Firestore as users hit /api/claude, /api/assemblyai, /api/toss
+(B) Admin dashboard — server endpoint + simple HTML page only the operator can see
+
+═══ Part A: Usage tracking ═══
+
+Add a small helper module /api/_usage.js that exports:
+  recordUsage({ uid, kind, increments })
+where kind ∈ ['note', 'quiz', 'classify', 'stt', 'payment'] and increments is an object like {inputTokens: 1234, outputTokens: 567}.
+
+The helper writes to:
+  users/{uid}/usage/{YYYY-MM}
+using FieldValue.increment for cumulative counters and FieldValue.serverTimestamp for lastActivityAt.
+
+Schema for the monthly doc:
+  {
+    noteCount,        // count of feature='noteAnalysis' calls
+    quizCount,        // count of feature='quiz' calls
+    classifyCount,    // count of feature='classify'/'grade' calls
+    inputTokens,      // sum across all Anthropic calls this month
+    outputTokens,
+    cachedTokens,
+    sttSeconds,       // sum of AssemblyAI audio durations
+    paymentCount,     // successful Toss confirmations
+    paymentTotalKRW,  // sum of plan amounts
+    lastActivityAt,   // serverTimestamp on every increment
+  }
+
+Wire it in:
+- /api/claude.js — after a successful response, call recordUsage with kind based on `feature` plus token counts from the Anthropic response usage object. Don't break the existing B1 strict-mode and quota-gating logic.
+- /api/assemblyai.js — when transcription completes (or right after the transcribe POST returns 'queued'/'processing'), record kind='stt' with `sttSeconds: audio_duration` if available, else estimate from response.
+- /api/toss.js — after a successful Toss confirm (status==='DONE'), record kind='payment' with paymentTotalKRW and paymentCount=1.
+
+If recordUsage throws, catch + log + continue. Usage tracking is observability — must never break a real user's flow.
+
+═══ Part B: Admin dashboard ═══
+
+New files:
+- /api/admin.js — GET endpoint at /api/admin?action=overview
+- /public/admin.html — admin UI page
+- /public/js/admin.js — UI logic
+
+/api/admin.js logic:
+1. Verify Bearer token (Firebase ID token from Authorization header) via admin.auth().verifyIdToken()
+2. Reject if decoded.uid !== process.env.ADMIN_UID — return 403 with `{error: 'forbidden'}`
+3. List all users:
+     await admin.firestore().collection('users').get()
+4. For each user, also fetch their /usage subcollection (last 3 months max — current month, prev month, prev-prev)
+5. Return JSON: array of `{uid, plan, planExpiry, lastOrderId, lastPaymentAt, singlePurchases, displayName, email, createdAt, usage: {YYYY-MM: {...}}}`
+
+If user count > 200, paginate (return first 200 + a `nextCursor`). For beta this won't matter but should not silently truncate.
+
+/public/admin.html structure:
+- Firebase auth check on load — if not logged in, show "관리자 로그인 필요" + Google sign-in button
+- After login, fetch ID token, hit /api/admin?action=overview
+- If 403, show "관리자 권한이 없는 계정입니다."
+- If 200, render a table:
+  | UID(짧게) | 이메일 | 플랜 | 가입일 | 이번달 노트 | 이번달 퀴즈 | 이번달 토큰(in/out/cached) | STT 분 | 결제건수 | 마지막 활동 |
+- Click on a row → expand to show 3-month breakdown
+- Sort by: 마지막 활동 (default desc), 이번달 노트, 결제건수
+- Search box: filter by email substring or uid prefix
+- Aggregate footer row: 총 사용자 / 활성 사용자 (이번달 활동) / 이번달 총 노트 / 총 토큰 / 총 결제 매출
+
+Style: simple, monospace numbers, alternating row colors. Use existing CSS variables (--surface, --primary, --text). Match the lazyuniv visual language but no fancy chrome. Keep it functional — this is the operator's tool.
+
+═══ ADMIN_UID env var ═══
+
+Don't hardcode. Read from process.env.ADMIN_UID. After this commit, the user must set the env var in Vercel:
+  ADMIN_UID = <their Firebase UID>
+Mention this in the commit body. They can find their UID by logging into lazyuniv-ai.vercel.app, opening DevTools, and running `firebase.auth().currentUser.uid` in the console.
+
+═══ Constraints ═══
+
+- Edit /api/claude.js, /api/assemblyai.js, /api/toss.js to wire recordUsage. Keep changes minimal — just add the recordUsage calls in success paths, wrapped in try/catch.
+- Create new files: /api/_usage.js, /api/admin.js, /public/admin.html, /public/js/admin.js
+- Single commit covering all changes with a clear multi-line message.
+- Push to origin main; if push rejected, `git pull --rebase origin main` and retry.
+- Don't touch firestore.rules or storage.rules (rules are now strict; admin uses Admin SDK which bypasses rules — that's correct).
+- Don't touch /public/index.html. The admin page is standalone.
+
+═══ Verify ═══
+
+- node --check on each modified .js file
+- Read your own diffs
+- Confirm: usage tracking calls are in TRY/CATCH so they can't break user flows
+- Confirm: /api/admin.js properly rejects without ADMIN_UID set or with wrong UID
+
+═══ Output ═══
+
+Last line of your response, exactly one of:
+  DONE: <commit_hash> | usage tracking + admin dashboard
+or:
+  FAILED: <one-line reason>

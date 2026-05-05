@@ -1,0 +1,83 @@
+P0 critical fixes for lazyuniv-ai beta launch. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai. Vercel auto-deploys on push to main.
+
+THREE FIXES IN ONE COMMIT (all critical, all small):
+
+═══ P0-1: Firestore rules — block client write to users/{uid} ═══
+
+File: /firestore.rules
+
+Current vulnerability (from BETA_AUDIT.md section 3-A):
+The rule `match /users/{uid} { allow read, write: if request.auth.uid == uid; }` lets any logged-in user write their own user doc. They could open browser console and run:
+  firebase.firestore().collection('users').doc(myUid).set({ plan: 'monthly', planExpiry: '2099-12-31' }, { merge: true });
+→ checkQuota() server-side reads this and grants free monthly access.
+
+Fix:
+- Change `match /users/{uid}` to read-only for clients:
+    allow read: if request.auth != null && request.auth.uid == uid;
+    allow write: if false;
+- Admin SDK (api/claude.js, api/toss.js) bypasses rules so server-side writes still work.
+- Subcollections (notes, folders, transcripts, srsCards, timetable, gamification, etc.) keep their existing read+write per-user rules — only the parent user doc is locked.
+
+Verify by reading the file before/after. Also confirm api/toss.js + api/claude.js use admin.firestore() (Admin SDK) — grep for `admin.firestore` or `getFirestore` in /api/.
+
+═══ P0-2: Storage rules — allow slide image uploads ═══
+
+File: /storage.rules
+
+Current vulnerability:
+Only `users/{uid}/recordings/{filename}` is allowed. But firestore_sync.js:524 uploads slide images to `users/{uid}/notes/{noteId}/slide_{i}.png` — these all fail with permission-denied today, silently caught and stored as null URLs. Multi-device users see no slide images.
+
+Fix:
+- Add a rule allowing the notes/ subtree for the same uid:
+    match /users/{uid}/notes/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+- Keep the existing recordings/ rule and the default-deny.
+
+═══ P0-4: vercel.json — set maxDuration for /api/claude ═══
+
+File: /vercel.json (create if missing)
+
+Current vulnerability:
+Vercel's default function timeout is 10s on Hobby, 60s on Pro. The note-generation pipeline (Agent1 → Agent2 → Haiku patch → highlight) regularly runs 60-120s on long lectures. No setting today → Pro plan defaults apply (60s) which is borderline; Hobby would fail outright.
+
+Fix:
+- Read existing vercel.json. If absent, create it with:
+    {
+      "functions": {
+        "api/claude.js":      { "maxDuration": 300 },
+        "api/assemblyai.js":  { "maxDuration": 60 },
+        "api/toss.js":        { "maxDuration": 30 }
+      }
+    }
+- If vercel.json exists, merge the functions block into the existing config without disturbing other fields.
+- maxDuration 300 = 5 min cap. That's the upper bound on Pro plan. assemblyai.js polling is short, toss confirm is short.
+
+NOTE: 300s requires Pro plan. The user has confirmed they're on Pro (Vercel dashboard shows 360 GB-Hrs / Pro tier). If you find evidence they're on Hobby, set maxDuration: 60 instead and add a comment in commit message.
+
+═══ Process ═══
+
+1. Read each file (firestore.rules, storage.rules, vercel.json if exists).
+2. Make the three edits.
+3. Single commit covering all three with a clear multi-line message describing each fix.
+4. Push to origin main. If push rejected, `git pull --rebase origin main` and retry.
+
+═══ Constraints ═══
+
+- These are infrastructure files (rules + Vercel config). Don't touch any other files.
+- Don't modify api/claude.js or api/toss.js — those need separate Admin SDK changes for P1 (handled separately).
+- The firestore.rules audit comment from prior commit (`30af4d2`) should be preserved/updated to note this hardening.
+- The user must still run `firebase deploy --only firestore:rules,storage` to push these rules live (rules in git are not auto-deployed). Mention this in your commit body.
+
+═══ Verify before commit ═══
+
+- Read your own diff. Walk through each change mentally.
+- Confirm no other rules are loosened.
+- Confirm vercel.json is valid JSON (no trailing commas, etc.).
+
+═══ Output ═══
+
+Last line of your response, exactly one of:
+  DONE: <commit_hash> | rules+vercel hardened
+or:
+  FAILED: <one-line reason>

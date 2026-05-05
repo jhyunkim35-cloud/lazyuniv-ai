@@ -1,0 +1,69 @@
+Generate Korean 약관 (Terms of Service) and 개인정보 처리방침 (Privacy Policy) HTML pages for lazyuniv-ai. Working dir: /c/Users/김준현/meeting-app. Repo: jhyunkim35-cloud/lazyuniv-ai.
+
+CONTEXT:
+- Service: lazyuniv-ai (학생용 AI 학습노트 SaaS)
+- Domain: lazyuniv-ai.vercel.app
+- Stack: PPT/PDF + Clova STT + AI 학습노트 + 퀴즈 자동 생성
+- Pricing: 무료 월3강 / 강의당 500원 / 무제한 월 7,900원
+- Auth: Firebase Google OAuth
+- Payment: Toss Payments
+- Storage: Firebase (Firestore + Storage)
+- AI processor: Anthropic Claude API
+- STT: AssemblyAI (note: project memory mentions Clova; use AssemblyAI as that matches recent recorder.js code)
+- User base: South Korean university students
+- Operator info (PLACEHOLDERS — use exactly these strings, the user will fill in later):
+  - 운영자/대표자 이름: [TBD — 운영자 본명]
+  - 사업자등록번호: [TBD — 사업자등록번호]
+  - 통신판매업 신고번호: [TBD — 신고번호]
+  - 사업장 주소: [TBD — 주소]
+  - 연락 이메일: [TBD — 이메일]
+  - 호스팅 사업자: Vercel Inc. (US)
+
+YOUR TASK:
+Create two new HTML pages, each standalone and styled simply with the existing design tokens already used in /public/index.html (--surface, --primary, --text, --text-muted, 12px radius, system font stack). Both pages should be readable on mobile.
+
+1. /public/terms.html — 이용약관
+   - 목적, 정의, 약관의 게시 및 효력
+   - 회원가입 / 계정 / 탈퇴
+   - 서비스 내용 (PPT/PDF 업로드 → AI 학습노트 + 퀴즈 + STT)
+   - 요금 정책 (무료 월3강 / 단건 500원 / 무제한 월 7,900원), 환불 규정 (전자상거래법 기준)
+   - 사용자의 의무 (저작권 침해 콘텐츠 업로드 금지 등)
+   - 운영자의 책임 제한
+   - 분쟁 해결 (대한민국 법, 서울중앙지방법원 관할)
+   - 부칙: 시행일 (오늘 날짜 YYYY-MM-DD)
+
+2. /public/privacy.html — 개인정보 처리방침
+   - 수집하는 개인정보: 이름, 이메일 (Google OAuth), 결제 정보 (Toss 위탁), 학습 데이터 (업로드된 자료, 노트, 녹취록)
+   - 수집 목적: 서비스 제공, 결제 처리, 사용자 식별
+   - 보유 및 이용 기간: 회원 탈퇴 시까지 / 결제 기록은 5년 (전자상거래법)
+   - 제3자 제공: Anthropic (Claude API — 본문 콘텐츠 처리), AssemblyAI (STT — 오디오 처리), Toss Payments (결제), Firebase/Google Cloud (호스팅+저장+인증)
+   - 정보주체 권리: 열람, 정정, 삭제, 처리정지 요구 가능
+   - 개인정보 보호책임자 (운영자 정보 placeholder)
+   - 자동수집장치 (쿠키): Firebase Auth 세션 유지에 사용
+   - 시행일: 오늘 날짜
+   - 변경사항 고지 방법: 사이트 내 공지
+
+CRITICAL CAVEATS:
+- These are TEMPLATES. The user (Junhyun Kim) will review and fill in placeholders.
+- Use [TBD — ...] markers liberally for anything that needs user-specific info.
+- These templates are not legal advice; include a comment at top of each file: `<!-- TEMPLATE — 변호사 검토 필요. 운영자가 사업자등록 후 placeholder를 실제 정보로 교체할 것. -->`
+- Korean tone: 공식체 (~합니다 / ~입니다)
+- Use the same lucide-based design language as the rest of the app where it fits, but these pages can be simpler — just clean HTML with headings and paragraphs
+
+ADDITIONAL:
+- Add navigation links from the existing app footer or settings panel to /terms.html and /privacy.html so users can find them. If there's no obvious place, add a small footer to /public/index.html with two links: "이용약관 · 개인정보 처리방침". Look at the existing index.html structure carefully before deciding where to add.
+
+CONSTRAINTS:
+- Don't touch /api/claude.js (sister sub-claude in there for B1 strict mode)
+- Don't touch firestore.rules / storage.rules (other sub-claude auditing those)
+- Single commit, descriptive message
+- Push to origin main
+- If git push rejected: `git pull --rebase origin main` and retry
+
+VERIFY:
+- Read both new files yourself; make sure no placeholder is missed; make sure the links from index.html actually point to the right files
+
+Output the LAST line as exactly:
+  DONE: <commit_hash> | terms.html + privacy.html created, footer links added
+or:
+  FAILED: <one-line reason>
