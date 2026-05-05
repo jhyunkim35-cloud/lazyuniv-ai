@@ -380,7 +380,7 @@
             <p class="rec-help">강의를 직접 녹음하거나, 이미 녹음된 오디오 파일을 업로드하세요. STT가 끝나면 자동으로 녹취록 슬롯에 채워집니다.</p>
             <div class="rec-ios-warn" id="recIosWarn" style="display:none">
               <strong>iOS 사용자 안내</strong><br>
-              녹음 도중 화면을 끄거나 다른 앱으로 전환하면 마이크가 멈춥니다. 녹음 동안 lazyuniv-ai 화면을 켜둔 상태로 유지해주세요.
+              녹음 도중 화면을 끄거나 다른 앱으로 전환하면 마이크가 멈춥니다. 녹음 동안 Notyx 화면을 켜둔 상태로 유지해주세요.
             </div>
             <div class="rec-mode-grid">
               <button class="rec-mode-card" id="recPickLive">

@@ -124,7 +124,7 @@ async function startPayment(plan) {
   document.querySelector('div[style*="position:fixed"][style*="z-index:10000"]')?.remove();
 
   const amount = plan === 'monthly' ? 7900 : 500;
-  const orderName = plan === 'monthly' ? 'Lazyuniv AI 월정액' : 'Lazyuniv AI 1회 이용권';
+  const orderName = plan === 'monthly' ? 'Notyx 월정액' : 'Notyx 1회 이용권';
   const orderId = 'order_' + currentUser.uid.substring(0, 8) + '_' + Date.now();
 
   try {
