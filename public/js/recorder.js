@@ -80,10 +80,13 @@
         pointer-events: none !important;
       }
 
-      /* Minimized: backdrop is invisible + click-through */
+      /* Minimized: backdrop is invisible + click-through.
+         IMPORTANT: also kill backdrop-filter, otherwise the blur(2px)
+         from .recorder-backdrop in index.html stays applied to the
+         whole viewport (the element keeps inset:0) and the page looks
+         hazy while the pill floats. */
       .recorder-modal--minimized .recorder-backdrop {
-        background: transparent !important;
-        pointer-events: none !important;
+        display: none !important;
       }
 
       /* Minimized: panel becomes a compact floating pill */
@@ -370,8 +373,10 @@
       <div class="recorder-panel" role="dialog" aria-modal="true" aria-label="녹음">
         <div class="recorder-head">
           <div class="recorder-title" id="recTitle">녹음하기</div>
-          <button class="recorder-minimize" id="recMinimizeBtn" aria-label="최소화" style="display:none"><i data-lucide="minimize-2" class="icon-sm"></i></button>
-          <button class="recorder-close" id="recCloseBtn" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
+          <button class="recorder-minimize" id="recMinimizeBtn" aria-label="작게 줄이기" title="작게 줄이기" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="display:block"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="recorder-close" id="recCloseBtn" aria-label="닫기" title="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </div>
 
         <div class="recorder-body" id="recBody">
@@ -725,9 +730,11 @@
     });
     modalState.screen = name;
 
-    // Show minimize button only on the live (recording) screen
+    // Show minimize button on screens where backgrounding makes sense:
+    // - 'live'         (recording in progress — let it run in the background)
+    // - 'stt'          (transcribing in progress — same idea)
     const minimizeBtn = modalEl.querySelector('#recMinimizeBtn');
-    if (minimizeBtn) minimizeBtn.style.display = (name === 'live') ? '' : 'none';
+    if (minimizeBtn) minimizeBtn.style.display = (name === 'live' || name === 'stt') ? '' : 'none';
 
     window.mountLucideIcons?.();
   }
