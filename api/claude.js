@@ -59,8 +59,9 @@ function checkRateLimit(ip) {
 }
 
 const ALLOWED_ORIGINS = [
-  'https://lazyuniv-ai.vercel.app',  // production
-  'http://localhost:3000',               // local dev
+  'https://lazyuniv-ai.vercel.app',  // legacy (pre-rebrand) — keep until DNS swap
+  'https://notyx.vercel.app',        // current production
+  'http://localhost:3000',           // local dev
 ];
 
 const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];

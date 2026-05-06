@@ -2,6 +2,7 @@ const { getAdmin } = require('./_firebase-admin');
 
 const ALLOWED_ORIGINS = [
   'https://lazyuniv-ai.vercel.app',
+  'https://notyx.vercel.app',
   'http://localhost:3000',
 ];
 
