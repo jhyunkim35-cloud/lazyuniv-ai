@@ -1,6 +1,8 @@
-// Audited 2026-05-04 by Claude — verified per-user isolation
-// recordings/ is locked to request.auth.uid == uid.
-// Users may upload, download, and delete their own recordings (delete-after-STT flow).
+// Audited 2026-05-04 by Claude — verified per-user isolation.
+// Hardened 2026-05-06: file size caps + content-type guards on writes
+// to prevent storage abuse (huge uploads, arbitrary binary as audio/image).
+// recordings/ — locked to request.auth.uid == uid. Users may upload,
+// download, and delete their own recordings (delete-after-STT flow).
 rules_version = '2';
 
 service firebase.storage {
@@ -11,14 +13,33 @@ service firebase.storage {
       allow read, write: if false;
     }
 
-    // Per-user audio recordings: upload (put), download (getDownloadURL), delete (after STT).
+    // Per-user audio recordings.
+    // - Reads: owner only.
+    // - Writes: owner + size cap 600 MB + content-type must look like audio
+    //   (or generic octet-stream, which our recorder.js falls back to when
+    //   browser doesn't expose the codec). Anything else gets rejected at
+    //   the upload boundary so we never store random binary as "recording".
+    // - Deletes: owner only (post-STT cleanup).
     match /users/{uid}/recordings/{filename} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read:   if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+                            && request.auth.uid == uid
+                            && request.resource.size < 600 * 1024 * 1024
+                            && (request.resource.contentType.matches('audio/.*')
+                                || request.resource.contentType == 'application/octet-stream');
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // Per-user slide images uploaded by firestore_sync.js (notes/{noteId}/slide_N.png).
+    // - Writes: owner + 20 MB per file + must be an image type.
     match /users/{uid}/notes/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read:   if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+                            && request.auth.uid == uid
+                            && request.resource.size < 20 * 1024 * 1024
+                            && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
   }
 }
+
