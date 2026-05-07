@@ -40,6 +40,20 @@ service firebase.storage {
                             && request.resource.contentType.matches('image/.*');
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Shared group recordings (cost-splitting feature).
+    // - Reads: anyone in the group's memberUids array (cross-check via
+    //   Firestore lectureGroups/{groupId} doc).
+    // - Writes: blocked from clients. The group-create endpoint copies
+    //   the original audio here via Admin SDK (or issues a signed PUT URL
+    //   bound to the creator only). Direct uploads are rejected.
+    match /groupRecordings/{groupId}/{file=**} {
+      allow read: if request.auth != null
+        && request.auth.uid in firestore.get(
+             /databases/(default)/documents/lectureGroups/$(groupId)
+           ).data.memberUids;
+      allow write: if false;
+    }
   }
 }
 

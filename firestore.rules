@@ -77,5 +77,80 @@ service cloud.firestore {
         allow read, write: if false;
       }
     }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Shared collections (top-level) — multi-user features.
+    // Membership lives in `memberUids` (array). Reads gate on that array.
+    // Writes that mutate membership go through Admin SDK endpoints
+    // (api/group-join.js, api/room-join.js) with invite-token checks —
+    // direct client writes to memberUids are rejected.
+    // ─────────────────────────────────────────────────────────────────
+
+    // Cost-splitting groups for shared STT/recording purchases.
+    // Creator pays first (Toss), STT runs immediately, friends settle later.
+    match /lectureGroups/{groupId} {
+      allow read: if request.auth != null
+        && request.auth.uid in resource.data.memberUids;
+
+      // Create: caller must be the creator AND the only initial member.
+      // Other invariants (totalCost > 0, inviteToken length, etc.) are
+      // enforced by the create endpoint via Admin SDK; rules only assert
+      // the caller-identity surface.
+      allow create: if request.auth != null
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.memberUids.size() == 1
+        && request.resource.data.memberUids[0] == request.auth.uid;
+
+      // Update: creator may only flip `status` (e.g. archive). Member
+      // additions/removals must go through Admin SDK.
+      allow update: if request.auth != null
+        && resource.data.creatorUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if false;
+
+      // Per-member settlement state (paid Y/N, share amount, etc.).
+      // Anyone in the group reads; each member writes only their own row.
+      match /members/{memberUid} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/lectureGroups/$(groupId)).data.memberUids;
+        allow write: if request.auth != null && request.auth.uid == memberUid;
+      }
+
+      // Shared recording metadata (one per group). Read-only for members.
+      match /recording {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/lectureGroups/$(groupId)).data.memberUids;
+        allow write: if false;
+      }
+    }
+
+    // Study rooms — same-lecture peers share study time + progress only.
+    // Note CONTENT is never shared here; only minutes/progress counters.
+    match /studyRooms/{roomId} {
+      allow read: if request.auth != null
+        && request.auth.uid in resource.data.memberUids;
+
+      allow create: if request.auth != null
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.memberUids.size() == 1
+        && request.resource.data.memberUids[0] == request.auth.uid;
+
+      // Owner can flip status; member additions go via Admin SDK.
+      allow update: if request.auth != null
+        && resource.data.createdBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if false;
+
+      // Per-member study counters: studyMinutes, notesCount, progressPct,
+      // lastActiveAt. All members can READ each other (the whole point).
+      // Only the member themselves can WRITE their own row.
+      match /members/{memberUid} {
+        allow read: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/studyRooms/$(roomId)).data.memberUids;
+        allow write: if request.auth != null && request.auth.uid == memberUid;
+      }
+    }
   }
 }
