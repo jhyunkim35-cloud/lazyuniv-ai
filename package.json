@@ -2,6 +2,9 @@
   "name": "lecturenote-ai",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "deploy": "node scripts/deploy.js"
+  },
   "dependencies": {
     "firebase-admin": "^13.8.0"
   }
