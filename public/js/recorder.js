@@ -1,8 +1,8 @@
-// In-app recorder + audio file STT pipeline.
+﻿// In-app recorder + audio file STT pipeline.
 //
 // Three entry points wire into the existing multi-rec list:
-//   1. Live mic recording (web MediaRecorder)         — works PC, Android well; iOS limited (foreground only)
-//   2. Audio file upload (m4a/mp3/wav/webm/aac/etc.)  — universal fallback, including iOS
+//   1. Live mic recording (web MediaRecorder)         ??works PC, Android well; iOS limited (foreground only)
+//   2. Audio file upload (m4a/mp3/wav/webm/aac/etc.)  ??universal fallback, including iOS
 //
 // After audio is captured we:
 //   1. Upload audio blob to Firebase Storage at users/{uid}/recordings/{ts}.{ext}
@@ -13,11 +13,11 @@
 //
 // Depends on: constants.js (storage, currentUser, txtFiles, _currentView), pptx_parser.js (addRecSlot, setRecSlotFile),
 //             ui.js (showToast), firebase_auth.js (currentUser ID token), api.js (none),
-//             transcripts_store.js (saveTranscriptFS) — optional; if absent, recorder still works
+//             transcripts_store.js (saveTranscriptFS) ??optional; if absent, recorder still works
 //             but transcripts won't be persisted to the user's transcript store.
 
 (function () {
-  // ── Audio MIME detection (browser quirks) ───────────────
+  // ?? Audio MIME detection (browser quirks) ???????????????
   function pickMimeType() {
     const candidates = [
       'audio/webm;codecs=opus',
@@ -48,7 +48,7 @@
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
 
-  // ── Pill drag state ─────────────────────────────────────
+  // ?? Pill drag state ?????????????????????????????????????
   let pillPos = null; // {x, y} pixels from viewport top-left, or null for default
 
   function loadPillPos() {
@@ -63,13 +63,13 @@
     try { localStorage.setItem('recorder.pillPos', JSON.stringify({ x, y })); } catch (e) {}
   }
 
-  // ── Inline SVG icons for pill buttons (no lucide dependency) ──
+  // ?? Inline SVG icons for pill buttons (no lucide dependency) ??
   const SVG_PAUSE  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
   const SVG_PLAY   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
   const SVG_STOP   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
   const SVG_EXPAND = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 
-  // ── CSS injection ────────────────────────────────────────
+  // ?? CSS injection ????????????????????????????????????????
   function injectPillStyles() {
     if (document.getElementById('recorder-pill-styles')) return;
     const style = document.createElement('style');
@@ -117,7 +117,7 @@
         display: none !important;
       }
 
-      /* Pill content — hidden in full mode, shown in minimized mode */
+      /* Pill content ??hidden in full mode, shown in minimized mode */
       .recorder-pill {
         display: none;
       }
@@ -177,15 +177,15 @@
       .rec-pill-btn--expand { opacity: 0.65; }
       .rec-pill-btn--expand:hover { opacity: 1; }
 
-      /* ── Top-center grabber (replaces header minimize button) ──
+      /* ?? Top-center grabber (replaces header minimize button) ??
          Mobile-sheet pattern: a wide horizontal handle at the very
          top of the panel. On hover/touch, the handle highlights and
-         a "작게 보기" label fades in below it so the affordance is
-         unambiguous on first encounter — far more discoverable than
+         a "?묎쾶 蹂닿린" label fades in below it so the affordance is
+         unambiguous on first encounter ??far more discoverable than
          a tiny corner icon. Click the whole area to minimize. */
-      /* Mini "작게 보기" affordance pinned to the top-center of the
+      /* Mini "?묎쾶 蹂닿린" affordance pinned to the top-center of the
          recorder panel. Uses a Picture-in-Picture icon + label so the
-         action is unambiguous on first encounter — far more discoverable
+         action is unambiguous on first encounter ??far more discoverable
          than a tiny corner icon. Click the whole area to minimize. */
       .recorder-grabber {
         display: none;
@@ -228,10 +228,10 @@
       .recorder-grabber:active {
         transform: scale(0.97);
       }
-      /* Hide entirely while minimized — pill replaces it */
+      /* Hide entirely while minimized ??pill replaces it */
       .recorder-modal--minimized .recorder-grabber { display: none !important; }
 
-      /* ── STT 3-stage progress tracker ─────────── */
+      /* ?? STT 3-stage progress tracker ??????????? */
       .rec-stt-stages {
         display: flex;
         align-items: center;
@@ -295,7 +295,7 @@
       }
       .rec-stt-stage--done .rec-stt-stage-label { color: #4ade80; }
 
-      /* ── STT elapsed + hint strips ─────────────── */
+      /* ?? STT elapsed + hint strips ??????????????? */
       .rec-stt-elapsed {
         font-size: 0.95rem; font-weight: 700;
         font-variant-numeric: tabular-nums;
@@ -317,7 +317,7 @@
         margin-top: 0.4rem; text-align: center;
       }
 
-      /* ── Engine selector ─────────────────────────── */
+      /* ?? Engine selector ??????????????????????????? */
       .rec-engine-header {
         font-size: 1.05rem; font-weight: 700;
         color: var(--text, #e2e2f2); margin-bottom: 0.35rem;
@@ -341,7 +341,7 @@
       .rec-engine-option-title { font-weight: 600; font-size: 0.93rem; color: var(--text, #e2e2f2); }
       .rec-engine-option-desc  { font-size: 0.78rem; color: var(--text-muted, #8888aa); margin-top: 0.18rem; }
 
-      /* ── Secondary button variant (done modal) ─── */
+      /* ?? Secondary button variant (done modal) ??? */
       .rec-btn-secondary {
         background: var(--surface2, #16162a);
         color: var(--text, #e2e2f2);
@@ -349,7 +349,7 @@
       }
       .rec-btn-secondary:hover { background: var(--surface3, #1e1e36); }
 
-      /* ── STT background pill ─────────────────────────── */
+      /* ?? STT background pill ??????????????????????????? */
       .rec-pill-stt-spinner {
         width: 14px; height: 14px;
         border: 2px solid rgba(96,165,250,0.25);
@@ -388,7 +388,7 @@
     document.head.appendChild(style);
   }
 
-  // ── Modal singleton ─────────────────────────────────────
+  // ?? Modal singleton ?????????????????????????????????????
   let modalEl = null;
   let modalState = {
     phase: 'idle', // idle | requesting | recording | paused | uploading | transcribing | completed | error
@@ -409,8 +409,8 @@
     recordingDurationSec: null,
     pollStart: 0,           // timestamp when STT polling started (for elapsed display)
     sttElapsedHandle: null, // setInterval handle for MM:SS elapsed display during STT
-    pendingFile: null,      // transcript File held for "다음: 강의 자료 추가하기" CTA
-    sttEngine: 'assemblyai', // 'assemblyai' | 'google' — set by engine selector
+    pendingFile: null,      // transcript File held for "?ㅼ쓬: 媛뺤쓽 ?먮즺 異붽??섍린" CTA
+    sttEngine: 'assemblyai', // 'assemblyai' | 'google' ??set by engine selector
     pendingBlob: null,       // audio Blob held between engine selector and handleAudioBlob
     pendingFilename: null,
   };
@@ -424,37 +424,37 @@
     modalEl.className = 'recorder-modal hidden';
     modalEl.innerHTML = `
       <div class="recorder-backdrop"></div>
-      <div class="recorder-panel" role="dialog" aria-modal="true" aria-label="녹음">
-        <button class="recorder-grabber" id="recMinimizeBtn" aria-label="작게 보기 (PIP)" title="작게 보기 (PIP)">
+      <div class="recorder-panel" role="dialog" aria-modal="true" aria-label="?뱀쓬">
+        <button class="recorder-grabber" id="recMinimizeBtn" aria-label="?묎쾶 蹂닿린 (PIP)" title="?묎쾶 蹂닿린 (PIP)">
           <svg class="recorder-grabber-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 9V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
             <rect x="13" y="13" width="8" height="6" rx="1" fill="currentColor" stroke="none"/>
           </svg>
-          <span class="recorder-grabber-label">작게 보기</span>
+          <span class="recorder-grabber-label">?묎쾶 蹂닿린</span>
         </button>
         <div class="recorder-head">
-          <div class="recorder-title" id="recTitle">녹음하기</div>
-          <button class="recorder-close" id="recCloseBtn" aria-label="닫기" title="닫기"><i data-lucide="x" class="icon-sm"></i></button>
+          <div class="recorder-title" id="recTitle">?뱀쓬?섍린</div>
+          <button class="recorder-close" id="recCloseBtn" aria-label="?リ린" title="?リ린"><i data-lucide="x" class="icon-sm"></i></button>
         </div>
 
         <div class="recorder-body" id="recBody">
           <!-- Idle: pick mode -->
           <div class="rec-screen rec-screen-idle" data-screen="idle">
-            <p class="rec-help">강의를 직접 녹음하거나, 이미 녹음된 오디오 파일을 업로드하세요. STT가 끝나면 자동으로 녹취록 슬롯에 채워집니다.</p>
+            <p class="rec-help">媛뺤쓽瑜?吏곸젒 ?뱀쓬?섍굅?? ?대? ?뱀쓬???ㅻ뵒???뚯씪???낅줈?쒗븯?몄슂. STT媛 ?앸굹硫??먮룞?쇰줈 ?뱀랬濡??щ’??梨꾩썙吏묐땲??</p>
             <div class="rec-ios-warn" id="recIosWarn" style="display:none">
-              <strong>iOS 사용자 안내</strong><br>
-              녹음 도중 화면을 끄거나 다른 앱으로 전환하면 마이크가 멈춥니다. 녹음 동안 Notyx 화면을 켜둔 상태로 유지해주세요.
+              <strong>iOS ?ъ슜???덈궡</strong><br>
+              ?뱀쓬 ?꾩쨷 ?붾㈃???꾧굅???ㅻⅨ ?깆쑝濡??꾪솚?섎㈃ 留덉씠?ш? 硫덉땅?덈떎. ?뱀쓬 ?숈븞 Notyx ?붾㈃??耳쒕몦 ?곹깭濡??좎??댁＜?몄슂.
             </div>
             <div class="rec-mode-grid">
               <button class="rec-mode-card" id="recPickLive">
                 <div class="rec-mode-icon"><i data-lucide="mic"></i></div>
-                <div class="rec-mode-title">직접 녹음</div>
-                <div class="rec-mode-sub">PC · 안드로이드 권장</div>
+                <div class="rec-mode-title">吏곸젒 ?뱀쓬</div>
+                <div class="rec-mode-sub">PC 쨌 ?덈뱶濡쒖씠??沅뚯옣</div>
               </button>
               <label class="rec-mode-card" for="recFileInput">
                 <div class="rec-mode-icon"><i data-lucide="upload"></i></div>
-                <div class="rec-mode-title">오디오 파일 업로드</div>
-                <div class="rec-mode-sub">mp3 · m4a · wav · webm</div>
+                <div class="rec-mode-title">?ㅻ뵒???뚯씪 ?낅줈??/div>
+                <div class="rec-mode-sub">mp3 쨌 m4a 쨌 wav 쨌 webm</div>
               </label>
               <input type="file" id="recFileInput" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac,.flac" style="display:none" />
             </div>
@@ -464,38 +464,38 @@
           <div class="rec-screen rec-screen-live" data-screen="live">
             <div class="rec-timer" id="recTimer">00:00</div>
             <div class="rec-meter"><div class="rec-meter-bar" id="recMeterBar"></div></div>
-            <div class="rec-status" id="recLiveStatus">녹음 중…</div>
+            <div class="rec-status" id="recLiveStatus">?뱀쓬 以묅?/div>
             <div class="rec-actions">
-              <button class="rec-btn rec-btn-secondary" id="recPauseBtn">일시정지</button>
-              <button class="rec-btn rec-btn-stop" id="recStopBtn">녹음 종료</button>
+              <button class="rec-btn rec-btn-secondary" id="recPauseBtn">?쇱떆?뺤?</button>
+              <button class="rec-btn rec-btn-stop" id="recStopBtn">?뱀쓬 醫낅즺</button>
             </div>
-            <button class="rec-cancel-link" id="recCancelLiveBtn">취소</button>
+            <button class="rec-cancel-link" id="recCancelLiveBtn">痍⑥냼</button>
           </div>
 
           <!-- Engine selector (live recording only) -->
           <div class="rec-screen rec-screen-engine-select" data-screen="engine-select">
-            <div class="rec-engine-header">STT 엔진 선택</div>
-            <div class="rec-engine-duration" id="recEngineDurationLabel">녹음 시간: 계산 중…</div>
+            <div class="rec-engine-header">STT ?붿쭊 ?좏깮</div>
+            <div class="rec-engine-duration" id="recEngineDurationLabel">?뱀쓬 ?쒓컙: 怨꾩궛 以묅?/div>
             <div class="rec-engine-options">
               <label class="rec-engine-option rec-engine-option--selected" id="recEngineOptAAI">
                 <input type="radio" name="sttEngine" value="assemblyai" id="recEngineAssemblyAI" checked>
                 <div>
-                  <div class="rec-engine-option-title">기본 (AssemblyAI)</div>
-                  <div class="rec-engine-option-desc">무료 · 빠름 · 정확도 보통</div>
+                  <div class="rec-engine-option-title">湲곕낯 (AssemblyAI)</div>
+                  <div class="rec-engine-option-desc">臾대즺 쨌 鍮좊쫫 쨌 ?뺥솗??蹂댄넻</div>
                 </div>
               </label>
               <label class="rec-engine-option" id="recEngineOptGoogle">
                 <input type="radio" name="sttEngine" value="google" id="recEngineGoogle">
                 <div>
                   <div class="rec-engine-option-title">Google STT (Chirp_2)</div>
-                  <div class="rec-engine-option-desc">한국어 정확도 최상 · <span id="recEnginePriceLabel">1,500원~</span></div>
+                  <div class="rec-engine-option-desc">?쒓뎅???뺥솗??理쒖긽 쨌 <span id="recEnginePriceLabel">1,500??</span></div>
                 </div>
               </label>
             </div>
             <div class="rec-actions">
-              <button class="rec-btn rec-btn-primary" id="recEngineProceedBtn">계속 →</button>
+              <button class="rec-btn rec-btn-primary" id="recEngineProceedBtn">怨꾩냽 ??/button>
             </div>
-            <button class="rec-cancel-link" id="recEngineCancelBtn">취소 (녹음 파기)</button>
+            <button class="rec-cancel-link" id="recEngineCancelBtn">痍⑥냼 (?뱀쓬 ?뚭린)</button>
           </div>
 
           <!-- Uploading -->
@@ -503,53 +503,53 @@
             <div class="rec-progress-wrap">
               <div class="rec-progress-bar" id="recUploadBar"></div>
             </div>
-            <div class="rec-status" id="recUploadStatus">업로드 준비 중…</div>
+            <div class="rec-status" id="recUploadStatus">?낅줈??以鍮?以묅?/div>
           </div>
 
           <!-- Transcribing (AssemblyAI polling) -->
           <div class="rec-screen rec-screen-stt" data-screen="stt">
             <div class="rec-stt-stages">
               <div class="rec-stt-stage rec-stt-stage--done" id="recSttStage1">
-                <div class="rec-stt-stage-dot">✓</div>
-                <div class="rec-stt-stage-label">① 업로드</div>
+                <div class="rec-stt-stage-dot">??/div>
+                <div class="rec-stt-stage-label">???낅줈??/div>
               </div>
               <div class="rec-stt-stage-line"></div>
               <div class="rec-stt-stage rec-stt-stage--active" id="recSttStage2">
                 <div class="rec-stt-stage-dot rec-stt-stage-dot--spinner"></div>
-                <div class="rec-stt-stage-label" id="recSttStage2Label">② 변환 대기 중</div>
+                <div class="rec-stt-stage-label" id="recSttStage2Label">??蹂???湲?以?/div>
               </div>
               <div class="rec-stt-stage-line"></div>
               <div class="rec-stt-stage rec-stt-stage--pending" id="recSttStage3">
-                <div class="rec-stt-stage-dot">③</div>
-                <div class="rec-stt-stage-label">슬롯 채우기</div>
+                <div class="rec-stt-stage-dot">??/div>
+                <div class="rec-stt-stage-label">?щ’ 梨꾩슦湲?/div>
               </div>
             </div>
-            <div class="rec-status" id="recSttStatus">텍스트 변환 시작 중…</div>
-            <div class="rec-stt-elapsed" id="recSttElapsed">경과 00:00</div>
-            <div class="rec-stt-hint">보통 강의 길이의 30~50% 시간이 소요됩니다 (90분 강의 ≈ 30~45분)</div>
-            <div class="rec-stt-close-note">💡 이 창을 닫아도 변환은 계속됩니다. 결과는 자동으로 녹취록 슬롯에 추가됩니다.</div>
-            <div class="rec-stt-long-warn" id="recSttLongWarn">⚠️ 긴 강의는 시간이 더 걸릴 수 있습니다. 조금만 기다려주세요.</div>
-            <button class="rec-cancel-link" id="recHideSttBtn">창 닫기 (백그라운드 진행)</button>
+            <div class="rec-status" id="recSttStatus">?띿뒪??蹂???쒖옉 以묅?/div>
+            <div class="rec-stt-elapsed" id="recSttElapsed">寃쎄낵 00:00</div>
+            <div class="rec-stt-hint">蹂댄넻 媛뺤쓽 湲몄씠??30~50% ?쒓컙???뚯슂?⑸땲??(90遺?媛뺤쓽 ??30~45遺?</div>
+            <div class="rec-stt-close-note">?뮕 ??李쎌쓣 ?レ븘??蹂?섏? 怨꾩냽?⑸땲?? 寃곌낵???먮룞?쇰줈 ?뱀랬濡??щ’??異붽??⑸땲??</div>
+            <div class="rec-stt-long-warn" id="recSttLongWarn">?좑툘 湲?媛뺤쓽???쒓컙????嫄몃┫ ???덉뒿?덈떎. 議곌툑留?湲곕떎?ㅼ＜?몄슂.</div>
+            <button class="rec-cancel-link" id="recHideSttBtn">李??リ린 (諛깃렇?쇱슫??吏꾪뻾)</button>
           </div>
 
           <!-- Completed -->
           <div class="rec-screen rec-screen-done" data-screen="done">
             <div class="rec-done-icon"><i data-lucide="check"></i></div>
-            <div class="rec-status" id="recDoneStatus">변환 완료</div>
-            <div class="rec-done-hint" id="recDoneHint">녹취록 슬롯에 텍스트가 추가되었습니다. 분석을 시작하세요.</div>
-            <div class="rec-done-byo-hint" id="recDoneBYOHint" style="font-size:0.75rem;color:var(--text-muted,#aaa);margin:0.4rem 0 0;line-height:1.45">💡 정확도가 부족하면 <a href="https://clovanote.naver.com" target="_blank" rel="noopener" style="color:var(--accent,#7c9ef8)">클로바노트</a>에서 변환 후 .txt 업로드 가능</div>
+            <div class="rec-status" id="recDoneStatus">蹂???꾨즺</div>
+            <div class="rec-done-hint" id="recDoneHint">?뱀랬濡??щ’???띿뒪?멸? 異붽??섏뿀?듬땲?? 遺꾩꽍???쒖옉?섏꽭??</div>
+            <div class="rec-done-byo-hint" id="recDoneBYOHint" style="font-size:0.75rem;color:var(--text-muted,#aaa);margin:0.4rem 0 0;line-height:1.45">?뮕 ?뺥솗?꾧? 遺議깊븯硫?<a href="https://clovanote.naver.com" target="_blank" rel="noopener" style="color:var(--accent,#7c9ef8)">?대줈諛붾끂??/a>?먯꽌 蹂????.txt ?낅줈??媛??/div>
             <div class="rec-actions">
-              <button class="rec-btn rec-btn-secondary" id="recDoneCloseBtn">확인</button>
-              <button class="rec-btn rec-btn-primary" id="recDoneGoNewBtn" style="display:none">다음: 강의 자료 추가하기 →</button>
+              <button class="rec-btn rec-btn-secondary" id="recDoneCloseBtn">?뺤씤</button>
+              <button class="rec-btn rec-btn-primary" id="recDoneGoNewBtn" style="display:none">?ㅼ쓬: 媛뺤쓽 ?먮즺 異붽??섍린 ??/button>
             </div>
           </div>
 
           <!-- Error -->
           <div class="rec-screen rec-screen-error" data-screen="error">
             <div class="rec-error-icon"><i data-lucide="alert-triangle"></i></div>
-            <div class="rec-status" id="recErrorStatus">오류가 발생했습니다.</div>
+            <div class="rec-status" id="recErrorStatus">?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.</div>
             <div class="rec-actions">
-              <button class="rec-btn rec-btn-primary" id="recErrorRetryBtn">다시 시도</button>
+              <button class="rec-btn rec-btn-primary" id="recErrorRetryBtn">?ㅼ떆 ?쒕룄</button>
             </div>
           </div>
         </div>
@@ -560,23 +560,23 @@
           <div id="recPillRecContent" style="display:flex;align-items:center;gap:8px;width:100%">
             <div class="rec-dot" id="recPillDot"></div>
             <div class="rec-pill-timer" id="recPillTimer">00:00</div>
-            <button class="rec-pill-btn rec-pill-btn--pause"  id="recPillPauseBtn"  aria-label="일시정지"></button>
-            <button class="rec-pill-btn rec-pill-btn--stop"   id="recPillStopBtn"   aria-label="녹음 종료"></button>
-            <button class="rec-pill-btn rec-pill-btn--expand" id="recPillExpandBtn" aria-label="확장"></button>
+            <button class="rec-pill-btn rec-pill-btn--pause"  id="recPillPauseBtn"  aria-label="?쇱떆?뺤?"></button>
+            <button class="rec-pill-btn rec-pill-btn--stop"   id="recPillStopBtn"   aria-label="?뱀쓬 醫낅즺"></button>
+            <button class="rec-pill-btn rec-pill-btn--expand" id="recPillExpandBtn" aria-label="?뺤옣"></button>
           </div>
           <!-- STT pill content -->
           <div id="recPillSttContent" style="display:none;align-items:center;gap:8px;width:100%">
             <div class="rec-pill-stt-spinner"></div>
-            <div class="rec-pill-stt-label" id="recPillSttLabel">변환 중…</div>
+            <div class="rec-pill-stt-label" id="recPillSttLabel">蹂??以묅?/div>
             <div class="rec-pill-stt-elapsed" id="recPillSttElapsed">00:00</div>
-            <button class="rec-pill-btn rec-pill-btn--expand" id="recPillSttExpandBtn" aria-label="확장"></button>
+            <button class="rec-pill-btn rec-pill-btn--expand" id="recPillSttExpandBtn" aria-label="?뺤옣"></button>
           </div>
         </div>
       </div>
     `;
     document.body.appendChild(modalEl);
 
-    // Set pill button icons (inline SVG — no lucide mounting needed)
+    // Set pill button icons (inline SVG ??no lucide mounting needed)
     modalEl.querySelector('#recPillPauseBtn').innerHTML     = SVG_PAUSE;
     modalEl.querySelector('#recPillStopBtn').innerHTML      = SVG_STOP;
     modalEl.querySelector('#recPillExpandBtn').innerHTML    = SVG_EXPAND;
@@ -628,7 +628,7 @@
       modalEl.querySelector('.recorder-panel')
     );
 
-    // Block ESC while minimized — prevents accidental cancel via any external handler
+    // Block ESC while minimized ??prevents accidental cancel via any external handler
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape'
           && modalEl
@@ -641,7 +641,7 @@
     return modalEl;
   }
 
-  // ── Backdrop click: auto-minimize during active recording or STT ──
+  // ?? Backdrop click: auto-minimize during active recording or STT ??
   function handleBackdropClick() {
     if (modalState.phase === 'recording' || modalState.phase === 'paused' || modalState.phase === 'transcribing') {
       minimizePill();
@@ -650,7 +650,7 @@
     }
   }
 
-  // ── Pill minimize / expand ───────────────────────────────
+  // ?? Pill minimize / expand ???????????????????????????????
   function minimizePill() {
     ensureModal();
     loadPillPos();
@@ -712,7 +712,7 @@
         const paused = phase === 'paused';
         dot.classList.toggle('rec-dot--paused', paused);
         pauseBtn.innerHTML = paused ? SVG_PLAY : SVG_PAUSE;
-        pauseBtn.setAttribute('aria-label', paused ? '재개' : '일시정지');
+        pauseBtn.setAttribute('aria-label', paused ? '?ш컻' : '?쇱떆?뺤?');
         const mainTimer = document.getElementById('recTimer');
         const pillTimer = document.getElementById('recPillTimer');
         if (mainTimer && pillTimer) pillTimer.textContent = mainTimer.textContent;
@@ -720,7 +720,7 @@
     }
   }
 
-  // ── Pill drag (mouse + touch) ────────────────────────────
+  // ?? Pill drag (mouse + touch) ????????????????????????????
   function initPillDrag(pillEl, panelEl) {
     let dragging  = false;
     let startX    = 0, startY    = 0;
@@ -780,7 +780,7 @@
     document.addEventListener('touchend', function () { dragEnd(); });
   }
 
-  // ── Screen switching ─────────────────────────────────────
+  // ?? Screen switching ?????????????????????????????????????
   function switchScreen(name) {
     if (!modalEl) return;
     modalEl.querySelectorAll('.rec-screen').forEach(el => {
@@ -789,10 +789,10 @@
     modalState.screen = name;
 
     // Show minimize button on screens where backgrounding makes sense:
-    // - 'live'         (recording in progress — let it run in the background)
-    // - 'stt'          (transcribing in progress — same idea)
+    // - 'live'         (recording in progress ??let it run in the background)
+    // - 'stt'          (transcribing in progress ??same idea)
     // The grabber has `display: none` by default and switches to flex via
-    // .is-visible — toggling style.display directly would lose the flex
+    // .is-visible ??toggling style.display directly would lose the flex
     // and break the bar/label layout.
     const minimizeBtn = modalEl.querySelector('#recMinimizeBtn');
     if (minimizeBtn) minimizeBtn.classList.toggle('is-visible', name === 'live' || name === 'stt');
@@ -823,12 +823,12 @@
 
   function closeModalIfSafe() {
     if (modalState.phase === 'recording' || modalState.phase === 'paused') {
-      if (!confirm('녹음을 취소하시겠습니까? 현재까지 녹음한 내용은 사라집니다.')) return;
+      if (!confirm('?뱀쓬??痍⑥냼?섏떆寃좎뒿?덇퉴? ?꾩옱源뚯? ?뱀쓬???댁슜? ?щ씪吏묐땲??')) return;
       cancelLiveRecording();
       return;
     }
     if (modalState.phase === 'uploading') {
-      if (!confirm('업로드를 취소하시겠습니까?')) return;
+      if (!confirm('?낅줈?쒕? 痍⑥냼?섏떆寃좎뒿?덇퉴?')) return;
     }
     if (modalState.phase === 'transcribing') {
       minimizePill();
@@ -837,20 +837,20 @@
     hideModal();
   }
 
-  // ── Live recording ──────────────────────────────────────
+  // ?? Live recording ??????????????????????????????????????
   async function startLiveRecording() {
     if (modalState.phase === 'transcribing') {
-      window.showToast?.('⚠️ 이전 변환이 끝난 후 시작하세요.');
+      window.showToast?.('?좑툘 ?댁쟾 蹂?섏씠 ?앸궃 ???쒖옉?섏꽭??');
       return;
     }
     if (!currentUser) {
-      window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
+      window.showToast?.('?뵎 濡쒓렇?????댁슜?????덉뒿?덈떎.');
       return;
     }
     if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '이 브라우저는 녹음을 지원하지 않습니다. 오디오 파일 업로드를 사용해주세요.';
+        '??釉뚮씪?곗????뱀쓬??吏?먰븯吏 ?딆뒿?덈떎. ?ㅻ뵒???뚯씪 ?낅줈?쒕? ?ъ슜?댁＜?몄슂.';
       return;
     }
 
@@ -866,7 +866,7 @@
       console.error('[recorder] getUserMedia denied', err);
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '마이크 권한이 거부되었습니다. 브라우저 설정에서 마이크 사용을 허용해주세요.';
+        '留덉씠??沅뚰븳??嫄곕??섏뿀?듬땲?? 釉뚮씪?곗? ?ㅼ젙?먯꽌 留덉씠???ъ슜???덉슜?댁＜?몄슂.';
       return;
     }
 
@@ -877,7 +877,7 @@
       console.error('[recorder] MediaRecorder init failed', err);
       releaseStream();
       switchScreen('error');
-      document.getElementById('recErrorStatus').textContent = '녹음을 시작할 수 없습니다.';
+      document.getElementById('recErrorStatus').textContent = '?뱀쓬???쒖옉?????놁뒿?덈떎.';
       return;
     }
 
@@ -897,8 +897,8 @@
     setupAudioMeter(modalState.stream);
     startTimer();
     switchScreen('live');
-    document.getElementById('recPauseBtn').textContent = '일시정지';
-    document.getElementById('recLiveStatus').textContent = '녹음 중…';
+    document.getElementById('recPauseBtn').textContent = '?쇱떆?뺤?';
+    document.getElementById('recLiveStatus').textContent = '?뱀쓬 以묅?;
   }
 
   function startTimer() {
@@ -918,7 +918,7 @@
       const pillTimer = document.getElementById('recPillTimer');
       if (pillTimer) pillTimer.textContent = timeStr;
     }, 250);
-    // Must set phase AFTER wiring the interval — phase drives the ms calculation above
+    // Must set phase AFTER wiring the interval ??phase drives the ms calculation above
     modalState.phase = 'recording';
   }
 
@@ -953,7 +953,7 @@
         if (bar) bar.style.width = pct + '%';
       }, 80);
     } catch (e) {
-      // Audio meter is decorative — silent fallback is fine
+      // Audio meter is decorative ??silent fallback is fine
     }
   }
 
@@ -963,14 +963,14 @@
       modalState.rec.pause();
       modalState.elapsedAtPause += Date.now() - modalState.startTime;
       modalState.phase = 'paused';
-      document.getElementById('recPauseBtn').textContent = '재개';
-      document.getElementById('recLiveStatus').textContent = '일시정지됨';
+      document.getElementById('recPauseBtn').textContent = '?ш컻';
+      document.getElementById('recLiveStatus').textContent = '?쇱떆?뺤???;
     } else if (modalState.rec.state === 'paused') {
       modalState.rec.resume();
       modalState.startTime = Date.now();
       modalState.phase = 'recording';
-      document.getElementById('recPauseBtn').textContent = '일시정지';
-      document.getElementById('recLiveStatus').textContent = '녹음 중…';
+      document.getElementById('recPauseBtn').textContent = '?쇱떆?뺤?';
+      document.getElementById('recLiveStatus').textContent = '?뱀쓬 以묅?;
     }
     updatePillUI();
   }
@@ -1021,7 +1021,7 @@
     if (blob.size < 5 * 1024) {
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '녹음된 내용이 너무 짧습니다. 다시 시도해주세요.';
+        '?뱀쓬???댁슜???덈Т 吏㏃뒿?덈떎. ?ㅼ떆 ?쒕룄?댁＜?몄슂.';
       return;
     }
 
@@ -1040,7 +1040,7 @@
     showEngineSelector();
   }
 
-  // ── Engine selector (live recording only) ──────────────
+  // ?? Engine selector (live recording only) ??????????????
   function showEngineSelector() {
     const durationMin = Math.ceil(modalState.recordingDurationSec / 60);
     const { minutes, priceKRW } = (typeof priceFor === 'function')
@@ -1048,10 +1048,10 @@
       : { minutes: Math.ceil(durationMin / 30) * 30, priceKRW: 1500 };
 
     const durLbl = document.getElementById('recEngineDurationLabel');
-    if (durLbl) durLbl.textContent = '녹음 시간: ' + durationMin + '분';
+    if (durLbl) durLbl.textContent = '?뱀쓬 ?쒓컙: ' + durationMin + '遺?;
 
     const priceLbl = document.getElementById('recEnginePriceLabel');
-    if (priceLbl) priceLbl.textContent = priceKRW.toLocaleString() + '원~';
+    if (priceLbl) priceLbl.textContent = priceKRW.toLocaleString() + '??';
 
     // Reset to default
     const aaiRadio = document.getElementById('recEngineAssemblyAI');
@@ -1075,18 +1075,18 @@
         : { minutes: Math.ceil(durationMin / 30) * 30, priceKRW: 1500 };
 
       const confirmed = confirm(
-        `이 강의는 ${minutes}분입니다.\nGoogle STT 변환 비용: ${priceKRW.toLocaleString()}원\n결제하시겠습니까?`
+        `??媛뺤쓽??${minutes}遺꾩엯?덈떎.\nGoogle STT 蹂??鍮꾩슜: ${priceKRW.toLocaleString()}??n寃곗젣?섏떆寃좎뒿?덇퉴?`
       );
       if (!confirmed) return; // stay on engine selector
 
       try {
-        if (typeof payForSttEntitlement !== 'function') throw new Error('결제 모듈이 로드되지 않았습니다.');
+        if (typeof payForSttEntitlement !== 'function') throw new Error('寃곗젣 紐⑤뱢??濡쒕뱶?섏? ?딆븯?듬땲??');
         await payForSttEntitlement(durationMin);
-        // payment succeeded — sttEngine stays 'google'
+        // payment succeeded ??sttEngine stays 'google'
       } catch (e) {
-        // payment cancelled or failed — fall back to assemblyai automatically
+        // payment cancelled or failed ??fall back to assemblyai automatically
         modalState.sttEngine = 'assemblyai';
-        window.showToast?.('결제 취소 — 기본 STT로 진행합니다');
+        window.showToast?.('寃곗젣 痍⑥냼 ??湲곕낯 STT濡?吏꾪뻾?⑸땲??);
       }
     }
 
@@ -1104,37 +1104,37 @@
     hideModal();
   }
 
-  // ── File upload entry ───────────────────────────────────
+  // ?? File upload entry ???????????????????????????????????
   function onFilePicked(ev) {
     const file = ev.target.files && ev.target.files[0];
     ev.target.value = '';
     if (!file) return;
     if (modalState.phase === 'transcribing') {
-      window.showToast?.('⚠️ 이전 변환이 끝난 후 시작하세요.');
+      window.showToast?.('?좑툘 ?댁쟾 蹂?섏씠 ?앸궃 ???쒖옉?섏꽭??');
       return;
     }
     if (!currentUser) {
-      window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
+      window.showToast?.('?뵎 濡쒓렇?????댁슜?????덉뒿?덈떎.');
       return;
     }
     if (file.size > 500 * 1024 * 1024) {
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '파일이 너무 큽니다 (최대 500MB). 더 작은 파일을 사용해주세요.';
+        '?뚯씪???덈Т ?쎈땲??(理쒕? 500MB). ???묒? ?뚯씪???ъ슜?댁＜?몄슂.';
       return;
     }
     modalState.sttEngine = 'assemblyai'; // file uploads always use free AssemblyAI path
     handleAudioBlob(file, file.name);
   }
 
-  // ── Upload to Firebase Storage + AssemblyAI pipeline ───
+  // ?? Upload to Firebase Storage + AssemblyAI pipeline ???
   async function handleAudioBlob(blob, filename) {
     if (!currentUser) {
-      window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
+      window.showToast?.('?뵎 濡쒓렇?????댁슜?????덉뒿?덈떎.');
       return;
     }
     switchScreen('upload');
-    document.getElementById('recUploadStatus').textContent = '업로드 중…';
+    document.getElementById('recUploadStatus').textContent = '?낅줈??以묅?;
     document.getElementById('recUploadBar').style.width = '0%';
 
     const path = 'users/' + currentUser.uid + '/recordings/'
@@ -1152,7 +1152,7 @@
         const bar = document.getElementById('recUploadBar');
         const lbl = document.getElementById('recUploadStatus');
         if (bar) bar.style.width = pct.toFixed(1) + '%';
-        if (lbl) lbl.textContent = `업로드 중… ${pct.toFixed(0)}%`;
+        if (lbl) lbl.textContent = `?낅줈??以묅?${pct.toFixed(0)}%`;
       });
       await task;
       downloadUrl = await ref.getDownloadURL();
@@ -1160,13 +1160,13 @@
       console.error('[recorder] storage upload failed', err);
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '업로드에 실패했습니다. 인터넷 연결을 확인해주세요.';
+        '?낅줈?쒖뿉 ?ㅽ뙣?덉뒿?덈떎. ?명꽣???곌껐???뺤씤?댁＜?몄슂.';
       return;
     }
 
     switchScreen('stt');
     modalState.phase = 'transcribing';
-    document.getElementById('recSttStatus').textContent = '텍스트 변환 시작 중…';
+    document.getElementById('recSttStatus').textContent = '?띿뒪??蹂???쒖옉 以묅?;
 
     // Determine STT endpoint based on selected engine
     const sttApi = modalState.sttEngine === 'google' ? '/api/google-stt' : '/api/assemblyai';
@@ -1174,14 +1174,14 @@
     // Track when polling started for elapsed display and long-wait warning
     modalState.pollStart = Date.now();
 
-    // MM:SS elapsed counter — updates every second while STT is in progress
+    // MM:SS elapsed counter ??updates every second while STT is in progress
     if (modalState.sttElapsedHandle) clearInterval(modalState.sttElapsedHandle);
     modalState.sttElapsedHandle = setInterval(() => {
       const sec = Math.floor((Date.now() - modalState.pollStart) / 1000);
       const mm  = String(Math.floor(sec / 60)).padStart(2, '0');
       const ss  = String(sec % 60).padStart(2, '0');
       const el  = document.getElementById('recSttElapsed');
-      if (el) el.textContent = `경과 ${mm}:${ss}`;
+      if (el) el.textContent = `寃쎄낵 ${mm}:${ss}`;
       const pillElapsed = document.getElementById('recPillSttElapsed');
       if (pillElapsed) pillElapsed.textContent = `${mm}:${ss}`;
       if (sec >= 300) {
@@ -1211,11 +1211,11 @@
       console.error('[recorder] transcribe start failed', err);
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '텍스트 변환을 시작하지 못했습니다. (' + (err.message || 'unknown') + ')';
+        '?띿뒪??蹂?섏쓣 ?쒖옉?섏? 紐삵뻽?듬땲?? (' + (err.message || 'unknown') + ')';
       return;
     }
 
-    document.getElementById('recSttStatus').textContent = '대기열에서 차례를 기다리는 중…';
+    document.getElementById('recSttStatus').textContent = '?湲곗뿴?먯꽌 李⑤?瑜?湲곕떎由щ뒗 以묅?;
     const pollStart = Date.now();
     const POLL_INTERVAL = 6000;
     const MAX_POLL_MS = 90 * 60 * 1000;
@@ -1235,13 +1235,13 @@
         const pillLbl  = document.getElementById('recPillSttLabel');
 
         if (j.status === 'queued') {
-          lbl.textContent = '대기열에서 차례를 기다리는 중…';
-          if (stLabel)  stLabel.textContent = '② 변환 대기 중';
-          if (pillLbl)  pillLbl.textContent = '대기 중…';
+          lbl.textContent = '?湲곗뿴?먯꽌 李⑤?瑜?湲곕떎由щ뒗 以묅?;
+          if (stLabel)  stLabel.textContent = '??蹂???湲?以?;
+          if (pillLbl)  pillLbl.textContent = '?湲?以묅?;
         } else if (j.status === 'processing') {
-          lbl.textContent = '텍스트 변환 중…';
-          if (stLabel)  stLabel.textContent = '② 텍스트 변환 중';
-          if (pillLbl)  pillLbl.textContent = '변환 중…';
+          lbl.textContent = '?띿뒪??蹂??以묅?;
+          if (stLabel)  stLabel.textContent = '???띿뒪??蹂??以?;
+          if (pillLbl)  pillLbl.textContent = '蹂??以묅?;
         } else if (j.status === 'completed') {
           deliverTranscript(j.text || '', filename);
           return;
@@ -1250,7 +1250,7 @@
         }
 
         if (Date.now() - pollStart > MAX_POLL_MS) {
-          throw new Error('처리 시간이 너무 오래 걸립니다. 잠시 후 다시 시도해주세요.');
+          throw new Error('泥섎━ ?쒓컙???덈Т ?ㅻ옒 嫄몃┰?덈떎. ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.');
         }
         modalState.pollHandle = setTimeout(poll, POLL_INTERVAL);
       } catch (err) {
@@ -1267,7 +1267,7 @@
         }
         switchScreen('error');
         document.getElementById('recErrorStatus').textContent =
-          '변환 중 오류가 발생했습니다. (' + (err.message || 'unknown') + ')';
+          '蹂??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. (' + (err.message || 'unknown') + ')';
       }
     }
     modalState.pollHandle = setTimeout(poll, 1500);
@@ -1276,8 +1276,8 @@
   function formatElapsed(sec) {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
-    if (m === 0) return `${s}초`;
-    return `${m}분 ${s}초`;
+    if (m === 0) return `${s}珥?;
+    return `${m}遺?${s}珥?;
   }
 
   async function deliverTranscript(text, sourceFilename) {
@@ -1287,7 +1287,7 @@
     if (!cleanText) {
       switchScreen('error');
       document.getElementById('recErrorStatus').textContent =
-        '변환된 텍스트가 비어있습니다. 녹음 파일을 확인해주세요.';
+        '蹂?섎맂 ?띿뒪?멸? 鍮꾩뼱?덉뒿?덈떎. ?뱀쓬 ?뚯씪???뺤씤?댁＜?몄슂.';
       return;
     }
 
@@ -1302,7 +1302,7 @@
         });
       } catch (err) {
         console.error('[recorder] saveTranscriptFS failed:', err);
-        window.showToast?.('⚠️ 녹취록 자동 저장에 실패했습니다. 슬롯에는 추가됩니다.');
+        window.showToast?.('?좑툘 ?뱀랬濡??먮룞 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?щ’?먮뒗 異붽??⑸땲??');
       }
     }
 
@@ -1319,7 +1319,7 @@
     if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
     modalState.phase = 'completed';
 
-    // Briefly advance stage tracker: stage 2 → done, stage 3 → active
+    // Briefly advance stage tracker: stage 2 ??done, stage 3 ??active
     const _st2 = document.getElementById('recSttStage2');
     const _st3 = document.getElementById('recSttStage3');
     if (_st2) _st2.className = 'rec-stt-stage rec-stt-stage--done';
@@ -1329,7 +1329,7 @@
     const baseName = (sourceFilename || 'recording').replace(/\.[^.]+$/, '');
     const file = new File([cleanText], baseName + '.txt', { type: 'text/plain' });
 
-    // Always keep a reference so the "다음" CTA can add it later if needed
+    // Always keep a reference so the "?ㅼ쓬" CTA can add it later if needed
     modalState.pendingFile = file;
 
     let didFillSlot = false;
@@ -1350,9 +1350,9 @@
     switchScreen('done');
     const status = document.getElementById('recDoneStatus');
     if (status) {
-      const lenLabel   = `${cleanText.length.toLocaleString()}자`;
-      const savedLabel = savedTranscript ? ' · 내 녹취록에 저장됨' : '';
-      status.textContent = `변환 완료 · ${lenLabel}${savedLabel}`;
+      const lenLabel   = `${cleanText.length.toLocaleString()}??;
+      const savedLabel = savedTranscript ? ' 쨌 ???뱀랬濡앹뿉 ??λ맖' : '';
+      status.textContent = `蹂???꾨즺 쨌 ${lenLabel}${savedLabel}`;
     }
 
     // Tailor done-screen hint and CTA based on whether the slot was filled
@@ -1360,15 +1360,15 @@
     const goNewBtn = document.getElementById('recDoneGoNewBtn');
     const closeBtn = document.getElementById('recDoneCloseBtn');
     if (didFillSlot && _currentView === 'new') {
-      // User already on new-note view, slot populated → just confirm
-      if (doneHint) doneHint.textContent = 'PPT/PDF를 추가하면 AI 노트 분석을 바로 시작할 수 있습니다.';
+      // User already on new-note view, slot populated ??just confirm
+      if (doneHint) doneHint.textContent = 'PPT/PDF瑜?異붽??섎㈃ AI ?명듃 遺꾩꽍??諛붾줈 ?쒖옉?????덉뒿?덈떎.';
       if (goNewBtn) goNewBtn.style.display = 'none';
-      if (closeBtn) { closeBtn.textContent = '확인'; closeBtn.className = 'rec-btn rec-btn-primary'; }
+      if (closeBtn) { closeBtn.textContent = '?뺤씤'; closeBtn.className = 'rec-btn rec-btn-primary'; }
     } else {
-      // User on home/transcripts or slot not filled → show navigation CTA
-      if (doneHint) doneHint.textContent = '내 녹취록에 저장되었습니다. 새 노트에서 강의 자료와 함께 AI 분석을 시작해보세요.';
+      // User on home/transcripts or slot not filled ??show navigation CTA
+      if (doneHint) doneHint.textContent = '???뱀랬濡앹뿉 ??λ릺?덉뒿?덈떎. ???명듃?먯꽌 媛뺤쓽 ?먮즺? ?④퍡 AI 遺꾩꽍???쒖옉?대낫?몄슂.';
       if (goNewBtn) goNewBtn.style.display = '';
-      if (closeBtn) { closeBtn.textContent = '닫기'; closeBtn.className = 'rec-btn rec-btn-secondary'; }
+      if (closeBtn) { closeBtn.textContent = '?リ린'; closeBtn.className = 'rec-btn rec-btn-secondary'; }
     }
 
     // Surface the modal if the user had hidden or minimized it during background processing
@@ -1382,15 +1382,15 @@
     }
 
     if (didFillSlot && savedTranscript) {
-      window.showToast?.('🎙️ 녹취록이 슬롯에 추가되고 내 녹취록에도 저장되었습니다.');
+      window.showToast?.('?럺截??뱀랬濡앹씠 ?щ’??異붽??섍퀬 ???뱀랬濡앹뿉????λ릺?덉뒿?덈떎.');
     } else if (savedTranscript) {
-      window.showToast?.('🎙️ 내 녹취록에 저장되었습니다. 새 노트에서 활용해보세요!');
+      window.showToast?.('?럺截????뱀랬濡앹뿉 ??λ릺?덉뒿?덈떎. ???명듃?먯꽌 ?쒖슜?대낫?몄슂!');
     } else if (didFillSlot) {
-      window.showToast?.('🎙️ 녹취록이 추가되었습니다.');
+      window.showToast?.('?럺截??뱀랬濡앹씠 異붽??섏뿀?듬땲??');
     }
   }
 
-  // ── Public entry ────────────────────────────────────────
+  // ?? Public entry ????????????????????????????????????????
   window.openRecorderModal = function (targetSlotId) {
     showModal(targetSlotId);
   };
