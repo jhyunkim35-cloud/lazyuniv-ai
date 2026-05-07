@@ -177,6 +177,60 @@
       .rec-pill-btn--expand { opacity: 0.65; }
       .rec-pill-btn--expand:hover { opacity: 1; }
 
+      /* ── Top-center grabber (replaces header minimize button) ──
+         Mobile-sheet pattern: a wide horizontal handle at the very
+         top of the panel. On hover/touch, the handle highlights and
+         a "작게 보기" label fades in below it so the affordance is
+         unambiguous on first encounter — far more discoverable than
+         a tiny corner icon. Click the whole area to minimize. */
+      /* Mini "작게 보기" affordance pinned to the top-center of the
+         recorder panel. Uses a Picture-in-Picture icon + label so the
+         action is unambiguous on first encounter — far more discoverable
+         than a tiny corner icon. Click the whole area to minimize. */
+      .recorder-grabber {
+        display: none;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: auto;
+        margin: 8px auto 4px;
+        padding: 6px 14px;
+        background: rgba(124,58,237,0.08);
+        border: 1px solid rgba(124,58,237,0.18);
+        border-radius: 999px;
+        cursor: pointer;
+        color: var(--primary, #7c3aed);
+        transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+        flex-shrink: 0;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        line-height: 1;
+      }
+      .recorder-grabber.is-visible { display: inline-flex; }
+      .recorder-grabber-icon {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        display: block;
+      }
+      .recorder-grabber-label {
+        white-space: nowrap;
+      }
+      .recorder-grabber:hover,
+      .recorder-grabber:focus-visible {
+        background: rgba(124,58,237,0.14);
+        border-color: rgba(124,58,237,0.35);
+        outline: none;
+      }
+      .recorder-grabber:active {
+        transform: scale(0.97);
+      }
+      /* Hide entirely while minimized — pill replaces it */
+      .recorder-modal--minimized .recorder-grabber { display: none !important; }
+
       /* ── STT 3-stage progress tracker ─────────── */
       .rec-stt-stages {
         display: flex;
@@ -371,11 +425,15 @@
     modalEl.innerHTML = `
       <div class="recorder-backdrop"></div>
       <div class="recorder-panel" role="dialog" aria-modal="true" aria-label="녹음">
+        <button class="recorder-grabber" id="recMinimizeBtn" aria-label="작게 보기 (PIP)" title="작게 보기 (PIP)">
+          <svg class="recorder-grabber-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 9V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/>
+            <rect x="13" y="13" width="8" height="6" rx="1" fill="currentColor" stroke="none"/>
+          </svg>
+          <span class="recorder-grabber-label">작게 보기</span>
+        </button>
         <div class="recorder-head">
           <div class="recorder-title" id="recTitle">녹음하기</div>
-          <button class="recorder-minimize" id="recMinimizeBtn" aria-label="작게 줄이기" title="작게 줄이기" style="display:none">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="display:block"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
           <button class="recorder-close" id="recCloseBtn" aria-label="닫기" title="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </div>
 
@@ -733,8 +791,11 @@
     // Show minimize button on screens where backgrounding makes sense:
     // - 'live'         (recording in progress — let it run in the background)
     // - 'stt'          (transcribing in progress — same idea)
+    // The grabber has `display: none` by default and switches to flex via
+    // .is-visible — toggling style.display directly would lose the flex
+    // and break the bar/label layout.
     const minimizeBtn = modalEl.querySelector('#recMinimizeBtn');
-    if (minimizeBtn) minimizeBtn.style.display = (name === 'live' || name === 'stt') ? '' : 'none';
+    if (minimizeBtn) minimizeBtn.classList.toggle('is-visible', name === 'live' || name === 'stt');
 
     window.mountLucideIcons?.();
   }
