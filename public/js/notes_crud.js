@@ -28,6 +28,10 @@ async function autoSaveNote() {
       return;
     }
     const notesHtml = document.getElementById('finalNotesBody')?.innerHTML || '';
+    // Phase 3B-4: pick up the most-recent recorder audio path so the note
+    // doc knows which Storage object backs it. Cleared after save so the
+    // path doesn't leak into the next unrelated note.
+    const audioStoragePath = window.recorderLastAudioPath || null;
     const record = await saveNoteFS({
       id:                   currentNoteId || undefined,
       title,
@@ -38,7 +42,9 @@ async function autoSaveNote() {
       filteredText:         storedFilteredText,
       highlightedTranscript: storedHighlightedTranscript,
       extractedImages:      extractedImages,
+      audioStoragePath:     audioStoragePath,
     });
+    if (audioStoragePath) window.recorderLastAudioPath = null;
     currentNoteId = record.id;
     showSuccessToast('💾 저장 완료');
     renderHomeView();

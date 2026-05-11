@@ -1306,13 +1306,17 @@
       }
     }
 
-    // Step 2: delete original audio from Storage (best-effort)
+    // Step 2: cache the audio path for the upcoming note (Phase 3B-4).
+    // We used to delete the original audio from Storage here, but the
+    // cost-splitting flow ("친구랑 나누기") needs the source audio to copy
+    // into the group bucket on demand. Now we just stash the path so the
+    // next autoSaveNote can write it to the note doc; the audio is then
+    // either copied + cleaned up by api/group-create, or eventually swept
+    // by a Storage lifecycle rule (configured separately in Firebase
+    // Console — see ops backlog).
     if (modalState.audioStoragePath) {
-      const pathToDelete = modalState.audioStoragePath;
+      window.recorderLastAudioPath = modalState.audioStoragePath;
       modalState.audioStoragePath = null;
-      storage.ref(pathToDelete).delete().catch((e) => {
-        console.warn('[recorder] audio delete failed (non-fatal):', e.message);
-      });
     }
 
     // Clear STT elapsed interval now that we're done processing

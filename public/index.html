@@ -4647,7 +4647,10 @@ dlPdfBtn.addEventListener('click', () => {
 // Quiz functions (tryExtractJsonObject through launchQuiz) moved to /js/quiz.js
 
 // Cost-splitting groups: open modal with sensible defaults derived from current note.
-document.getElementById('shareGroupBtn')?.addEventListener('click', () => {
+// Phase 3B-4: audio path is now auto-fetched from the saved note doc rather
+// than typed by the user. Notes without a recording (legacy or PPT-only)
+// silently fail closed with a friendly toast.
+document.getElementById('shareGroupBtn')?.addEventListener('click', async () => {
   if (typeof openGroupCreateModal !== 'function') {
     showToast('그룹 기능 로드 실패 — 새로고침 후 다시 시도해주세요');
     return;
@@ -4660,13 +4663,35 @@ document.getElementById('shareGroupBtn')?.addEventListener('click', () => {
   if (!lectureName) {
     lectureName = document.getElementById('pptTagName')?.textContent?.trim() || '';
   }
-  // audioStoragePath auto-fill is a Phase 3B-2 deliverable; for now the user
-  // pastes it from the recordings panel. The modal's hint mentions this.
+  // Pull audioStoragePath from the saved note doc. Fall back gracefully
+  // when there's no current note (just-finished pipeline before save) or
+  // the doc fetch fails — modal's own gate will toast in that case.
+  let audioStoragePath = null;
+  if (typeof currentNoteId !== 'undefined' && currentNoteId && typeof getNoteFS === 'function') {
+    try {
+      const note = await getNoteFS(currentNoteId);
+      if (note && typeof note.audioStoragePath === 'string' && note.audioStoragePath.startsWith('users/')) {
+        audioStoragePath = note.audioStoragePath;
+      }
+    } catch (e) {
+      console.warn('[shareGroup] note fetch failed', e);
+    }
+  }
+  // Fallback for the brand-new-note window: pipeline just finished, autoSave
+  // hasn't run yet, so the path is still in the recorder cache.
+  if (!audioStoragePath && window.recorderLastAudioPath) {
+    audioStoragePath = window.recorderLastAudioPath;
+  }
+  if (!audioStoragePath) {
+    showToast('이 노트는 녹음 파일이 없어 공유할 수 없어요 (녹음으로 만든 노트만 가능)');
+    return;
+  }
   openGroupCreateModal({
     noteId: typeof currentNoteId !== 'undefined' ? currentNoteId : null,
     lectureName,
     totalCost: 1500,
     expectedMinutes: 90,
+    audioStoragePath,
   });
 });
 

@@ -139,11 +139,19 @@
       noteId: opts.noteId || null,
     };
 
-    // Inputs
+    // Hard gate: without a recording, there is nothing for friends to share.
+    // The caller (the shareGroupBtn handler in index.html) is supposed to
+    // check this first and toast, but defend-in-depth in case it's called
+    // from somewhere else later.
+    if (!defaults.audioStoragePath || !defaults.audioStoragePath.startsWith('users/')) {
+      toast('이 노트는 녹음 파일이 없어 공유할 수 없습니다');
+      return;
+    }
+
+    // Inputs (audio path is now derived from the note, not user-entered)
     const lectureInput = $('input', { type: 'text', placeholder: '예: 산업심리학 5주차', value: defaults.lectureName, maxlength: 100 });
     const costInput    = $('input', { type: 'number', min: 100, max: 50000, step: 100, value: defaults.totalCost });
     const minutesInput = $('input', { type: 'number', min: 1, max: 300, value: defaults.expectedMinutes });
-    const audioInput   = $('input', { type: 'text', placeholder: 'users/<uid>/recordings/...', value: defaults.audioStoragePath });
 
     const inviteBox = $('div', { class: 'groups-invite-box', style: 'display:none' });
     const submitBtn = $('button', { class: 'groups-btn groups-btn-primary' }, '그룹 만들기');
@@ -163,12 +171,11 @@
       const lectureName = lectureInput.value.trim();
       const totalCost = Number(costInput.value);
       const expectedMinutes = Number(minutesInput.value);
-      const audioStoragePath = audioInput.value.trim();
+      const audioStoragePath = defaults.audioStoragePath; // pre-validated above
 
       if (!lectureName) return toast('강의명을 입력해주세요');
       if (!(totalCost > 0 && totalCost <= 50000)) return toast('총 비용은 100~50000원');
       if (!(expectedMinutes > 0 && expectedMinutes <= 300)) return toast('예상 시간은 1~300분');
-      if (!audioStoragePath.startsWith('users/')) return toast('audio 경로가 올바르지 않습니다');
 
       submitBtn.disabled = true;
       submitBtn.textContent = '만드는 중...';
@@ -218,7 +225,12 @@
     modal.appendChild(field('강의명', lectureInput, '나중에 그룹 이름으로 표시됩니다'));
     modal.appendChild(field('총 STT 비용 (원)', costInput, '내가 결제한 실제 금액'));
     modal.appendChild(field('예상 강의 시간 (분)', minutesInput));
-    modal.appendChild(field('audio 경로', audioInput, '녹음 파일 storage path (자동 추후)'));
+
+    // Info row: audio is auto-linked from the note — no user input required
+    const audioInfo = $('div', { style: 'background:var(--surface-2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text-muted,#64748b);display:flex;align-items:center;gap:8px' });
+    audioInfo.appendChild($('span', { style: 'flex-shrink:0' }, '🎙️'));
+    audioInfo.appendChild($('span', {}, '녹음 파일이 이 노트에 자동 연결됩니다'));
+    modal.appendChild(audioInfo);
 
     modal.appendChild(inviteBox);
 
