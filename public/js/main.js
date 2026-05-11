@@ -52,9 +52,18 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
 (async function handlePaymentCallback() {
   const params = new URLSearchParams(window.location.search);
   const paymentStatus = params.get('payment');
-  // Clean URL immediately so paymentKey never leaks to history on error
-  window.history.replaceState({}, '', window.location.pathname);
   if (!paymentStatus) return;
+
+  // Clean only payment params from URL — preserve `join` and any future
+  // deeplinks. paymentKey never leaks to history because we strip it here.
+  try {
+    const url = new URL(window.location.href);
+    ['payment', 'paymentKey', 'orderId', 'amount', 'plan'].forEach(k => url.searchParams.delete(k));
+    const q = url.searchParams.toString();
+    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
+  } catch (_) {
+    window.history.replaceState({}, '', window.location.pathname);
+  }
 
   if (paymentStatus === 'success') {
     const paymentKey = params.get('paymentKey');
@@ -97,5 +106,37 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
     }
   } else if (paymentStatus === 'fail') {
     showToast('❌ 결제가 취소되었습니다.');
+  }
+})();
+
+// Handle invite link (?join=<token>): wait for auth, then open join modal.
+// Runs AFTER the payment IIFE — by the time we get here payment has already
+// cleaned its own params from the URL, but `join` survives because payment's
+// replaceState was triggered only on `?payment=...`. We grab `join` fresh.
+(async function handleJoinCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('join');
+  if (!token) return;
+
+  // Wait for auth — user may still need to click "Google 로그인"
+  await new Promise(resolve => {
+    if (currentUser) resolve();
+    else auth.onAuthStateChanged(u => { if (u) resolve(); });
+  });
+
+  // Clean only the `join` param so a refresh doesn't re-trigger the modal,
+  // but preserve any other params (e.g. future deeplinks).
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('join');
+    const q = url.searchParams.toString();
+    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
+  } catch (_) { /* old browsers without URL constructor: ignore */ }
+
+  if (typeof openGroupJoinModal === 'function') {
+    openGroupJoinModal({ token });
+  } else {
+    console.error('[main] openGroupJoinModal not available — groups.js failed to load');
+    if (typeof showToast === 'function') showToast('초대 링크 처리 실패 — 새로고침 후 다시 시도해주세요');
   }
 })();

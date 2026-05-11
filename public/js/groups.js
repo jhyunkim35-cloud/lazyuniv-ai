@@ -299,6 +299,114 @@
     box.appendChild(row);
   }
 
+  // ── Group join modal ──────────────────────────────────────────────────────
+  // Called when a friend clicks an invite link (?join=<token>) and auth is
+  // ready. The modal shows a confirm gate first — joining is idempotent on
+  // the backend (re-clicking is a no-op) but we still want explicit consent
+  // so the user understands what they're entering.
+  function openGroupJoinModal({ token } = {}) {
+    ensureStyles();
+    if (!token || typeof token !== 'string') {
+      toast('초대 링크가 올바르지 않습니다');
+      return;
+    }
+
+    const overlay = $('div', { class: 'groups-overlay' });
+    const modal = $('div', { class: 'groups-modal' });
+    overlay.appendChild(modal);
+
+    function close() { overlay.remove(); }
+
+    const joinBtn = $('button', { class: 'groups-btn groups-btn-primary' }, '합류하기');
+    const cancelBtn = $('button', { class: 'groups-btn groups-btn-secondary' }, '취소');
+    cancelBtn.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    const statusBox = $('div', { class: 'groups-invite-box', style: 'display:none' });
+
+    joinBtn.addEventListener('click', async () => {
+      joinBtn.disabled = true;
+      joinBtn.textContent = '합류 중...';
+      const idToken = await getIdToken();
+      if (!idToken) {
+        joinBtn.disabled = false;
+        joinBtn.textContent = '합류하기';
+        return toast('로그인이 필요합니다');
+      }
+      try {
+        const res = await fetch('/api/group-join', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + idToken,
+          },
+          body: JSON.stringify({ inviteToken: token }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (res.status === 404) throw new Error('group_not_found');
+          if (res.status === 403 && data.error === 'group_full') throw new Error('group_full');
+          if (res.status === 403 && data.error === 'group_inactive') throw new Error('group_inactive');
+          throw new Error(data.error || ('http_' + res.status));
+        }
+        showJoinSuccess(statusBox, data);
+        joinBtn.style.display = 'none';
+        cancelBtn.textContent = '닫기';
+      } catch (e) {
+        console.error('[groups] join failed', e);
+        const msg = (
+          e.message === 'group_not_found' ? '그룹을 찾을 수 없습니다 (만료된 링크일 수 있어요)' :
+          e.message === 'group_full' ? '그룹 정원이 가득 찼습니다' :
+          e.message === 'group_inactive' ? '비활성화된 그룹입니다' :
+          e.message === 'bad_token' ? '초대 토큰이 올바르지 않습니다' :
+          '합류 실패: ' + (e.message || 'unknown')
+        );
+        showJoinError(statusBox, msg);
+        joinBtn.disabled = false;
+        joinBtn.textContent = '합류하기';
+      }
+    });
+
+    modal.appendChild($('h2', {}, '👥 강의 그룹 합류'));
+    modal.appendChild($('p', { class: 'subtitle' }, '친구가 공유한 강의 노트/녹취록 그룹에 합류합니다.'));
+
+    const summary = $('div', { style: 'background:var(--surface-2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:14px;margin-bottom:8px;font-size:13px;line-height:1.6' });
+    summary.appendChild($('div', { style: 'font-weight:600;margin-bottom:6px' }, '합류하면…'));
+    const ul = $('ul', { style: 'margin:0;padding-left:18px;color:var(--text-muted,#64748b)' });
+    ul.appendChild($('li', {}, '그룹의 강의 노트와 녹취록을 함께 볼 수 있어요'));
+    ul.appendChild($('li', {}, '원작자가 결제한 STT 비용을 나중에 분담 송금할 수 있어요'));
+    ul.appendChild($('li', {}, '내 학습 데이터는 그대로 비공개로 유지됩니다'));
+    summary.appendChild(ul);
+    modal.appendChild(summary);
+
+    modal.appendChild(statusBox);
+
+    const actions = $('div', { class: 'groups-actions' });
+    actions.appendChild(cancelBtn);
+    actions.appendChild(joinBtn);
+    modal.appendChild(actions);
+
+    document.body.appendChild(overlay);
+  }
+
+  function showJoinSuccess(box, data) {
+    box.style.display = 'block';
+    box.replaceChildren();
+    box.appendChild($('div', { style: 'font-weight:600;font-size:14px;color:var(--primary,#7c3aed);margin-bottom:6px' },
+      '✅ "' + (data.lectureName || '강의') + '" 그룹 합류 완료'));
+    box.appendChild($('div', { style: 'font-size:12px;color:var(--text-muted,#64748b)' },
+      '현재 멤버 ' + (data.memberCount || 1) + '명' + (data.already ? ' (이미 멤버였어요)' : '')));
+    box.appendChild($('div', { style: 'font-size:11px;color:var(--text-muted,#94a3b8);margin-top:8px' },
+      '그룹 노트/녹취록 보기는 곧 추가됩니다.'));
+  }
+
+  function showJoinError(box, msg) {
+    box.style.display = 'block';
+    box.replaceChildren();
+    box.appendChild($('div', { style: 'font-weight:600;font-size:13px;color:#dc2626' }, '❌ ' + msg));
+  }
+
   // ── Expose ────────────────────────────────────────────────────────────────
   window.openGroupCreateModal = openGroupCreateModal;
+  window.openGroupJoinModal = openGroupJoinModal;
 })();
