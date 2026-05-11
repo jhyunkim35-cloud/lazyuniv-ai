@@ -1,10 +1,16 @@
 // Google Cloud Speech-to-Text (Chirp_2) proxy — keeps service account credentials server-side.
-//   POST ?action=transcribe — { audio_url, expectedMinutes } -> { operation_id }
+//   POST ?action=transcribe — { audio_url, expectedMinutes, groupId? } -> { operation_id }
 //   GET  ?action=status&id  — poll status -> { status, text?, error_msg?, speaker_count?, audio_duration? }
+//                              (pass ?groupId=... to also persist the transcript into the group's recording doc)
 //
 // Auth: Firebase ID token in Authorization: Bearer <token>.
 // Entitlement: user must have an unconsumed sttEntitlements doc in Firestore.
 // Rate-limit: 30 req/min/IP.
+//
+// Group mode (groupId set): caller must be the group's creator on transcribe,
+// and any group member on status. The transcript is written back to
+// lectureGroups/<gid>/recording/meta so all members (governed by Storage +
+// Firestore rules) can read it.
 //
 // Service account: GOOGLE_STT_SERVICE_ACCOUNT env (preferred) or FIREBASE_SERVICE_ACCOUNT.
 // The same key material is used to mint a short-lived OAuth2 token scoped to
@@ -264,6 +270,7 @@ module.exports = async (req, res) => {
 
       const audio_url = body?.audio_url;
       const expectedMinutes = Number(body?.expectedMinutes) || 0;
+      const groupId = body?.groupId ? String(body.groupId).slice(0, 64) : null;
 
       if (!audio_url || typeof audio_url !== 'string') {
         return res.status(400).json({ error: 'missing_audio_url' });
@@ -279,6 +286,33 @@ module.exports = async (req, res) => {
       const admin = getAdmin();
       const db = admin.firestore();
       const FV = admin.firestore.FieldValue;
+
+      // ── Group mode: verify caller is the group's creator + paths match ──
+      let groupRef = null;
+      let groupRecRef = null;
+      if (groupId) {
+        if (!/^[A-Za-z0-9]{1,64}$/.test(groupId)) {
+          return res.status(400).json({ error: 'bad_group_id' });
+        }
+        groupRef = db.collection('lectureGroups').doc(groupId);
+        const gSnap = await groupRef.get();
+        if (!gSnap.exists) return res.status(404).json({ error: 'group_not_found' });
+        const gData = gSnap.data();
+        if (gData.creatorUid !== user.uid) {
+          return res.status(403).json({ error: 'group_creator_only' });
+        }
+        if (gData.status !== 'active') {
+          return res.status(403).json({ error: 'group_inactive' });
+        }
+        // Loose path check: the audio_url must reference the group's audio path.
+        // Storage URLs URL-encode '/' as '%2F'; check both raw and encoded forms.
+        const expected = gData.groupAudioPath || '';
+        const encExpected = expected.replace(/\//g, '%2F');
+        if (!audio_url.includes(expected) && !audio_url.includes(encExpected)) {
+          return res.status(400).json({ error: 'audio_url_mismatch_group' });
+        }
+        groupRecRef = groupRef.collection('recording').doc('meta');
+      }
 
       const entQuery = await db
         .collection('users').doc(user.uid)
@@ -351,7 +385,17 @@ module.exports = async (req, res) => {
       // Persist operation_id in entitlement for audit; fire-and-forget
       entDoc.ref.update({ transcriptId: operationId }).catch(() => {});
 
-      console.log(`[google-stt] started op=${operationId} uid=${user.uid} paid=${entData.minutes}min requested=${expectedMinutes}min`);
+      // Group mode: link the running operation to the group's recording doc
+      // so subsequent status polls (from any member) can find + persist it.
+      if (groupRecRef) {
+        groupRecRef.set({
+          operationId,
+          sttStatus: 'processing',
+          startedAt: FV.serverTimestamp(),
+        }, { merge: true }).catch(e => console.error('[group-stt] rec update failed', e.message));
+      }
+
+      console.log(`[google-stt] started op=${operationId} uid=${user.uid} paid=${entData.minutes}min requested=${expectedMinutes}min${groupId ? ` group=${groupId}` : ''}`);
       return res.status(200).json({ operation_id: operationId, status: 'queued' });
     }
 
@@ -361,6 +405,25 @@ module.exports = async (req, res) => {
       // Google operation IDs are typically numeric strings; allow alphanumeric + safe path chars
       if (!id || !/^[\w./:@-]{1,256}$/.test(id)) {
         return res.status(400).json({ error: 'bad_id' });
+      }
+
+      // Group mode: any member may poll. Result also gets persisted into the
+      // recording doc so members who join later can read the transcript.
+      const groupIdQ = (req.query?.groupId || '').toString().slice(0, 64);
+      let groupRecRef = null;
+      if (groupIdQ) {
+        if (!/^[A-Za-z0-9]{1,64}$/.test(groupIdQ)) {
+          return res.status(400).json({ error: 'bad_group_id' });
+        }
+        const admin = getAdmin();
+        const gRef = admin.firestore().collection('lectureGroups').doc(groupIdQ);
+        const gSnap = await gRef.get();
+        if (!gSnap.exists) return res.status(404).json({ error: 'group_not_found' });
+        const gData = gSnap.data();
+        if (!Array.isArray(gData.memberUids) || !gData.memberUids.includes(user.uid)) {
+          return res.status(403).json({ error: 'group_not_member' });
+        }
+        groupRecRef = gRef.collection('recording').doc('meta');
       }
 
       const token = await getAccessToken();
@@ -408,6 +471,25 @@ module.exports = async (req, res) => {
         });
       } catch (e) {
         console.error('[usage] stt record failed:', e.message);
+      }
+
+      // Group mode: persist the transcript so any member can read it later.
+      // Idempotent via merge — re-polling won't corrupt.
+      if (groupRecRef) {
+        try {
+          const admin = getAdmin();
+          const FV = admin.firestore.FieldValue;
+          await groupRecRef.set({
+            transcript: text,
+            speakerCount: speaker_count,
+            audioDuration: audio_duration,
+            sttStatus: 'completed',
+            completedAt: FV.serverTimestamp(),
+          }, { merge: true });
+        } catch (e) {
+          console.error('[group-stt] persist completed transcript failed:', e.message);
+          // Non-fatal — still return text to the caller.
+        }
       }
 
       return res.status(200).json({

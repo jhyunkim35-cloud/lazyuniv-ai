@@ -3,11 +3,13 @@
     { "source": "/(.*)", "destination": "/public/$1" }
   ],
   "functions": {
-    "api/claude.js":     { "maxDuration": 300 },
-    "api/assemblyai.js": { "maxDuration": 60 },
-    "api/google-stt.js": { "maxDuration": 60 },
-    "api/admin.js":      { "maxDuration": 30 },
-    "api/toss.js":       { "maxDuration": 30 }
+    "api/claude.js":       { "maxDuration": 300 },
+    "api/assemblyai.js":   { "maxDuration": 60 },
+    "api/google-stt.js":   { "maxDuration": 60 },
+    "api/admin.js":        { "maxDuration": 30 },
+    "api/toss.js":         { "maxDuration": 30 },
+    "api/group-create.js": { "maxDuration": 30 },
+    "api/group-join.js":   { "maxDuration": 15 }
   },
   "headers": [
     {
