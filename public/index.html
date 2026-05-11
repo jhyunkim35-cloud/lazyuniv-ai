@@ -4223,6 +4223,7 @@
             <button class="action-btn" id="dlMdBtn" disabled><i data-lucide="arrow-down-to-line" class="icon-sm"></i> .md</button>
             <button class="action-btn" id="dlPdfBtn" disabled><i data-lucide="arrow-down-to-line" class="icon-sm"></i> PDF</button>
             <button class="action-btn" id="splitViewBtn" disabled><i data-lucide="book-open" class="icon-sm"></i> 뷰어</button>
+            <button class="action-btn" id="shareGroupBtn" disabled title="친구들과 STT 비용 나누고 노트 공유"><i data-lucide="users" class="icon-sm"></i> 친구랑 나누기</button>
           </div>
         </div>
       </div>
@@ -4439,6 +4440,7 @@
 <script src="/js/firebase_auth.js?v=mp1b4jqw"></script>
 <script src="/js/payment.js?v=mp1b4jqw"></script>
 <script src="/js/recorder.js?v=mp1b4jqw"></script>
+<script src="/js/groups.js?v=mp1b4jqw"></script>
 <script src="/js/main.js?v=mp1b4jqw"></script>
 <script>
 // Constants, state, DOM refs, Firebase init moved to /js/constants.js
@@ -4643,6 +4645,30 @@ dlPdfBtn.addEventListener('click', () => {
 });
 
 // Quiz functions (tryExtractJsonObject through launchQuiz) moved to /js/quiz.js
+
+// Cost-splitting groups: open modal with sensible defaults derived from current note.
+document.getElementById('shareGroupBtn')?.addEventListener('click', () => {
+  if (typeof openGroupCreateModal !== 'function') {
+    showToast('그룹 기능 로드 실패 — 새로고침 후 다시 시도해주세요');
+    return;
+  }
+  let lectureName = '';
+  if (typeof storedNotesText === 'string' && storedNotesText) {
+    const h1 = storedNotesText.match(/^#\s+(.+)$/m);
+    if (h1) lectureName = h1[1].replace(/\*\*/g, '').trim().slice(0, 100);
+  }
+  if (!lectureName) {
+    lectureName = document.getElementById('pptTagName')?.textContent?.trim() || '';
+  }
+  // audioStoragePath auto-fill is a Phase 3B-2 deliverable; for now the user
+  // pastes it from the recordings panel. The modal's hint mentions this.
+  openGroupCreateModal({
+    noteId: typeof currentNoteId !== 'undefined' ? currentNoteId : null,
+    lectureName,
+    totalCost: 1500,
+    expectedMinutes: 90,
+  });
+});
 
 splitViewBtn.addEventListener('click', async () => {
   const splitViewer = document.getElementById('splitViewer');

@@ -544,6 +544,7 @@ ${recText}`;
   /* enable download buttons — single mode only */
   if (!targetBodyEl) {
     [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    document.getElementById('shareGroupBtn')?.removeAttribute('disabled');
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');
@@ -627,6 +628,7 @@ ${critiqueText}`;
 
   if (!targetBodyEl) {
     [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+    document.getElementById('shareGroupBtn')?.removeAttribute('disabled');
     const dbgBtn = document.getElementById('splitDebugBtn');
     if (dbgBtn) dbgBtn.style.display = '';
     document.getElementById('notesActions').classList.add('visible');

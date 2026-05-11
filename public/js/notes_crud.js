@@ -102,6 +102,8 @@ async function openSavedNote(id) {
 
   // Enable action buttons (they start disabled until a pipeline runs)
   [quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn].forEach(b => { b.disabled = false; });
+  const _shareGroupBtn = document.getElementById('shareGroupBtn');
+  if (_shareGroupBtn) _shareGroupBtn.disabled = false;
   const _dbgBtnRestore = document.getElementById('splitDebugBtn');
   if (_dbgBtnRestore) _dbgBtnRestore.style.display = '';
   document.getElementById('notesActions')?.classList.add('visible');
