@@ -84,6 +84,8 @@ module.exports = async (req, res) => {
         shareAmount: 0,        // member declares + marks paid via client write
         sharePaid: false,
         shareMethod: null,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
       });
     });
   } catch (err) {

@@ -140,3 +140,33 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
     if (typeof showToast === 'function') showToast('초대 링크 처리 실패 — 새로고침 후 다시 시도해주세요');
   }
 })();
+
+// Handle direct group-page link (?group=<gid>): wait for auth, then open page.
+// Used by:
+//   - "그룹 페이지 열기" buttons in invite-result and join-success panels
+//   - future "내 그룹" sidebar entries that list past groups
+//   - any external bookmark / pasted URL
+(async function handleGroupPageCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const gid = params.get('group');
+  if (!gid) return;
+
+  await new Promise(resolve => {
+    if (currentUser) resolve();
+    else auth.onAuthStateChanged(u => { if (u) resolve(); });
+  });
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('group');
+    const q = url.searchParams.toString();
+    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
+  } catch (_) {}
+
+  if (typeof openGroupPage === 'function') {
+    openGroupPage({ groupId: gid });
+  } else {
+    console.error('[main] openGroupPage not available');
+    if (typeof showToast === 'function') showToast('그룹 페이지 로드 실패');
+  }
+})();

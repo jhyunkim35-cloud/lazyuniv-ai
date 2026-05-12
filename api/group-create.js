@@ -137,6 +137,8 @@ module.exports = async (req, res) => {
         shareAmount: totalCost,    // creator paid full upfront
         sharePaid: true,
         shareMethod: 'toss',
+        displayName: user.displayName,
+        photoURL: user.photoURL,
       });
 
       tx.set(groupRef.collection('recording').doc('meta'), {

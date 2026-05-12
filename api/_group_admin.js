@@ -48,7 +48,15 @@ async function verifyUser(req) {
   try {
     const admin = getAdmin();
     const decoded = await admin.auth().verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email };
+    // name/picture come from Firebase Auth (Google profile). Used by the
+    // group page to render member rows; we trust this source so members
+    // can't spoof each other's display names by writing their own row.
+    return {
+      uid: decoded.uid,
+      email: decoded.email,
+      displayName: decoded.name || decoded.email || decoded.uid.slice(0, 8),
+      photoURL: decoded.picture || null,
+    };
   } catch {
     return null;
   }

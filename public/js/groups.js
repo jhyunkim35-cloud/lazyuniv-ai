@@ -309,6 +309,19 @@
     row.appendChild(kakaoBtn);
 
     box.appendChild(row);
+
+    // Open group page CTA (Phase 3B-3 hook)
+    if (data.groupId) {
+      const openPageBtn = $('button', {
+        class: 'groups-btn groups-btn-primary',
+        style: 'margin-top:12px;width:100%',
+        onclick: () => {
+          box.closest('.groups-overlay')?.remove();
+          openGroupPage({ groupId: data.groupId });
+        },
+      }, '→ 그룹 페이지로 이동');
+      box.appendChild(openPageBtn);
+    }
   }
 
   // ── Group join modal ──────────────────────────────────────────────────────
@@ -408,8 +421,18 @@
       '✅ "' + (data.lectureName || '강의') + '" 그룹 합류 완료'));
     box.appendChild($('div', { style: 'font-size:12px;color:var(--text-muted,#64748b)' },
       '현재 멤버 ' + (data.memberCount || 1) + '명' + (data.already ? ' (이미 멤버였어요)' : '')));
-    box.appendChild($('div', { style: 'font-size:11px;color:var(--text-muted,#94a3b8);margin-top:8px' },
-      '그룹 노트/녹취록 보기는 곧 추가됩니다.'));
+
+    if (data.groupId) {
+      const openPageBtn = $('button', {
+        class: 'groups-btn groups-btn-primary',
+        style: 'margin-top:12px;width:100%',
+        onclick: () => {
+          box.closest('.groups-overlay')?.remove();
+          openGroupPage({ groupId: data.groupId });
+        },
+      }, '→ 그룹 페이지로 이동');
+      box.appendChild(openPageBtn);
+    }
   }
 
   function showJoinError(box, msg) {
@@ -418,7 +441,518 @@
     box.appendChild($('div', { style: 'font-weight:600;font-size:13px;color:#dc2626' }, '❌ ' + msg));
   }
 
+  // ── Group page (Phase 3B-3) ───────────────────────────────────────────────
+  // Full UI for an active group: header with status + archive, member list
+  // with per-row settlement state, my-row inline editor, transcript view.
+  //
+  // Reads three Firestore resources:
+  //   lectureGroups/{gid}           — header metadata + invite token
+  //   lectureGroups/{gid}/members   — list of all members + their settlement
+  //   lectureGroups/{gid}/recording/meta — STT transcript + status
+  //
+  // Writes:
+  //   members/{my-uid}    — only my settlement row (rule-enforced)
+  //   lectureGroups/{gid} — only status flip (creator only; rule-enforced)
+  async function openGroupPage({ groupId } = {}) {
+    ensureStyles();
+    ensurePageStyles();
+    if (!groupId || typeof groupId !== 'string') {
+      toast('그룹 ID가 올바르지 않습니다');
+      return;
+    }
+    const uid = firebase.auth().currentUser?.uid;
+    if (!uid) {
+      toast('로그인이 필요합니다');
+      return;
+    }
+
+    // Build shell first so the user sees a frame immediately
+    const overlay = $('div', { class: 'groups-overlay' });
+    const sheet = $('div', { class: 'groups-page' });
+    overlay.appendChild(sheet);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    const loadingEl = $('div', { class: 'groups-page-loading' }, '⏳ 그룹 정보 불러오는 중...');
+    sheet.appendChild(loadingEl);
+    document.body.appendChild(overlay);
+
+    let groupData, membersData, recordingMeta;
+    try {
+      const db = firebase.firestore();
+      const groupRef = db.collection('lectureGroups').doc(groupId);
+
+      const [groupSnap, membersSnap, recSnap] = await Promise.all([
+        groupRef.get(),
+        groupRef.collection('members').orderBy('joinedAt').get(),
+        groupRef.collection('recording').doc('meta').get().catch(() => null),
+      ]);
+
+      if (!groupSnap.exists) {
+        loadingEl.remove();
+        sheet.appendChild($('div', { class: 'groups-page-error' }, '❌ 그룹을 찾을 수 없습니다 (삭제되었거나 권한이 없습니다)'));
+        return;
+      }
+      groupData = { id: groupSnap.id, ...groupSnap.data() };
+      membersData = membersSnap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      recordingMeta = recSnap?.exists ? recSnap.data() : null;
+    } catch (e) {
+      console.error('[group-page] fetch failed', e);
+      loadingEl.remove();
+      sheet.appendChild($('div', { class: 'groups-page-error' }, '❌ 그룹 정보를 불러오지 못했습니다: ' + (e.message || 'unknown')));
+      return;
+    }
+
+    loadingEl.remove();
+    renderGroupPage(sheet, { groupData, membersData, recordingMeta, uid, overlay });
+  }
+
+  function renderGroupPage(sheet, ctx) {
+    const { groupData, membersData, recordingMeta, uid, overlay } = ctx;
+    const isCreator = groupData.creatorUid === uid;
+    const isArchived = groupData.status === 'archived';
+    sheet.replaceChildren();
+
+    // ── Header ────────────────────────────────────────────────────────────
+    const header = $('div', { class: 'groups-page-header' });
+    header.appendChild($('h2', {}, groupData.lectureName || '강의 그룹'));
+    if (isArchived) {
+      header.appendChild($('span', { class: 'groups-status-badge groups-status-badge--archived' }, '보관됨'));
+    } else {
+      header.appendChild($('span', { class: 'groups-status-badge' }, '진행 중'));
+    }
+
+    const closeBtn = $('button', { class: 'groups-page-close', 'aria-label': '닫기' }, '✕');
+    closeBtn.addEventListener('click', () => overlay.remove());
+    header.appendChild(closeBtn);
+    sheet.appendChild(header);
+
+    // ── Meta strip: cost + duration + member count + invite ───────────────
+    const meta = $('div', { class: 'groups-page-meta' });
+    meta.appendChild(metaItem('💰', '총 비용', (groupData.totalCost || 0).toLocaleString() + '원'));
+    meta.appendChild(metaItem('⏱', '예상', (groupData.expectedMinutes || 0) + '분'));
+    meta.appendChild(metaItem('👥', '멤버', membersData.length + '명'));
+    if (!isArchived && groupData.inviteToken) {
+      const inviteUrl = `${location.origin}/?join=${encodeURIComponent(groupData.inviteToken)}`;
+      const inviteBtn = $('button', {
+        class: 'groups-meta-invite',
+        onclick: async () => {
+          try {
+            await navigator.clipboard.writeText(inviteUrl);
+            inviteBtn.textContent = '✓ 링크 복사됨';
+            setTimeout(() => { inviteBtn.textContent = '🔗 초대 링크 복사'; }, 1800);
+          } catch (e) {
+            toast('복사 실패');
+          }
+        },
+      }, '🔗 초대 링크 복사');
+      meta.appendChild(inviteBtn);
+    }
+    sheet.appendChild(meta);
+
+    // ── Members section ───────────────────────────────────────────────────
+    sheet.appendChild($('h3', { class: 'groups-page-section-title' }, '멤버 · 정산'));
+    const membersList = $('div', { class: 'groups-members-list' });
+    membersData.forEach(m => {
+      membersList.appendChild(memberRow(m, { groupData, uid, isArchived }));
+    });
+    sheet.appendChild(membersList);
+
+    // Settlement summary: how many paid / total cost split
+    const paidCount = membersData.filter(m => m.sharePaid).length;
+    const paidAmount = membersData.filter(m => m.sharePaid).reduce((s, m) => s + (Number(m.shareAmount) || 0), 0);
+    const summaryNote = $('div', { class: 'groups-settlement-summary' });
+    summaryNote.appendChild($('span', {}, `정산 ${paidCount}/${membersData.length}명`));
+    summaryNote.appendChild($('span', { class: 'groups-summary-dot' }, '·'));
+    summaryNote.appendChild($('span', {}, `확정 합계 ${paidAmount.toLocaleString()}원 / 총 ${(groupData.totalCost || 0).toLocaleString()}원`));
+    sheet.appendChild(summaryNote);
+
+    // ── Transcript section ────────────────────────────────────────────────
+    sheet.appendChild($('h3', { class: 'groups-page-section-title' }, '강의 녹취록'));
+    sheet.appendChild(renderTranscriptBox(recordingMeta));
+
+    // ── Footer: archive (creator only) ────────────────────────────────────
+    if (isCreator && !isArchived) {
+      const footer = $('div', { class: 'groups-page-footer' });
+      const archiveBtn = $('button', { class: 'groups-btn groups-btn-secondary groups-archive-btn' }, '📦 그룹 보관');
+      archiveBtn.addEventListener('click', async () => {
+        if (!confirm('이 그룹을 보관하시겠습니까?\n보관 후엔 새 멤버를 받을 수 없고, 정산 마킹도 멈춥니다.')) return;
+        archiveBtn.disabled = true;
+        archiveBtn.textContent = '보관 중...';
+        try {
+          await firebase.firestore().collection('lectureGroups').doc(groupData.id).update({
+            status: 'archived',
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          });
+          toast('그룹이 보관되었습니다');
+          overlay.remove();
+        } catch (e) {
+          console.error('[group-page] archive failed', e);
+          toast('보관 실패: ' + (e.message || 'unknown'));
+          archiveBtn.disabled = false;
+          archiveBtn.textContent = '📦 그룹 보관';
+        }
+      });
+      footer.appendChild(archiveBtn);
+      sheet.appendChild(footer);
+    }
+  }
+
+  function metaItem(icon, label, value) {
+    const wrap = $('div', { class: 'groups-meta-item' });
+    wrap.appendChild($('span', { class: 'groups-meta-icon' }, icon));
+    const text = $('div', { class: 'groups-meta-text' });
+    text.appendChild($('div', { class: 'groups-meta-label' }, label));
+    text.appendChild($('div', { class: 'groups-meta-value' }, value));
+    wrap.appendChild(text);
+    return wrap;
+  }
+
+  function memberRow(member, { groupData, uid, isArchived }) {
+    const isSelf = member.uid === uid;
+    const isCreator = member.role === 'creator';
+    const row = $('div', { class: 'groups-member-row' + (isSelf ? ' is-self' : '') });
+
+    // Avatar (photoURL fallback to initial)
+    const avatar = $('div', { class: 'groups-member-avatar' });
+    if (member.photoURL) {
+      const img = $('img', { src: member.photoURL, alt: '', referrerpolicy: 'no-referrer' });
+      img.addEventListener('error', () => {
+        avatar.replaceChildren();
+        avatar.textContent = (member.displayName || '?').charAt(0).toUpperCase();
+        avatar.classList.add('groups-member-avatar--text');
+      });
+      avatar.appendChild(img);
+    } else {
+      avatar.textContent = (member.displayName || '?').charAt(0).toUpperCase();
+      avatar.classList.add('groups-member-avatar--text');
+    }
+    row.appendChild(avatar);
+
+    // Name + role
+    const info = $('div', { class: 'groups-member-info' });
+    const nameRow = $('div', { class: 'groups-member-name' });
+    nameRow.appendChild($('span', {}, member.displayName || '익명'));
+    if (isSelf) nameRow.appendChild($('span', { class: 'groups-self-tag' }, '나'));
+    if (isCreator) nameRow.appendChild($('span', { class: 'groups-role-tag' }, '원작자'));
+    info.appendChild(nameRow);
+    info.appendChild($('div', { class: 'groups-member-sub' },
+      `분담 ${Number(member.shareAmount || 0).toLocaleString()}원` +
+      (member.shareMethod ? ` · ${member.shareMethod}` : '')
+    ));
+    row.appendChild(info);
+
+    // Badge (paid / unpaid)
+    const badge = $('div', {
+      class: 'groups-pay-badge ' + (member.sharePaid ? 'groups-pay-badge--paid' : 'groups-pay-badge--unpaid')
+    }, member.sharePaid ? '✓ 정산' : '대기');
+    row.appendChild(badge);
+
+    // Inline editor for self (not creator — creator's row is already settled,
+    // and not when group is archived)
+    if (isSelf && !isCreator && !isArchived) {
+      const editor = buildSettlementEditor(member, groupData);
+      row.appendChild(editor);
+    }
+
+    return row;
+  }
+
+  function buildSettlementEditor(member, groupData) {
+    const wrap = $('div', { class: 'groups-settlement-editor' });
+    const totalCost = Number(groupData.totalCost) || 0;
+    const memberCount = (groupData.memberUids || []).length || 1;
+    const evenSplit = totalCost > 0 ? Math.round(totalCost / memberCount) : 0;
+
+    const amountInput = $('input', {
+      type: 'number',
+      min: 0,
+      max: totalCost,
+      step: 100,
+      value: Number(member.shareAmount) || evenSplit,
+      placeholder: String(evenSplit),
+    });
+
+    const methodSelect = $('select', {});
+    [
+      ['', '방법 선택'],
+      ['cash', '현금'],
+      ['transfer', '계좌이체'],
+      ['kakaopay', '카카오페이'],
+      ['toss', '토스'],
+      ['other', '기타'],
+    ].forEach(([v, label]) => {
+      const opt = $('option', { value: v }, label);
+      if ((member.shareMethod || '') === v) opt.setAttribute('selected', 'selected');
+      methodSelect.appendChild(opt);
+    });
+
+    const saveBtn = $('button', { class: 'groups-btn groups-btn-primary groups-settlement-save' },
+      member.sharePaid ? '정산 취소' : '✓ 정산 완료');
+
+    saveBtn.addEventListener('click', async () => {
+      const amount = Number(amountInput.value);
+      const method = methodSelect.value;
+      if (!(amount >= 0 && amount <= totalCost)) {
+        return toast(`분담 금액은 0 ~ ${totalCost.toLocaleString()}원`);
+      }
+      const willPay = !member.sharePaid;
+      if (willPay && !method) return toast('정산 방법을 선택해주세요');
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = '저장 중...';
+      try {
+        await firebase.firestore()
+          .collection('lectureGroups').doc(groupData.id)
+          .collection('members').doc(member.uid)
+          .set({
+            sharePaid: willPay,
+            shareAmount: amount,
+            shareMethod: willPay ? method : null,
+            settledAt: willPay ? firebase.firestore.FieldValue.serverTimestamp() : null,
+          }, { merge: true });
+        toast(willPay ? '정산 완료!' : '정산 취소되었습니다', 'success');
+        // Re-open page to reflect (simplest path — onSnapshot is a v2 nice-to-have)
+        const overlay = wrap.closest('.groups-overlay');
+        const gid = groupData.id;
+        overlay?.remove();
+        setTimeout(() => openGroupPage({ groupId: gid }), 80);
+      } catch (e) {
+        console.error('[group-page] settlement save failed', e);
+        toast('저장 실패: ' + (e.message || 'unknown'));
+        saveBtn.disabled = false;
+        saveBtn.textContent = willPay ? '✓ 정산 완료' : '정산 취소';
+      }
+    });
+
+    wrap.appendChild($('div', { class: 'groups-editor-row' },
+      labeled('금액 (원)', amountInput),
+      labeled('방법', methodSelect),
+    ));
+    wrap.appendChild(saveBtn);
+    return wrap;
+  }
+
+  function labeled(label, input) {
+    const w = $('div', { class: 'groups-editor-field' });
+    w.appendChild($('label', {}, label));
+    w.appendChild(input);
+    return w;
+  }
+
+  function renderTranscriptBox(meta) {
+    const box = $('div', { class: 'groups-transcript-box' });
+    if (!meta) {
+      box.appendChild($('div', { class: 'groups-transcript-empty' }, '녹취록 메타데이터가 없습니다.'));
+      return box;
+    }
+    const status = meta.sttStatus || 'pending';
+    if (status === 'pending') {
+      box.appendChild($('div', { class: 'groups-transcript-empty' }, '⏳ STT가 아직 시작되지 않았어요. 원작자가 시작해야 합니다.'));
+    } else if (status === 'processing') {
+      box.appendChild($('div', { class: 'groups-transcript-empty' }, '🔄 텍스트 변환 중... 완료되면 여기에 표시됩니다.'));
+    } else if (status === 'error') {
+      box.appendChild($('div', { class: 'groups-transcript-error' }, '❌ 변환 중 오류가 발생했어요.'));
+    } else if (status === 'completed' && meta.transcript) {
+      const dur = meta.audioDuration ? Math.floor(meta.audioDuration / 60) + '분' : '';
+      const speakers = meta.speakerCount ? `· 화자 ${meta.speakerCount}명` : '';
+      if (dur || speakers) {
+        box.appendChild($('div', { class: 'groups-transcript-meta' }, [dur, speakers].filter(Boolean).join(' ')));
+      }
+      const pre = $('pre', { class: 'groups-transcript-text' }, String(meta.transcript).slice(0, 50000));
+      box.appendChild(pre);
+    } else {
+      box.appendChild($('div', { class: 'groups-transcript-empty' }, '녹취록 상태: ' + status));
+    }
+    return box;
+  }
+
+  // ── Group page styles ─────────────────────────────────────────────────────
+  function ensurePageStyles() {
+    if (document.getElementById('groups-page-styles')) return;
+    const css = `
+      .groups-page {
+        background: var(--surface, #fff); border-radius: 16px;
+        max-width: 640px; width: 100%; max-height: 92vh;
+        overflow-y: auto; padding: 0; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        display: flex; flex-direction: column;
+      }
+      .groups-page-loading, .groups-page-error {
+        padding: 60px 24px; text-align: center;
+        color: var(--text-muted, #64748b); font-size: 14px;
+      }
+      .groups-page-error { color: #dc2626; }
+
+      .groups-page-header {
+        display: flex; align-items: center; gap: 10px;
+        padding: 20px 24px 14px;
+        border-bottom: 1px solid var(--border, #e2e8f0); position: sticky;
+        top: 0; background: var(--surface, #fff); z-index: 1;
+      }
+      .groups-page-header h2 {
+        margin: 0; font-size: 18px; font-weight: 700;
+        color: var(--text, #0f172a); flex: 1; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .groups-status-badge {
+        font-size: 11px; font-weight: 600; padding: 3px 9px;
+        border-radius: 999px; background: rgba(124,58,237,0.12);
+        color: var(--primary, #7c3aed);
+      }
+      .groups-status-badge--archived {
+        background: rgba(148,163,184,0.18); color: #64748b;
+      }
+      .groups-page-close {
+        background: none; border: none; font-size: 20px; cursor: pointer;
+        color: var(--text-muted, #94a3b8); padding: 4px 8px; line-height: 1;
+      }
+      .groups-page-close:hover { color: var(--text, #0f172a); }
+
+      .groups-page-meta {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        gap: 10px; padding: 16px 24px; align-items: center;
+      }
+      .groups-meta-item { display: flex; gap: 8px; align-items: center; }
+      .groups-meta-icon { font-size: 18px; flex-shrink: 0; }
+      .groups-meta-text { min-width: 0; }
+      .groups-meta-label { font-size: 11px; color: var(--text-muted, #94a3b8); }
+      .groups-meta-value { font-size: 14px; font-weight: 700; color: var(--text, #0f172a); }
+      .groups-meta-invite {
+        grid-column: 1 / -1; padding: 9px 14px; border-radius: 8px;
+        border: 1px dashed var(--primary, #7c3aed); background: rgba(124,58,237,0.06);
+        color: var(--primary, #7c3aed); font-size: 13px; font-weight: 600;
+        cursor: pointer; transition: background 0.15s;
+      }
+      .groups-meta-invite:hover { background: rgba(124,58,237,0.12); }
+
+      .groups-page-section-title {
+        margin: 18px 24px 8px; font-size: 13px; font-weight: 700;
+        color: var(--text, #0f172a); letter-spacing: 0.01em;
+      }
+
+      .groups-members-list {
+        margin: 0 16px; display: flex; flex-direction: column; gap: 8px;
+      }
+      .groups-member-row {
+        display: grid;
+        grid-template-columns: 40px 1fr auto;
+        align-items: center; gap: 12px; padding: 12px;
+        background: var(--surface-2, #f8fafc);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 12px;
+      }
+      .groups-member-row.is-self {
+        border-color: var(--primary, #7c3aed);
+        background: rgba(124,58,237,0.04);
+        grid-template-columns: 40px 1fr auto;
+        grid-template-rows: auto auto;
+      }
+      .groups-member-avatar {
+        width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--surface-3, #e2e8f0); color: var(--text, #0f172a);
+        font-weight: 700; font-size: 16px;
+      }
+      .groups-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
+      .groups-member-info { min-width: 0; }
+      .groups-member-name {
+        display: flex; align-items: center; gap: 6px;
+        font-weight: 600; font-size: 14px; color: var(--text, #0f172a);
+        flex-wrap: wrap;
+      }
+      .groups-self-tag, .groups-role-tag {
+        font-size: 10px; padding: 2px 6px; border-radius: 999px;
+        background: var(--surface-3, #e2e8f0); color: var(--text-muted, #64748b);
+        font-weight: 600;
+      }
+      .groups-role-tag {
+        background: rgba(124,58,237,0.15); color: var(--primary, #7c3aed);
+      }
+      .groups-member-sub {
+        font-size: 12px; color: var(--text-muted, #94a3b8); margin-top: 2px;
+      }
+      .groups-pay-badge {
+        font-size: 11px; font-weight: 700; padding: 4px 10px;
+        border-radius: 999px; white-space: nowrap;
+      }
+      .groups-pay-badge--paid {
+        background: rgba(34,197,94,0.15); color: #16a34a;
+      }
+      .groups-pay-badge--unpaid {
+        background: rgba(249,115,22,0.15); color: #ea580c;
+      }
+
+      .groups-settlement-editor {
+        grid-column: 1 / -1; margin-top: 10px;
+        padding-top: 10px; border-top: 1px dashed var(--border, #e2e8f0);
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      .groups-editor-row {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      }
+      .groups-editor-field { display: flex; flex-direction: column; gap: 4px; }
+      .groups-editor-field label {
+        font-size: 11px; color: var(--text-muted, #94a3b8); font-weight: 600;
+      }
+      .groups-editor-field input, .groups-editor-field select {
+        padding: 8px 10px; border: 1px solid var(--border, #e2e8f0);
+        border-radius: 6px; font-size: 13px;
+        background: var(--surface, #fff); color: var(--text, #0f172a);
+      }
+      .groups-editor-field input:focus, .groups-editor-field select:focus {
+        outline: none; border-color: var(--primary, #7c3aed);
+      }
+      .groups-settlement-save { padding: 9px 14px; font-size: 13px; }
+
+      .groups-settlement-summary {
+        margin: 8px 24px 4px;
+        padding: 10px 12px;
+        background: var(--surface-2, #f8fafc);
+        border-radius: 8px;
+        font-size: 12px; color: var(--text-muted, #64748b);
+        display: flex; gap: 8px; flex-wrap: wrap;
+      }
+      .groups-summary-dot { opacity: 0.5; }
+
+      .groups-transcript-box {
+        margin: 0 24px 16px;
+        background: var(--surface-2, #f8fafc);
+        border: 1px solid var(--border, #e2e8f0);
+        border-radius: 10px; padding: 14px;
+        font-size: 13px; max-height: 320px; overflow-y: auto;
+      }
+      .groups-transcript-empty, .groups-transcript-error {
+        color: var(--text-muted, #94a3b8); text-align: center; padding: 12px 0;
+      }
+      .groups-transcript-error { color: #dc2626; }
+      .groups-transcript-meta {
+        font-size: 11px; color: var(--text-muted, #94a3b8); margin-bottom: 8px;
+      }
+      .groups-transcript-text {
+        margin: 0; white-space: pre-wrap; word-break: break-word;
+        font-family: inherit; font-size: 13px; line-height: 1.55;
+        color: var(--text, #0f172a);
+      }
+
+      .groups-page-footer {
+        padding: 14px 24px 20px; border-top: 1px solid var(--border, #e2e8f0);
+        margin-top: 16px;
+      }
+      .groups-archive-btn { width: 100%; }
+
+      @media (max-width: 600px) {
+        .groups-page { max-height: 100vh; border-radius: 0; }
+        .groups-page-meta { grid-template-columns: 1fr 1fr; }
+        .groups-meta-invite { grid-column: 1 / -1; }
+      }
+    `;
+    const style = document.createElement('style');
+    style.id = 'groups-page-styles';
+    style.textContent = css;
+    document.head.appendChild(style);
+  }
+
   // ── Expose ────────────────────────────────────────────────────────────────
   window.openGroupCreateModal = openGroupCreateModal;
   window.openGroupJoinModal = openGroupJoinModal;
+  window.openGroupPage = openGroupPage;
 })();
