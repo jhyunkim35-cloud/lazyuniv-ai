@@ -127,7 +127,7 @@ function renderBatchSessions() {
       <label class="batch-file-btn ${s.txtFile ? 'has-file' : ''}" style="flex:1; margin:0; min-width:0;">
         <input type="file" accept=".txt" data-session-id="${s.id}" class="batch-session-file-input" style="display:none;" />
         <span class="batch-file-btn-icon">🎙️</span>
-        <span class="batch-file-btn-label">${s.txtFile?.name || '녹취록 선택'}</span>
+        <span class="batch-file-btn-label">${s.txtFile ? escHtml(s.txtFile.name) : '녹취록 선택'}</span>
       </label>
       <select data-session-id="${s.id}" class="batch-prof-select batch-session-prof-select">
         ${[1,2,3,4,5].map(n => `<option value="${n}" ${s.professorNum === n ? 'selected' : ''}>참석자${n}</option>`).join('')}

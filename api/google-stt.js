@@ -327,21 +327,43 @@ module.exports = async (req, res) => {
       }
 
       const entDoc = entQuery.docs[0];
-      const entData = entDoc.data();
-
-      if (entData.minutes < expectedMinutes) {
-        return res.status(400).json({
-          error: 'audio_exceeds_paid_minutes',
-          paid: entData.minutes,
-          requested: expectedMinutes,
+      let entData;
+      // Atomic claim: re-read inside a transaction and refuse if another
+      // concurrent request already flipped `consumed`. Without this two
+      // requests racing on the same unconsumed entitlement could both pass
+      // the empty-check and both run STT for the price of one paid slot.
+      try {
+        entData = await db.runTransaction(async (tx) => {
+          const fresh = await tx.get(entDoc.ref);
+          if (!fresh.exists) throw new Error('entitlement_disappeared');
+          const data = fresh.data();
+          if (data.consumed) throw new Error('entitlement_already_consumed');
+          if (data.minutes < expectedMinutes) {
+            throw Object.assign(new Error('audio_exceeds_paid_minutes'), {
+              paid: data.minutes,
+              requested: expectedMinutes,
+            });
+          }
+          tx.update(entDoc.ref, {
+            consumed: true,
+            consumedAt: FV.serverTimestamp(),
+          });
+          return data;
         });
+      } catch (err) {
+        if (err.message === 'audio_exceeds_paid_minutes') {
+          return res.status(400).json({
+            error: 'audio_exceeds_paid_minutes',
+            paid: err.paid,
+            requested: err.requested,
+          });
+        }
+        if (err.message === 'entitlement_already_consumed') {
+          return res.status(402).json({ error: 'no_entitlement' });
+        }
+        console.error('[google-stt] entitlement claim failed:', err.message);
+        return res.status(500).json({ error: 'entitlement_claim_failed' });
       }
-
-      // Mark consumed before STT call; rollback if STT fails to start.
-      await entDoc.ref.update({
-        consumed: true,
-        consumedAt: FV.serverTimestamp(),
-      });
 
       // ── Trigger Google Cloud Speech long-running recognition ───────────────
       let operationId;
