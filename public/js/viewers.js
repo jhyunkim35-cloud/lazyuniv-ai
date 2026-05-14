@@ -300,19 +300,8 @@ function switchSplitTab(tab) {
   }
 
   if (tab === 'accordion' && !accordionEl.innerHTML.trim()) {
-    accordionEl.innerHTML = notesEl.innerHTML.trim()
-      ? buildAccordionView(notesEl)
-      : '<span class="placeholder-msg">노트가 없습니다.</span>';
-    if (_accordionOpenLabels.size) {
-      accordionEl.querySelectorAll('.acc-header').forEach(h => {
-        const sec = h.closest('.acc-section');
-        if (sec) {
-          if (_accordionOpenLabels.has(h.textContent.trim())) sec.classList.add('open');
-          else sec.classList.remove('open');
-        }
-      });
-    }
-    if (currentNoteId) _attachAccordionSrsButtons(accordionEl, currentNoteId);
+    // Round 5: delegate to renderAccordion so heading/slide modes share one path.
+    renderAccordion(accordionEl, notesEl, accordionEl._mode || 'heading');
   }
 
   // Refresh weakness badges whenever notes tab is shown
@@ -406,6 +395,100 @@ function buildAccordionView(sourceEl) {
   closeH1();
 
   return html || '<span class="placeholder-msg">내용이 없습니다.</span>';
+}
+
+// Round 5: Group note elements by the slide they reference (first a.slide-ref
+// inside each top-level element). Consecutive elements pointing to the same
+// slide range merge into one section. Content appearing before any reference
+// goes into a "도입" group.
+function buildSlideAccordion(sourceEl) {
+  const container = sourceEl.querySelector('.md-content') || sourceEl;
+  const nodes = Array.from(container.childNodes)
+    .filter(n => n.nodeType === Node.ELEMENT_NODE && n.tagName.toLowerCase() !== 'hr');
+
+  const groups = []; // { label, slideStart, slideEnd, body }
+  let current = null;
+
+  for (const el of nodes) {
+    const firstRef = el.querySelector && el.querySelector('a.slide-ref');
+    if (firstRef) {
+      const start = parseInt(firstRef.dataset.slideStart, 10);
+      if (Number.isFinite(start)) {
+        const end = firstRef.dataset.slideEnd
+          ? parseInt(firstRef.dataset.slideEnd, 10)
+          : start;
+        const label = firstRef.dataset.slideEnd
+          ? `슬라이드 ${start}–${end}`
+          : `슬라이드 ${start}`;
+        if (!current || current.slideStart !== start || current.slideEnd !== end) {
+          current = { label, slideStart: start, slideEnd: end, body: '' };
+          groups.push(current);
+        }
+      }
+    }
+    if (!current) {
+      current = { label: '도입', slideStart: 0, slideEnd: 0, body: '' };
+      groups.push(current);
+    }
+    current.body += el.outerHTML;
+  }
+
+  if (!groups.length) {
+    return '<span class="placeholder-msg">슬라이드 참조가 없는 노트입니다.</span>';
+  }
+
+  return groups.map(g =>
+    `<div class="acc-section open">` +
+      `<div class="acc-header" onclick="this.closest('.acc-section').classList.toggle('open')">${g.label}</div>` +
+      `<div class="acc-body">${g.body}</div>` +
+    `</div>`
+  ).join('');
+}
+
+// Round 5: Build the accordion in either heading or slide grouping mode.
+// Re-applies open-section state and SRS buttons only for the heading mode
+// (slide groups don't map cleanly to flashcard section titles).
+function renderAccordion(accordionEl, notesEl, mode) {
+  if (!accordionEl || !notesEl) return;
+  accordionEl._mode = mode;
+
+  if (!notesEl.innerHTML.trim()) {
+    accordionEl.innerHTML = '<span class="placeholder-msg">노트가 없습니다.</span>';
+    return;
+  }
+
+  const builder = mode === 'slide' ? buildSlideAccordion : buildAccordionView;
+  const body    = builder(notesEl);
+  const hAct    = mode === 'heading' ? 'active' : '';
+  const sAct    = mode === 'slide'   ? 'active' : '';
+
+  accordionEl.innerHTML =
+    `<div class="acc-mode-toggle">` +
+      `<button class="acc-mode-btn ${hAct}" onclick="setAccordionMode('heading')">헤딩별</button>` +
+      `<button class="acc-mode-btn ${sAct}" onclick="setAccordionMode('slide')">슬라이드별</button>` +
+    `</div>` +
+    `<div class="acc-content">${body}</div>`;
+
+  if (mode === 'heading' && _accordionOpenLabels && _accordionOpenLabels.size) {
+    accordionEl.querySelectorAll('.acc-header').forEach(h => {
+      const sec = h.closest('.acc-section');
+      if (!sec) return;
+      if (_accordionOpenLabels.has(h.textContent.trim())) sec.classList.add('open');
+      else sec.classList.remove('open');
+    });
+  }
+
+  if (mode === 'heading' && currentNoteId) {
+    _attachAccordionSrsButtons(accordionEl, currentNoteId);
+  }
+}
+
+// Round 5: exposed for the inline onclick on .acc-mode-btn buttons.
+function setAccordionMode(mode) {
+  const accordionEl = document.getElementById('splitAccordion');
+  const notesEl     = document.getElementById('splitNotes');
+  if (!accordionEl || !notesEl) return;
+  renderAccordion(accordionEl, notesEl, mode);
 }
 
 function openPdfPopup(bodyEl) {

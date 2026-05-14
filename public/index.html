@@ -500,6 +500,23 @@
     /* Round 4: slides tab is mobile-only; hide its button on desktop where
        the slide list is permanently shown in the left 50% column. */
     .split-tab[data-tab="slides"] { display:none; }
+    /* Round 5: accordion mode toggle (heading vs slide grouping) */
+    .acc-mode-toggle {
+      display:flex; gap:0.4rem; padding:0.5rem 1rem;
+      background:var(--surface); border-bottom:1px solid var(--border);
+      position:sticky; top:0; z-index:2;
+    }
+    .acc-mode-btn {
+      padding:0.35rem 0.85rem; border:1px solid var(--border);
+      background:transparent; border-radius:6px; cursor:pointer;
+      font-size:0.8rem; color:var(--text-muted); font-weight:600;
+      transition:all 0.15s ease;
+    }
+    .acc-mode-btn:hover { color:var(--text); }
+    .acc-mode-btn.active {
+      background:var(--primary, #7c4dff); color:#fff;
+      border-color:var(--primary, #7c4dff);
+    }
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
@@ -3799,6 +3816,7 @@
         border-right:none !important;
         border-bottom:none !important;
         display:none !important;
+        order:2 !important;
       }
       #splitViewer.tab-slides #splitSlides {
         display:block !important;
@@ -3806,6 +3824,7 @@
       #splitRight {
         width:100% !important;
         min-height:0 !important;
+        order:1 !important;
       }
       /* In non-slides tabs, splitRight takes the whole viewport.
          In the slides tab, splitRight shrinks to its tab-header height
