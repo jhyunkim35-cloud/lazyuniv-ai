@@ -477,6 +477,16 @@
 
     #splitSlides img { width:100%; border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem; display:block; }
     #splitSlides .slide-label { text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; }
+    /* Round 1: slide list items + clickable p.N references + flash highlight */
+    #splitSlides .split-slide-item { display:block; border-radius:8px; transition:background 0.3s ease; }
+    a.slide-ref { color:var(--primary, #7c4dff); text-decoration:underline; text-underline-offset:2px; cursor:pointer; font-weight:500; padding:0 2px; border-radius:3px; }
+    a.slide-ref:hover { background:var(--surface2); }
+    @keyframes slide-flash {
+      0%   { background:rgba(124,77,255,0);    box-shadow:0 0 0 0   rgba(124,77,255,0); }
+      25%  { background:rgba(124,77,255,0.28); box-shadow:0 0 0 4px rgba(124,77,255,0.45); }
+      100% { background:rgba(124,77,255,0);    box-shadow:0 0 0 0   rgba(124,77,255,0); }
+    }
+    .split-slide-item.flash-highlight { animation:slide-flash 1.2s ease-out; }
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
@@ -4701,6 +4711,8 @@ splitViewBtn.addEventListener('click', async () => {
   const splitNotes  = document.getElementById('splitNotes');
 
   splitNotes.innerHTML = document.getElementById('finalNotesBody').innerHTML;
+  // Round 1: convert "p.N" / "p.N-M" text refs into clickable slide-jump anchors.
+  linkifySlideRefs(splitNotes);
   // Clear stale secondary-tab content so each re-open re-populates from fresh stored data
   document.getElementById('splitTranscript').innerHTML = '';
   document.getElementById('splitAccordion').innerHTML = '';
@@ -4714,13 +4726,17 @@ splitViewBtn.addEventListener('click', async () => {
     for (const img of sortedImages) {
       if (seen.has(img.slideNumber)) continue;
       seen.add(img.slideNumber);
+      const wrap = document.createElement('div');
+      wrap.className = 'split-slide-item';
+      wrap.dataset.slideNumber = String(img.slideNumber);
       const imgEl = document.createElement('img');
       imgEl.src = getImgSrc(img);
-      splitSlides.appendChild(imgEl);
+      wrap.appendChild(imgEl);
       const label = document.createElement('div');
       label.className = 'slide-label';
       label.textContent = `슬라이드 ${img.slideNumber}`;
-      splitSlides.appendChild(label);
+      wrap.appendChild(label);
+      splitSlides.appendChild(wrap);
     }
   } else if (pptFile && pptFile.name.toLowerCase().endsWith('.pdf')) {
     try {
@@ -4734,13 +4750,17 @@ splitViewBtn.addEventListener('click', async () => {
         canvas.width  = viewport.width;
         canvas.height = viewport.height;
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const wrap = document.createElement('div');
+        wrap.className = 'split-slide-item';
+        wrap.dataset.slideNumber = String(i);
         const imgEl = document.createElement('img');
         imgEl.src = canvas.toDataURL();
-        splitSlides.appendChild(imgEl);
+        wrap.appendChild(imgEl);
         const label = document.createElement('div');
         label.className = 'slide-label';
         label.textContent = `슬라이드 ${i}`;
-        splitSlides.appendChild(label);
+        wrap.appendChild(label);
+        splitSlides.appendChild(wrap);
       }
       pdf.destroy();
     } catch (e) {
@@ -4762,6 +4782,15 @@ document.getElementById('splitCloseBtn').addEventListener('click', () => {
   document.getElementById('splitViewer').style.display = 'none';
   document.body.style.overflow = '';
   switchView('home');
+});
+
+// Round 1: delegate p.N anchor clicks anywhere inside the split viewer to jumpToSlide.
+document.getElementById('splitViewer').addEventListener('click', (e) => {
+  const a = e.target.closest('a.slide-ref');
+  if (!a) return;
+  e.preventDefault();
+  const start = parseInt(a.dataset.slideStart, 10);
+  if (!isNaN(start)) jumpToSlide(start);
 });
 
 

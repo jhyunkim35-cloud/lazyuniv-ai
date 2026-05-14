@@ -95,6 +95,67 @@ function populateSplitImagePanel() {
   };
 }
 
+// Round 1: Walk text nodes under rootEl and replace "p.3" / "p.3-4" patterns
+// with anchor elements that jump to the corresponding slide on click.
+// Skips text already inside an <a> to avoid double-linking.
+function linkifySlideRefs(rootEl) {
+  if (!rootEl) return;
+  const re = /\bp\.(\d+)(?:-(\d+))?\b/gi;
+  const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.textContent || !/p\./i.test(node.textContent)) return NodeFilter.FILTER_SKIP;
+      if (node.parentElement && node.parentElement.closest('a')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const targets = [];
+  let node;
+  while ((node = walker.nextNode())) targets.push(node);
+  for (const textNode of targets) {
+    const text = textNode.textContent;
+    re.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    let matched = false;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      matched = true;
+      if (m.index > lastIdx) {
+        frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+      }
+      const a = document.createElement('a');
+      a.className = 'slide-ref';
+      a.href = '#';
+      a.dataset.slideStart = m[1];
+      if (m[2]) a.dataset.slideEnd = m[2];
+      a.textContent = m[0];
+      frag.appendChild(a);
+      lastIdx = m.index + m[0].length;
+    }
+    if (!matched) continue;
+    if (lastIdx < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    }
+    textNode.parentNode.replaceChild(frag, textNode);
+  }
+}
+
+// Round 1: Scroll the left slide list to the requested slide and flash-highlight it.
+function jumpToSlide(slideNumber) {
+  const target = document.querySelector(
+    `#splitSlides .split-slide-item[data-slide-number="${slideNumber}"]`
+  );
+  if (!target) {
+    showToast(`슬라이드 ${slideNumber}를 찾을 수 없어요`);
+    return;
+  }
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.remove('flash-highlight');
+  // Force reflow so the animation re-triggers on consecutive clicks.
+  void target.offsetWidth;
+  target.classList.add('flash-highlight');
+}
+
 function switchSplitTab(tab) {
   const _sqArea = document.getElementById('quizInlineArea');
   if (_sqArea && _sqArea._quizApi) _sqArea._quizApi.savePartialIfEligible();
