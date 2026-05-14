@@ -201,6 +201,55 @@ function initActiveSlideObserver() {
   items.forEach(item => observer.observe(item));
 }
 
+// Round 3: Reverse navigation — clicking a slide in the left list scrolls
+// the notes pane to the first p.N reference that covers that slide number,
+// then flash-highlights the anchor. If no reference exists, toast politely.
+function scrollNotesToFirstSlideRef(slideNumber) {
+  const splitNotes = document.getElementById('splitNotes');
+  const splitAccordion = document.getElementById('splitAccordion');
+  if (!splitNotes) return;
+
+  // Always search inside the notes pane (source of truth, accordion is derived).
+  const anchors = splitNotes.querySelectorAll('a.slide-ref');
+  let target = null;
+  for (const a of anchors) {
+    const start = parseInt(a.dataset.slideStart, 10);
+    if (!Number.isFinite(start)) continue;
+    const end = a.dataset.slideEnd ? parseInt(a.dataset.slideEnd, 10) : start;
+    if (slideNumber >= start && slideNumber <= end) {
+      target = a;
+      break;
+    }
+  }
+  if (!target) {
+    showToast(`p.${slideNumber} 참조가 노트에 없어요`);
+    return;
+  }
+
+  // If the user is currently looking at the accordion (or another tab), bring
+  // them back to the notes tab so the scroll target is actually visible.
+  const notesIsVisible = splitNotes.style.display !== 'none';
+  if (!notesIsVisible) switchSplitTab('notes');
+
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.remove('ref-flash');
+  void target.offsetWidth;
+  target.classList.add('ref-flash');
+}
+
+// Round 3: attach the click-on-slide -> scroll-notes handler exactly once.
+function initSlideListClickHandler() {
+  const splitSlides = document.getElementById('splitSlides');
+  if (!splitSlides || splitSlides._slideListClickHandlerAttached) return;
+  splitSlides.addEventListener('click', (e) => {
+    const item = e.target.closest('.split-slide-item');
+    if (!item) return;
+    const slideNumber = parseInt(item.dataset.slideNumber, 10);
+    if (Number.isFinite(slideNumber)) scrollNotesToFirstSlideRef(slideNumber);
+  });
+  splitSlides._slideListClickHandlerAttached = true;
+}
+
 function switchSplitTab(tab) {
   const _sqArea = document.getElementById('quizInlineArea');
   if (_sqArea && _sqArea._quizApi) _sqArea._quizApi.savePartialIfEligible();

@@ -490,6 +490,13 @@
     /* Round 2: emphasize the slide currently most-visible in the list */
     #splitSlides .split-slide-item.active img { border-color:var(--primary, #7c4dff); box-shadow:0 0 0 2px var(--primary, #7c4dff); }
     #splitSlides .split-slide-item.active .slide-label { color:var(--primary, #7c4dff); font-weight:600; }
+    /* Round 3: clickable slides + flash for the destination anchor */
+    #splitSlides .split-slide-item { cursor:pointer; }
+    @keyframes slide-ref-flash {
+      0%, 100% { background:transparent; box-shadow:none; }
+      30%, 60% { background:rgba(124,77,255,0.28); box-shadow:0 0 0 2px rgba(124,77,255,0.45); }
+    }
+    a.slide-ref.ref-flash { animation:slide-ref-flash 1.2s ease-out; border-radius:3px; }
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
@@ -4775,6 +4782,8 @@ splitViewBtn.addEventListener('click', async () => {
   populateSplitImagePanel();
   // Round 2: bind IntersectionObserver to mark the currently-visible slide.
   initActiveSlideObserver();
+  // Round 3: clicking a slide in the left list jumps notes to its first p.N ref.
+  initSlideListClickHandler();
   closeSidebar();
   splitViewer.style.display = 'flex';
   document.body.style.overflow = 'hidden';
