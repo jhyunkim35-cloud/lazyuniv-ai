@@ -149,6 +149,9 @@ function jumpToSlide(slideNumber) {
     showToast(`슬라이드 ${slideNumber}를 찾을 수 없어요`);
     return;
   }
+  // Round 4: on mobile the slide list lives behind a tab; activate it first
+  // so scrollIntoView has a visible target.
+  if (window.innerWidth <= 768) switchSplitTab('slides');
   target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   target.classList.remove('flash-highlight');
   // Force reflow so the animation re-triggers on consecutive clicks.
@@ -259,6 +262,13 @@ function switchSplitTab(tab) {
   document.querySelectorAll('#splitTabs .split-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
+
+  // Round 4: toggle a class on splitViewer so mobile CSS can show/hide the
+  // slide-list panel based on the active tab. The class is harmless on
+  // desktop because the relevant CSS lives inside the mobile media query.
+  const splitViewer = document.getElementById('splitViewer');
+  if (splitViewer) splitViewer.classList.toggle('tab-slides', tab === 'slides');
+
   const notesEl      = document.getElementById('splitNotes');
   const transcriptEl = document.getElementById('splitTranscript');
   const accordionEl  = document.getElementById('splitAccordion');

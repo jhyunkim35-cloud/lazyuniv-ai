@@ -497,6 +497,9 @@
       30%, 60% { background:rgba(124,77,255,0.28); box-shadow:0 0 0 2px rgba(124,77,255,0.45); }
     }
     a.slide-ref.ref-flash { animation:slide-ref-flash 1.2s ease-out; border-radius:3px; }
+    /* Round 4: slides tab is mobile-only; hide its button on desktop where
+       the slide list is permanently shown in the left 50% column. */
+    .split-tab[data-tab="slides"] { display:none; }
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
@@ -3782,17 +3785,41 @@
       #splitViewer > div:nth-of-type(2) {
         flex-direction:column !important;
       }
-      #splitSlides {
-        width:100% !important;
-        height:45vh !important;
-        flex-shrink:0 !important;
-        border-right:none !important;
-        border-bottom:1px solid var(--border-bright) !important;
+      /* Round 4: tabbed mobile layout — slides are one of the tabs,
+         not a permanent top section. The slide-list panel is hidden
+         unless the 'slides' tab is active. */
+      .split-tab[data-tab="slides"] {
+        display:flex !important;
       }
-      #splitRight {
+      #splitSlides {
         width:100% !important;
         flex:1 !important;
         min-height:0 !important;
+        height:auto !important;
+        border-right:none !important;
+        border-bottom:none !important;
+        display:none !important;
+      }
+      #splitViewer.tab-slides #splitSlides {
+        display:block !important;
+      }
+      #splitRight {
+        width:100% !important;
+        min-height:0 !important;
+      }
+      /* In non-slides tabs, splitRight takes the whole viewport.
+         In the slides tab, splitRight shrinks to its tab-header height
+         so the user can still tap another tab to leave. */
+      #splitViewer:not(.tab-slides) #splitRight {
+        flex:1 !important;
+      }
+      #splitViewer.tab-slides #splitRight {
+        flex:0 0 auto !important;
+      }
+      /* The image picker (carousel) only makes sense alongside notes,
+         not while inspecting the slide list itself. */
+      #splitViewer.tab-slides #splitImagePanel {
+        display:none !important;
       }
       /* Top bar buttons: hide labels, keep icons only on narrow screens */
       #splitTopBar .action-btn {
@@ -4382,6 +4409,7 @@
     <div id="splitSlides" style="width:50%; overflow-y:auto; padding:1rem; background:var(--surface); border-right:1px solid var(--border-bright);"></div>
     <div id="splitRight" style="width:50%; display:flex; flex-direction:column; overflow:hidden;">
       <div id="splitTabs" style="display:flex; border-bottom:1px solid var(--border); flex-shrink:0; align-items:center;">
+        <button class="split-tab" data-tab="slides" onclick="switchSplitTab('slides')"><i data-lucide="image" class="icon-sm"></i> 슬라이드</button>
         <button class="split-tab active" data-tab="notes" onclick="switchSplitTab('notes')"><i data-lucide="book-open" class="icon-sm"></i> 학습 노트</button>
         <button class="split-tab" data-tab="transcript" onclick="switchSplitTab('transcript')"><i data-lucide="mic" class="icon-sm"></i> 녹취록</button>
         <button class="split-tab" data-tab="accordion" onclick="switchSplitTab('accordion')"><i data-lucide="list-tree" class="icon-sm"></i> 아코디언</button>
