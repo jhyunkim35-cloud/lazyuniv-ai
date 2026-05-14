@@ -274,12 +274,14 @@ function switchSplitTab(tab) {
   const accordionEl  = document.getElementById('splitAccordion');
   const quizAreaEl   = document.getElementById('quizInlineArea');
   const classifyEl   = document.getElementById('classifyArea');
+  const askEl        = document.getElementById('splitAsk');
 
   notesEl.style.display      = tab === 'notes'      ? 'flex'  : 'none';
   transcriptEl.style.display = tab === 'transcript' ? 'flex'  : 'none';
   accordionEl.style.display  = tab === 'accordion'  ? 'block' : 'none';
   quizAreaEl.style.display   = tab === 'quiz'       ? 'flex'  : 'none';
   classifyEl.style.display   = tab === 'classify'   ? 'flex'  : 'none';
+  if (askEl) askEl.style.display = tab === 'ask' ? 'flex' : 'none';
 
   if (tab === 'transcript' && !transcriptEl.innerHTML.trim()) {
     if (storedHighlightedTranscript) {
@@ -312,6 +314,13 @@ function switchSplitTab(tab) {
   // Launch quiz settings when switching to quiz tab (only if area is empty)
   if (tab === 'quiz' && !quizAreaEl.innerHTML.trim()) {
     launchQuiz();
+  }
+
+  // Round 6: render or refresh the ask panel when it becomes active.
+  // Don't rebuild if user has an in-progress draft (input value would be lost),
+  // unless a new selection-based context just arrived.
+  if (tab === 'ask' && askEl && (!askEl.innerHTML.trim() || askEl._pendingContext)) {
+    renderAskPanel();
   }
 
   // Classify tab: use cache or fetch from API
@@ -489,6 +498,224 @@ function setAccordionMode(mode) {
   const notesEl     = document.getElementById('splitNotes');
   if (!accordionEl || !notesEl) return;
   renderAccordion(accordionEl, notesEl, mode);
+}
+
+// Round 6: Selection-based ask feature. Drag-select text in the notes or
+// accordion view, click the floating "❓ 질문하기" button that appears, and
+// jump into the ask tab with that selection as context. Each split-viewer
+// session re-runs initAskFeature so listeners can rebind without piling up.
+function initAskFeature() {
+  const splitViewer = document.getElementById('splitViewer');
+  if (!splitViewer || splitViewer._askInitialized) return;
+  splitViewer._askInitialized = true;
+
+  let floatBtn = document.getElementById('askFloatBtn');
+  if (!floatBtn) {
+    floatBtn = document.createElement('button');
+    floatBtn.id = 'askFloatBtn';
+    floatBtn.innerHTML = '❓ 질문하기';
+    // Prevent the mousedown from collapsing the selection before our click fires.
+    floatBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    floatBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const sel = window.getSelection();
+      const text = sel ? sel.toString().trim() : '';
+      if (!text) return;
+      const splitAsk = document.getElementById('splitAsk');
+      if (splitAsk) splitAsk._pendingContext = text;
+      floatBtn.style.display = 'none';
+      switchSplitTab('ask');
+    });
+    document.body.appendChild(floatBtn);
+  }
+
+  function updateFloatBtn() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      floatBtn.style.display = 'none';
+      return;
+    }
+    const text = sel.toString().trim();
+    if (!text || text.length < 2) {
+      floatBtn.style.display = 'none';
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const containerEl = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+    if (!containerEl) return;
+    // Restrict to notes/accordion content — selections inside slide labels or
+    // the carousel shouldn't show the button.
+    if (!containerEl.closest('#splitNotes') && !containerEl.closest('#splitAccordion')) {
+      floatBtn.style.display = 'none';
+      return;
+    }
+    const rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) {
+      floatBtn.style.display = 'none';
+      return;
+    }
+    // Anchor near the selection's top-right, clamped to the viewport.
+    floatBtn.style.left = `${Math.min(rect.right - 60, window.innerWidth - 140)}px`;
+    floatBtn.style.top  = `${Math.max(rect.top - 40, 8)}px`;
+    floatBtn.style.display = 'flex';
+  }
+
+  document.addEventListener('mouseup', () => setTimeout(updateFloatBtn, 0));
+  document.addEventListener('touchend', () => setTimeout(updateFloatBtn, 0));
+  // Hide on internal scroll so the button doesn't float over stale geometry.
+  splitViewer.addEventListener('scroll', () => { floatBtn.style.display = 'none'; }, true);
+}
+
+// Round 6: Render the ask panel (context card + history + input). Called
+// when the ask tab activates or after a question round-trip completes.
+function renderAskPanel() {
+  const askEl = document.getElementById('splitAsk');
+  if (!askEl) return;
+  if (!askEl._history) askEl._history = [];
+  if (askEl._pendingContext) {
+    askEl._context = askEl._pendingContext;
+    askEl._pendingContext = null;
+  }
+
+  const ctx = askEl._context;
+  const ctxPreview = ctx && ctx.length > 200 ? ctx.slice(0, 200) + '…' : ctx;
+  const ctxHtml = ctx
+    ? `<div class="ask-context-card">` +
+        `<span class="ask-context-label">선택한 부분</span>` +
+        `<span class="ask-context-text">${escHtml(ctxPreview)}</span>` +
+        `<button class="ask-context-clear" onclick="clearAskContext()" title="컨텍스트 지우기">×</button>` +
+      `</div>`
+    : '';
+
+  const historyHtml = askEl._history.length
+    ? askEl._history.map(m =>
+        m.role === 'user'
+          ? `<div class="ask-msg user">${escHtml(m.text)}</div>`
+          : `<div class="ask-msg bot">${renderMarkdown(m.text)}</div>`
+      ).join('')
+    : `<div class="ask-empty">` +
+        `<i data-lucide="help-circle" class="icon-lg"></i>` +
+        `<div>${ctx ? '선택한 부분에 대해 질문해보세요' : '노트 전체에 대해 질문해보세요'}</div>` +
+        `<div style="font-size:0.75rem;">예: "이게 무슨 뜻이야?" / "예시 들어줄 수 있어?"</div>` +
+      `</div>`;
+
+  askEl.innerHTML =
+    `<div class="ask-container">` +
+      ctxHtml +
+      `<div class="ask-history" id="askHistory">${historyHtml}</div>` +
+      `<div class="ask-input-area">` +
+        `<textarea class="ask-input" id="askInput" placeholder="질문 입력... (Ctrl+Enter로 보내기)" rows="1"></textarea>` +
+        `<button class="ask-send-btn" id="askSendBtn" onclick="sendAskQuestion()"><i data-lucide="send" class="icon-sm"></i>보내기</button>` +
+      `</div>` +
+    `</div>`;
+
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+
+  const input = document.getElementById('askInput');
+  if (input) {
+    input.focus();
+    input.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        sendAskQuestion();
+      }
+    });
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    });
+  }
+
+  const histEl = document.getElementById('askHistory');
+  if (histEl) histEl.scrollTop = histEl.scrollHeight;
+}
+
+// Round 6: clear the selection context and re-render. Exposed for inline onclick.
+function clearAskContext() {
+  const askEl = document.getElementById('splitAsk');
+  if (!askEl) return;
+  askEl._context = null;
+  renderAskPanel();
+}
+
+// Round 6: send the typed question to /api/claude with the current context
+// (selection or whole-note fallback) and append the answer to the history.
+async function sendAskQuestion() {
+  const askEl = document.getElementById('splitAsk');
+  const input = document.getElementById('askInput');
+  if (!askEl || !input) return;
+  const question = input.value.trim();
+  if (!question) return;
+
+  if (!askEl._history) askEl._history = [];
+  askEl._history.push({ role: 'user', text: question });
+
+  // Build a tutor-style system prompt with the relevant context.
+  const ctx = askEl._context;
+  let systemPrompt = '너는 학생의 강의 학습을 돕는 친절한 한국어 튜터야. 사용자의 질문에 명확하고 간결하게 답변해줘. 필요하면 예시를 들고, 답을 모르면 솔직히 모른다고 말해.';
+  if (ctx) {
+    systemPrompt += `\n\n학생이 선택한 노트 부분:\n${ctx}`;
+  } else if (typeof storedNotesText !== 'undefined' && storedNotesText) {
+    const snippet = storedNotesText.length > 4000
+      ? storedNotesText.slice(0, 4000) + '\n\n[노트 일부만 첨부됨]'
+      : storedNotesText;
+    systemPrompt += `\n\n학생의 학습 노트 전체:\n${snippet}`;
+  }
+
+  // Anthropic Messages API expects role-tagged messages; map our history.
+  const priorHistory = askEl._history.slice(0, -1);
+  const messages = priorHistory.map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: m.text,
+  }));
+  messages.push({ role: 'user', content: question });
+
+  input.value = '';
+  input.style.height = 'auto';
+  renderAskPanel();
+
+  const histEl = document.getElementById('askHistory');
+  if (histEl) {
+    const loader = document.createElement('div');
+    loader.className = 'ask-loading';
+    loader.innerHTML = '<span class="qi-spinner"></span>답변 생성 중…';
+    loader.id = 'askLoader';
+    histEl.appendChild(loader);
+    histEl.scrollTop = histEl.scrollHeight;
+  }
+  const sendBtn = document.getElementById('askSendBtn');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    let idToken = null;
+    try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
+
+    const res = await fetch('/api/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages,
+        idToken,
+        feature: 'ask',
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || err?.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const answer = data?.content?.[0]?.text || '(빈 응답)';
+    askEl._history.push({ role: 'bot', text: answer });
+  } catch (e) {
+    askEl._history.push({ role: 'bot', text: `오류: ${e.message}` });
+  }
+
+  renderAskPanel();
 }
 
 function openPdfPopup(bodyEl) {
