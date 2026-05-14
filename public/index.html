@@ -487,6 +487,9 @@
       100% { background:rgba(124,77,255,0);    box-shadow:0 0 0 0   rgba(124,77,255,0); }
     }
     .split-slide-item.flash-highlight { animation:slide-flash 1.2s ease-out; }
+    /* Round 2: emphasize the slide currently most-visible in the list */
+    #splitSlides .split-slide-item.active img { border-color:var(--primary, #7c4dff); box-shadow:0 0 0 2px var(--primary, #7c4dff); }
+    #splitSlides .split-slide-item.active .slide-label { color:var(--primary, #7c4dff); font-weight:600; }
     #splitNotes .md-content { max-width:none; }
     .table-scroll-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0.8rem 0; }
     .split-tab { padding:0.5rem 1.2rem; background:transparent; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; }
@@ -4770,6 +4773,8 @@ splitViewBtn.addEventListener('click', async () => {
   }
 
   populateSplitImagePanel();
+  // Round 2: bind IntersectionObserver to mark the currently-visible slide.
+  initActiveSlideObserver();
   closeSidebar();
   splitViewer.style.display = 'flex';
   document.body.style.overflow = 'hidden';

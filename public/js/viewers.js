@@ -156,6 +156,51 @@ function jumpToSlide(slideNumber) {
   target.classList.add('flash-highlight');
 }
 
+// Round 2: Highlight the slide currently most-visible inside the left list,
+// using IntersectionObserver. Rebinds on each split-viewer open so switching
+// notes does not leak observers from prior sessions.
+function initActiveSlideObserver() {
+  const splitSlides = document.getElementById('splitSlides');
+  if (!splitSlides) return;
+
+  // Tear down any prior observer/state from a previous session.
+  if (splitSlides._activeSlideObserver) {
+    splitSlides._activeSlideObserver.disconnect();
+  }
+  splitSlides._activeSlideVisibility = new Map();
+  splitSlides.querySelectorAll('.split-slide-item.active')
+    .forEach(el => el.classList.remove('active'));
+
+  const items = splitSlides.querySelectorAll('.split-slide-item');
+  if (!items.length) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      splitSlides._activeSlideVisibility.set(entry.target, entry.intersectionRatio);
+    }
+    let best = null;
+    let bestRatio = 0;
+    for (const [el, ratio] of splitSlides._activeSlideVisibility) {
+      if (ratio > bestRatio) {
+        best = el;
+        bestRatio = ratio;
+      }
+    }
+    if (!best || bestRatio <= 0) return;
+
+    const previousActive = splitSlides.querySelector('.split-slide-item.active');
+    if (previousActive === best) return;
+    if (previousActive) previousActive.classList.remove('active');
+    best.classList.add('active');
+  }, {
+    root: splitSlides,
+    threshold: [0, 0.25, 0.5, 0.75, 1],
+  });
+
+  splitSlides._activeSlideObserver = observer;
+  items.forEach(item => observer.observe(item));
+}
+
 function switchSplitTab(tab) {
   const _sqArea = document.getElementById('quizInlineArea');
   if (_sqArea && _sqArea._quizApi) _sqArea._quizApi.savePartialIfEligible();
