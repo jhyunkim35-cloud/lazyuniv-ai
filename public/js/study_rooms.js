@@ -896,9 +896,100 @@
     return wrap;
   }
 
+  // ── R3: study activity sync ───────────────────────────────────────────────
+  // Called from notes_crud.js when a saved note is opened. Maps note ->
+  // folder.lectureCode -> matching active study rooms and bumps the user's
+  // member doc in each: studyMinutes +=1, notesCount=fresh count, lastActiveAt.
+  //
+  // Rate-limit: same noteId within 60s = no-op. Protects against accidental
+  // double-opens and click-spamming. Per-tab in-memory map; intentionally
+  // not persisted (refresh = reset is fine for this proxy metric).
+  //
+  // Privacy: this function only ever touches the caller's own member doc
+  // (rules enforce `request.auth.uid == memberId` for writes). Other
+  // members' rows are not read here.
+  //
+  // Cost shape (per note open, after the rate-limit check passes):
+  //   1 read  (folder doc)
+  //   1 read  (rooms query, indexed)
+  //   1 read  (notes-in-folder count query)
+  //   N writes (one per matching room, usually 1)
+  // Fire-and-forget on the caller side — errors get logged, never thrown.
+  const _activitySyncLastSeen = new Map();   // noteId -> Date.now()
+
+  function _normalizeCodeForMatch(s) {
+    return String(s || '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
+  async function syncStudyActivityForNote(note) {
+    if (!note || !note.id || !note.folderId) return;
+    const uid = firebase.auth().currentUser?.uid;
+    if (!uid) return;
+
+    const last = _activitySyncLastSeen.get(note.id);
+    if (last && Date.now() - last < 60_000) return;
+    _activitySyncLastSeen.set(note.id, Date.now());
+
+    const db = firebase.firestore();
+    const FV = firebase.firestore.FieldValue;
+
+    try {
+      // 1. Folder's lectureCode (no code -> nothing to sync against)
+      const folderSnap = await db.collection('users').doc(uid)
+        .collection('folders').doc(note.folderId).get();
+      if (!folderSnap.exists) return;
+      const rawCode = folderSnap.data()?.lectureCode;
+      if (!rawCode) return;
+      const code = _normalizeCodeForMatch(rawCode);
+      if (!code) return;
+
+      // 2. User's active rooms with matching lectureCode. We split this
+      //    into (memberUids array-contains + status=='active') as the
+      //    indexed query, then filter lectureCode client-side. Avoids a
+      //    3-way composite index and the room count per user is small.
+      const roomsSnap = await db.collection('studyRooms')
+        .where('memberUids', 'array-contains', uid)
+        .where('status', '==', 'active')
+        .get();
+      const matching = roomsSnap.docs.filter(d => {
+        const rc = d.data()?.lectureCode;
+        return rc && _normalizeCodeForMatch(rc) === code;
+      });
+      if (!matching.length) return;
+
+      // 3. Count notes in this folder (own, all queried via Firestore so
+      //    the count matches what peers see, not what IDB happens to have)
+      const notesSnap = await db.collection('users').doc(uid)
+        .collection('notes')
+        .where('folderId', '==', note.folderId)
+        .get();
+      const notesCount = notesSnap.size;
+
+      // 4. Update each matching room's member doc. `set` with merge so
+      //    rooms the user joined before R3 (no fields populated) bootstrap
+      //    cleanly. studyMinutes uses increment for atomic accumulation.
+      await Promise.all(matching.map(roomDoc =>
+        roomDoc.ref.collection('members').doc(uid).set({
+          studyMinutes: FV.increment(1),
+          notesCount,
+          lastActiveAt: FV.serverTimestamp(),
+          // progressPct intentionally left at whatever it was (R3.x will
+          // compute this properly — for now 0 from room-create stays 0)
+        }, { merge: true })
+      ));
+
+      console.log('[study_rooms] activity sync ok',
+        'note=' + note.id, 'code=' + code,
+        'rooms=' + matching.length, 'notesCount=' + notesCount);
+    } catch (e) {
+      console.warn('[study_rooms] syncStudyActivityForNote failed:', e);
+    }
+  }
+
   // ── Expose ────────────────────────────────────────────────────────────────
   window.openStudyRoomEntryModal = openStudyRoomEntryModal;
   window.openStudyRoomCreateModal = openStudyRoomCreateModal;
   window.openStudyRoomJoinModal = openStudyRoomJoinModal;
   window.openStudyRoomPage = openStudyRoomPage;
+  window.syncStudyActivityForNote = syncStudyActivityForNote;
 })();

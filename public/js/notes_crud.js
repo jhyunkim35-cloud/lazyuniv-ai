@@ -120,6 +120,15 @@ async function openSavedNote(id) {
     const splitBtn = document.getElementById('splitViewBtn');
     if (splitBtn) splitBtn.click();
   }, 100);
+
+  // R3: sync study activity to matching study rooms (fire-and-forget,
+  // error-tolerant — never block note open on this). The sync function
+  // self-rate-limits per noteId (60s window) and bails out fast if the
+  // folder has no lectureCode, so it's cheap for the common case.
+  if (typeof window.syncStudyActivityForNote === 'function') {
+    window.syncStudyActivityForNote(note).catch(e =>
+      console.warn('[study_rooms] sync failed', e));
+  }
 }
 
 /* ═══════════════════════════════════════════════

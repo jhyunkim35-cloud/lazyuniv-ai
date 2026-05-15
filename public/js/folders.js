@@ -79,6 +79,17 @@ function renameFolderPrompt(id, currentName, currentColor) {
 
 function showFolderEditModal(id, currentName = '', currentColor = null) {
   const chosenColorRef = { value: currentColor || FOLDER_COLORS[0].value };
+  // R3: when editing, look up the existing lectureCode so the input
+  // pre-fills with what the user already chose (or stays blank for new
+  // folders / folders never linked to a room).
+  let initialLectureCode = '';
+  if (id) {
+    getAllFoldersFS().then(folders => {
+      const f = folders.find(x => x.id === id);
+      const input = overlay.querySelector('.folderEditLectureInput');
+      if (f && f.lectureCode && input) input.value = f.lectureCode;
+    }).catch(() => {});
+  }
   const overlay = document.createElement('div');
   overlay.className = 'db-modal-overlay';
   const colorDots = FOLDER_COLORS.map(c =>
@@ -91,6 +102,12 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
         <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.3rem;">폴더 이름</label>
         <input class="folderEditNameInput" value="${escHtml(currentName)}" placeholder="폴더 이름..."
           style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.85rem; box-sizing:border-box;" />
+      </div>
+      <div style="margin-bottom:0.8rem;">
+        <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.3rem;">스터디 룸 초대 코드 (선택)</label>
+        <input class="folderEditLectureInput" value="${escHtml(initialLectureCode)}" placeholder="예: PSYC301, 산심2026" maxlength="20"
+          style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.85rem; box-sizing:border-box;" />
+        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:0.25rem;">같은 코드의 스터디 룸에 이 폴더 노트 학습 활동이 공유됩니다 (시간/노트수만, 내용 X)</div>
       </div>
       <div style="margin-bottom:1rem;">
         <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.4rem;">색상</label>
@@ -112,16 +129,21 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
   });
 
   const nameInput = overlay.querySelector('.folderEditNameInput');
+  const lectureInput = overlay.querySelector('.folderEditLectureInput');
   setTimeout(() => nameInput.focus(), 50);
 
   const doSave = async () => {
     const name = nameInput.value.trim();
     if (!name) { showToast('폴더 이름을 입력하세요.'); return; }
+    // R3: lectureCode is optional. Empty string = clear / no linking.
+    // renameFolderFS + saveFolderFS persist `null` to make later reads
+    // unambiguous (vs "field missing entirely").
+    const lectureCode = (lectureInput?.value || '').trim() || null;
     try {
       if (id) {
-        await renameFolderFS(id, name, chosenColorRef.value);
+        await renameFolderFS(id, name, chosenColorRef.value, lectureCode);
       } else {
-        await saveFolderFS({ name, color: chosenColorRef.value });
+        await saveFolderFS({ name, color: chosenColorRef.value, lectureCode });
       }
       overlay.remove();
       await refreshFolderManagerList().catch(() => {});
@@ -130,6 +152,7 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
   };
   overlay.querySelector('.folderEditConfirmBtn').addEventListener('click', doSave);
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+  lectureInput?.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
 }
 
 async function deleteFolderConfirm(id) {

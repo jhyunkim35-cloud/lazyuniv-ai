@@ -317,14 +317,23 @@ async function deleteFolderFS(id) {
   // Also purge from IndexedDB — prevents ghost folder on next login sync
   await deleteFolder(id);
 }
-async function renameFolderFS(id, newName, color) {
+async function renameFolderFS(id, newName, color, lectureCode) {
   const ref = userFoldersRef();
   if (!ref) return renameFolder(id, newName, color);
   const doc = await ref.doc(id).get();
   if (!doc.exists) return;
   // M1: sanitize color against whitelist before persisting
   const safeColor = color !== undefined ? sanitizeFolderColor(color) : undefined;
-  const updated = Object.assign({}, doc.data(), { name: newName }, safeColor !== undefined ? { color: safeColor } : {});
+  // R3: lectureCode is the per-folder match key for study-room activity
+  // sync. Stored as-is (no charset enforcement here — sync side normalizes
+  // before comparing). Pass `null` to clear it, or `undefined` to leave it
+  // alone for callers that don't touch the code field.
+  const codePatch = lectureCode !== undefined
+    ? { lectureCode: (lectureCode && String(lectureCode).trim()) || null }
+    : {};
+  const updated = Object.assign({}, doc.data(), { name: newName },
+    safeColor !== undefined ? { color: safeColor } : {},
+    codePatch);
   await ref.doc(id).set(updated);
   return updated;
 }
