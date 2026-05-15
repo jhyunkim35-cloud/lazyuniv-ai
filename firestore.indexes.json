@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "studyRooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "inviteToken", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "studyRooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schoolCode", "order": "ASCENDING" },
+        { "fieldPath": "lectureCode", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

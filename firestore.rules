@@ -153,11 +153,16 @@ service cloud.firestore {
 
       // Per-member study counters: studyMinutes, notesCount, progressPct,
       // lastActiveAt. All members can READ each other (the whole point).
-      // Only the member themselves can WRITE their own row.
+      // Only the member themselves can WRITE their own row, and only
+      // while the room is still active — once archived, counters freeze
+      // (matches the lectureGroups members rule, and closes the console
+      // bypass that lets a user keep racking up minutes on a dead room).
       match /members/{memberUid} {
         allow read: if request.auth != null
           && request.auth.uid in get(/databases/$(database)/documents/studyRooms/$(roomId)).data.memberUids;
-        allow write: if request.auth != null && request.auth.uid == memberUid;
+        allow write: if request.auth != null
+          && request.auth.uid == memberUid
+          && get(/databases/$(database)/documents/studyRooms/$(roomId)).data.status == 'active';
       }
     }
   }
