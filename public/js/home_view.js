@@ -624,6 +624,16 @@ async function renderSidebarFolders(notes, folders) {
     } else {
       span.textContent = label;
     }
+    // R3: small ticket icon when this folder is linked to a study room,
+    // so the user can tell at a glance which folders share activity.
+    // Tooltip shows the actual invite code.
+    if (folder?.lectureCode) {
+      const ticketIcon = document.createElement('span');
+      ticketIcon.style.cssText = 'margin-left:4px;font-size:0.7em;opacity:0.65;vertical-align:middle;';
+      ticketIcon.title = `스터디 룸 연결: ${folder.lectureCode}`;
+      ticketIcon.textContent = '🎟';
+      span.appendChild(ticketIcon);
+    }
     const badge = document.createElement('span');
     badge.className = 'sidebar-folder-count';
     badge.textContent = count;

@@ -351,6 +351,27 @@
     }
     box.appendChild(row);
 
+    // R3 onboarding: connect-to-folder step is the most-missed action.
+    // Users create a room, share the link, and then wonder why no minutes
+    // ever accumulate — because they never linked a folder. Call it out
+    // explicitly with the actual code they should paste.
+    const nextStep = $('div', {
+      style: 'margin-top:14px;padding:10px 12px;background:rgba(124,58,237,0.08);' +
+             'border-left:3px solid var(--primary,#7c3aed);border-radius:6px;' +
+             'font-size:12px;line-height:1.5;color:var(--text,#0f172a);',
+    });
+    nextStep.appendChild($('div', { style: 'font-weight:700;margin-bottom:4px' }, '📝 다음 단계 — 폴더와 연결'));
+    if (data.lectureCode || data.inviteToken) {
+      // Backend currently returns roomId + inviteToken only, but lectureCode
+      // is what the user typed in the form. Pull it from the form input via
+      // closure if available, otherwise generic message.
+    }
+    nextStep.appendChild($('div', {},
+      '폴더 관리 → 강의 폴더 편집 → "스터디 룸 초대 코드"에 ' +
+      '위에서 정한 코드를 똑같이 입력하면, 그 폴더의 노트를 열 때마다 학습 시간이 친구들과 공유돼요. ' +
+      '(코드 안 정했으면 폴더 코드 박지 않아도 됨 — 초대 링크 받은 친구만 합류)'));
+    box.appendChild(nextStep);
+
     const openBtn = $('button', {
       class: 'sr-btn sr-btn-primary',
       style: 'margin-top:12px;width:100%',
@@ -874,13 +895,10 @@
     stat2.appendChild($('div', { class: 'sr-stat-label' }, '노트'));
     stats.appendChild(stat2);
 
-    const pct = Math.max(0, Math.min(100, Number(member.progressPct) || 0));
-    const stat3 = $('div', { class: 'sr-stat' });
-    const bar = $('div', { class: 'sr-progress-bar' });
-    bar.appendChild($('div', { class: 'sr-progress-fill', style: `width:${pct}%` }));
-    stat3.appendChild(bar);
-    stat3.appendChild($('div', { class: 'sr-stat-label' }, pct + '%'));
-    stats.appendChild(stat3);
+    // progressPct intentionally not rendered until R3.x defines what
+    // "progress" means (SRS review % / target note count / etc). Showing a
+    // permanent 0% bar looks like a bug to early users — better to hide
+    // until the metric is meaningful. Schema field still exists, just no UI.
 
     row.appendChild(stats);
     return row;
