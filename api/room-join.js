@@ -1,13 +1,13 @@
 // POST /api/room-join
-//   body: { inviteToken } OR { schoolCode, lectureCode }
+//   body: { inviteToken } OR { lectureCode }
 //   auth: Authorization: Bearer <Firebase ID token>
 //
 // Adds the caller as a member of a study room. Two lookup paths:
-//   1. Invite-token  — same flow as group-join.
-//   2. Code-matching — (schoolCode, lectureCode) pair finds an active
-//      room. If multiple exist (different users created duplicates), the
-//      first match wins; users who land in the wrong instance can leave
-//      and rejoin via invite link (round 2 UX).
+//   1. Invite-token  — 12-char auto-token from the invite link.
+//   2. Invite-code   — the user-chosen short code ("초대 코드"). If two
+//      rooms picked the same generic code, the first active match wins;
+//      users who land in the wrong instance can leave and rejoin via the
+//      correct invite link.
 //
 // Idempotent: already a member -> return existing room info. Same per-room
 // member cap as cost-splitting groups (30).
@@ -21,7 +21,6 @@ const {
   findRoomByLectureCode,
   normalizeCode,
   isValidLectureCode,
-  isValidSchoolCode,
 } = require('./_room_admin');
 
 const MAX_MEMBERS_PER_ROOM = 30;
@@ -53,14 +52,12 @@ module.exports = async (req, res) => {
     roomSnap = await findRoomByToken(inviteToken);
     if (!roomSnap) return res.status(404).json({ error: 'room_not_found' });
   } else {
-    const schoolCode = body?.schoolCode != null ? normalizeCode(String(body.schoolCode)) : null;
     const lectureCode = body?.lectureCode != null ? normalizeCode(String(body.lectureCode)) : null;
-    if (!(schoolCode && lectureCode)) {
+    if (!lectureCode) {
       return res.status(400).json({ error: 'missing_lookup' });
     }
-    if (!isValidSchoolCode(schoolCode)) return res.status(400).json({ error: 'bad_school_code' });
     if (!isValidLectureCode(lectureCode)) return res.status(400).json({ error: 'bad_lecture_code' });
-    roomSnap = await findRoomByLectureCode(schoolCode, lectureCode);
+    roomSnap = await findRoomByLectureCode(lectureCode);
     if (!roomSnap) return res.status(404).json({ error: 'room_not_found' });
   }
 

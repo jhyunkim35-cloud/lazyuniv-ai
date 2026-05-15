@@ -198,7 +198,7 @@
     });
     createTile.appendChild($('span', { class: 'sr-choice-icon' }, '➕'));
     createTile.appendChild($('div', { class: 'sr-choice-title' }, '새 룸 만들기'));
-    createTile.appendChild($('div', { class: 'sr-choice-desc' }, '강의명 + 학교/과목 코드로 새 룸을 생성하고 초대 링크를 받아요'));
+    createTile.appendChild($('div', { class: 'sr-choice-desc' }, '강의명과 초대 코드를 정해서 친구를 부르세요'));
     grid.appendChild(createTile);
 
     const joinTile = $('button', {
@@ -210,7 +210,7 @@
     });
     joinTile.appendChild($('span', { class: 'sr-choice-icon' }, '🚪'));
     joinTile.appendChild($('div', { class: 'sr-choice-title' }, '초대로 합류'));
-    joinTile.appendChild($('div', { class: 'sr-choice-desc' }, '초대 토큰이나 학교+과목 코드 페어로 기존 룸에 합류해요'));
+    joinTile.appendChild($('div', { class: 'sr-choice-desc' }, '친구가 알려준 초대 코드 또는 토큰을 입력해서 합류해요'));
     grid.appendChild(joinTile);
 
     modal.appendChild(grid);
@@ -226,8 +226,7 @@
     ensureStyles();
 
     const lectureInput = $('input', { type: 'text', placeholder: '예: 산업심리학 (월/수)', value: opts.lectureName || '', maxlength: 100 });
-    const schoolInput  = $('input', { type: 'text', placeholder: '예: SNU', value: opts.schoolCode || '', maxlength: 30 });
-    const codeInput    = $('input', { type: 'text', placeholder: '예: PSYC301', value: opts.lectureCode || '', maxlength: 20 });
+    const codeInput    = $('input', { type: 'text', placeholder: '예: PSYC301, 산심2026', value: opts.lectureCode || '', maxlength: 20 });
 
     const statusBox = $('div', { class: 'sr-status-box', style: 'display:none' });
     const submitBtn = $('button', { class: 'sr-btn sr-btn-primary' }, '룸 만들기');
@@ -241,14 +240,9 @@
 
     submitBtn.addEventListener('click', async () => {
       const lectureName = lectureInput.value.trim();
-      const schoolCode  = schoolInput.value.trim() || null;
       const lectureCode = codeInput.value.trim() || null;
 
       if (!lectureName) return toast('강의명을 입력해주세요');
-      // Either both codes or neither — code-based join needs the pair.
-      if ((schoolCode || lectureCode) && !(schoolCode && lectureCode)) {
-        return toast('학교 코드와 과목 코드는 함께 입력하거나 둘 다 비워주세요');
-      }
 
       submitBtn.disabled = true;
       submitBtn.textContent = '만드는 중...';
@@ -266,7 +260,7 @@
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + idToken,
           },
-          body: JSON.stringify({ lectureName, schoolCode, lectureCode }),
+          body: JSON.stringify({ lectureName, lectureCode }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || ('http_' + res.status));
@@ -278,9 +272,7 @@
         console.error('[study_rooms] create failed', e);
         const msg = (
           e.message === 'bad_lecture_name' ? '강의명이 너무 길거나 비어있어요' :
-          e.message === 'codes_must_pair' ? '학교/과목 코드는 함께 입력해주세요' :
-          e.message === 'bad_school_code' ? '학교 코드 형식이 올바르지 않습니다' :
-          e.message === 'bad_lecture_code' ? '과목 코드 형식이 올바르지 않습니다' :
+          e.message === 'bad_lecture_code' ? '초대 코드 형식이 올바르지 않아요 (영문/숫자/.-_ 1~20자)' :
           e.message === 'unauthorized' ? '로그인이 만료되었어요. 새로고침 후 다시 시도해주세요' :
           '룸 생성 실패: ' + (e.message || 'unknown')
         );
@@ -292,17 +284,13 @@
 
     modal.appendChild($('h2', {}, '➕ 새 스터디 룸 만들기'));
     modal.appendChild($('p', { class: 'sr-subtitle' },
-      '학교+과목 코드를 입력하면 같은 코드로 룸을 찾는 친구가 검색만으로도 합류할 수 있어요.'));
+      '강의명과 초대 코드를 정하면, 친구는 그 코드만 입력해서 바로 합류할 수 있어요.'));
 
     modal.appendChild(field('강의명', lectureInput, '룸 이름으로 표시됩니다 (필수)'));
-
-    const codeRow = $('div', { class: 'sr-field-row' });
-    codeRow.appendChild(field('학교 코드 (선택)', schoolInput, '예: SNU, YONSEI'));
-    codeRow.appendChild(field('과목 코드 (선택)', codeInput, '예: PSYC301'));
-    modal.appendChild(codeRow);
+    modal.appendChild(field('초대 코드 (선택)', codeInput, '친구에게 알려줄 짧은 코드. 영문/숫자/.-_ 1~20자'));
 
     modal.appendChild($('div', { class: 'sr-hint', style: 'margin:-4px 0 14px;font-size:11px;color:var(--text-muted,#94a3b8)' },
-      '※ 코드를 비우면 초대 링크로만 합류 가능'));
+      '※ 비우면 초대 링크로만 합류 가능'));
 
     modal.appendChild(statusBox);
 
@@ -384,32 +372,27 @@
 
     // If a token came from a URL invite, pre-fill the token tab and skip the
     // tab switcher entirely — the user already chose by clicking the link.
-    const startTab = token ? 'token' : 'token';
-    let currentTab = startTab;
+    let currentTab = 'token';
 
     const tokenInput = $('input', { type: 'text', placeholder: '12자 초대 토큰', value: token || '', maxlength: 12 });
-    const schoolInput = $('input', { type: 'text', placeholder: '예: SNU', maxlength: 30 });
-    const codeInput   = $('input', { type: 'text', placeholder: '예: PSYC301', maxlength: 20 });
+    const codeInput  = $('input', { type: 'text', placeholder: '예: PSYC301, 산심2026', maxlength: 20 });
 
     const tokenPanel = $('div', {});
-    tokenPanel.appendChild(field('초대 토큰', tokenInput, '룸을 만든 사람이 공유한 12자 코드'));
+    tokenPanel.appendChild(field('초대 토큰', tokenInput, '룸을 만든 사람이 공유한 12자 코드 (또는 초대 링크 사용)'));
 
     const codePanel = $('div', { style: 'display:none' });
-    const codeRow = $('div', { class: 'sr-field-row' });
-    codeRow.appendChild(field('학교 코드', schoolInput, '예: SNU'));
-    codeRow.appendChild(field('과목 코드', codeInput, '예: PSYC301'));
-    codePanel.appendChild(codeRow);
+    codePanel.appendChild(field('초대 코드', codeInput, '룸을 만든 사람이 정한 짧은 코드. 영문/숫자/.-_ 1~20자'));
 
     const switcher = $('div', { class: 'sr-tab-switcher' });
     const tokenTabBtn = $('button', { class: 'active' }, '🎟 초대 토큰');
-    const codeTabBtn = $('button', {}, '🏫 학교+과목 코드');
+    const codeTabBtn = $('button', {}, '🔤 초대 코드');
     function switchTab(name) {
       currentTab = name;
       tokenTabBtn.classList.toggle('active', name === 'token');
       codeTabBtn.classList.toggle('active', name === 'code');
       tokenPanel.style.display = name === 'token' ? '' : 'none';
       codePanel.style.display  = name === 'code' ? '' : 'none';
-      setTimeout(() => (name === 'token' ? tokenInput : schoolInput).focus(), 30);
+      setTimeout(() => (name === 'token' ? tokenInput : codeInput).focus(), 30);
     }
     tokenTabBtn.addEventListener('click', () => switchTab('token'));
     codeTabBtn.addEventListener('click', () => switchTab('code'));
@@ -424,12 +407,10 @@
     joinBtn.addEventListener('click', async () => {
       const body = currentTab === 'token'
         ? { inviteToken: tokenInput.value.trim() }
-        : { schoolCode: schoolInput.value.trim(), lectureCode: codeInput.value.trim() };
+        : { lectureCode: codeInput.value.trim() };
 
       if (currentTab === 'token' && !body.inviteToken) return toast('초대 토큰을 입력해주세요');
-      if (currentTab === 'code' && !(body.schoolCode && body.lectureCode)) {
-        return toast('학교 코드와 과목 코드를 모두 입력해주세요');
-      }
+      if (currentTab === 'code' && !body.lectureCode) return toast('초대 코드를 입력해주세요');
 
       joinBtn.disabled = true;
       joinBtn.textContent = '합류 중...';
@@ -461,9 +442,8 @@
           e.message === 'room_full' ? '룸 정원이 가득 찼습니다 (최대 30명)' :
           e.message === 'room_inactive' ? '비활성화된 룸입니다' :
           e.message === 'bad_token' ? '초대 토큰 형식이 올바르지 않습니다' :
-          e.message === 'bad_school_code' ? '학교 코드 형식이 올바르지 않습니다' :
-          e.message === 'bad_lecture_code' ? '과목 코드 형식이 올바르지 않습니다' :
-          e.message === 'missing_lookup' ? '토큰 또는 학교+과목 코드 중 하나는 입력해주세요' :
+          e.message === 'bad_lecture_code' ? '초대 코드 형식이 올바르지 않아요 (영문/숫자/.-_ 1~20자)' :
+          e.message === 'missing_lookup' ? '초대 토큰 또는 초대 코드 중 하나는 입력해주세요' :
           '합류 실패: ' + (e.message || 'unknown')
         );
         showJoinError(statusBox, msg);
@@ -474,7 +454,7 @@
 
     modal.appendChild($('h2', {}, '🚪 스터디 룸 합류'));
     modal.appendChild($('p', { class: 'sr-subtitle' },
-      '친구의 초대 토큰 또는 학교+과목 코드 페어로 합류해요. 노트 내용은 공유되지 않고 학습 시간·진도만 보입니다.'));
+      '친구가 공유한 초대 토큰(링크) 또는 초대 코드로 합류해요. 노트 내용은 공유되지 않고 학습 시간·진도만 보입니다.'));
 
     // Skip the tab switcher when a token was passed in (URL invite path);
     // the user clicked the link, no point asking them to confirm which tab.
@@ -490,7 +470,7 @@
     modal.appendChild(actions);
 
     document.body.appendChild(overlay);
-    setTimeout(() => (token ? tokenInput : tokenInput).focus(), 50);
+    setTimeout(() => tokenInput.focus(), 50);
   }
 
   function showJoinSuccess(box, data) {
@@ -774,10 +754,10 @@
     header.appendChild(closeBtn);
     sheet.appendChild(header);
 
-    // Meta strip — codes + member count
+    // Meta strip — invite code + member count
     const meta = $('div', { class: 'sr-page-meta' });
-    if (roomData.schoolCode && roomData.lectureCode) {
-      meta.appendChild(metaItem('🏫', '학교/과목', `${roomData.schoolCode} · ${roomData.lectureCode}`));
+    if (roomData.lectureCode) {
+      meta.appendChild(metaItem('🎟', '초대 코드', roomData.lectureCode));
     }
     meta.appendChild(metaItem('👥', '멤버', (roomData.memberUids || []).length + '명'));
     sheet.appendChild(meta);

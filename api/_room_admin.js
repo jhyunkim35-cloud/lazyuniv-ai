@@ -22,32 +22,25 @@ function generateRoomToken() {
   return generateInviteToken();
 }
 
-// Lecture/school codes are short identifiers users type to find each
-// other's rooms (e.g. "PSYC301" + "SNU"). Normalize aggressively before
-// storage AND lookup: case-folded, all whitespace stripped, so " snu " and
-// "SNU" both resolve to the same row in findRoomByLectureCode.
+// "Invite codes" are user-chosen short identifiers (UI shows them as
+// "초대 코드"). The creator picks one when making the room ("산심2026",
+// "PSYC301", whatever), shares it verbally, and friends type it in to
+// join — no need to copy a 12-char auto-token. Internally we keep the
+// field name `lectureCode` for schema continuity; UI labels differ.
+//
+// Normalize aggressively before storage AND lookup: case-folded, all
+// whitespace stripped, so " psyc301 " and "PSYC301" both resolve to the
+// same row.
 function normalizeCode(s) {
   return String(s || '').trim().replace(/\s+/g, '').toUpperCase();
 }
 
-// Lecture codes are typically short course identifiers (~10 chars).
-// 20 chars covers "MATH-101A", "ECON3030", "PSYC301", etc. Allowed:
-// letters/digits/dot/dash/underscore — no spaces (those get normalized
-// away upstream, but we still reject anything that slipped through).
+// 20 chars covers anything a user would type by hand ("PSYC301",
+// "SANSIM2026", "MATH-101A"). Allowed: letters/digits/dot/dash/underscore.
 function isValidLectureCode(c) {
   return typeof c === 'string'
       && c.length >= 1
       && c.length <= 20
-      && /^[A-Z0-9._-]+$/i.test(c);
-}
-
-// School codes can be domain-style ("YONSEI.AC.KR") or abbreviated
-// ("SNU"). 30 chars accommodates either without becoming a free-text
-// field. Same charset rule as lecture codes.
-function isValidSchoolCode(c) {
-  return typeof c === 'string'
-      && c.length >= 1
-      && c.length <= 30
       && /^[A-Z0-9._-]+$/i.test(c);
 }
 
@@ -66,21 +59,18 @@ async function findRoomByToken(token) {
   return q.docs[0];
 }
 
-// Code-based lookup: (schoolCode, lectureCode) together address a single
-// "class," but multiple users might race to create rooms for it. We just
-// return the first match — duplicate-room cleanup is out of scope. Users
-// who land in a different instance than their friends can leave + rejoin
-// via invite link (UI in round 2). Codes are normalized again here as a
-// safety net in case a caller forgot.
-async function findRoomByLectureCode(schoolCode, lectureCode) {
-  const s = normalizeCode(schoolCode);
-  const l = normalizeCode(lectureCode);
-  if (!isValidSchoolCode(s) || !isValidLectureCode(l)) return null;
+// Code-based lookup: a single user-chosen code finds an active room. If
+// the user picked a generic code that collides with someone else's room
+// (e.g. "PSYC301" at two different universities), the first active match
+// wins — they can leave and rejoin via the right invite link. Encouraging
+// distinctive codes is a UX job, not a backend job.
+async function findRoomByLectureCode(lectureCode) {
+  const c = normalizeCode(lectureCode);
+  if (!isValidLectureCode(c)) return null;
   const admin = getAdmin();
   const db = admin.firestore();
   const q = await db.collection('studyRooms')
-    .where('schoolCode', '==', s)
-    .where('lectureCode', '==', l)
+    .where('lectureCode', '==', c)
     .where('status', '==', 'active')
     .limit(1)
     .get();
@@ -95,7 +85,6 @@ module.exports = {
   isValidInviteToken,
   normalizeCode,
   isValidLectureCode,
-  isValidSchoolCode,
   findRoomByToken,
   findRoomByLectureCode,
 };

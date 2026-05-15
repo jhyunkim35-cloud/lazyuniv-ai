@@ -1,12 +1,13 @@
 // POST /api/room-create
-//   body: { lectureName, schoolCode?, lectureCode? }
+//   body: { lectureName, lectureCode? }
 //   auth: Authorization: Bearer <Firebase ID token>
 //
 // Creates a study room — same-lecture peers share study time + progress
 // only. Unlike group-create, there's no audio file involved: study rooms
 // are pure activity-counter sharing surfaces.
 //
-// 1. Validates lectureName + optional (schoolCode, lectureCode) pair.
+// 1. Validates lectureName + optional lectureCode (the user-chosen short
+//    "invite code" used as a verbal alternative to the 12-char URL token).
 // 2. Creates studyRoom doc + members/<creator> sub-doc in a transaction.
 // 3. Member sub-doc starts with all counters at zero; round 3 (activity
 //    tracking) will increment them via direct member-row writes.
@@ -24,7 +25,6 @@ const {
   generateRoomToken,
   normalizeCode,
   isValidLectureCode,
-  isValidSchoolCode,
 } = require('./_room_admin');
 
 const MAX_LECTURE_NAME = 100;
@@ -48,18 +48,11 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'bad_lecture_name' });
   }
 
-  // schoolCode + lectureCode are optional but must travel together —
-  // having only one half makes code-based join impossible.
-  let schoolCode = body?.schoolCode != null ? normalizeCode(String(body.schoolCode)) : null;
+  // lectureCode is the user-chosen short identifier ("초대 코드" in UI).
+  // Optional — if omitted, the room can only be joined via the auto-token
+  // invite link.
   let lectureCode = body?.lectureCode != null ? normalizeCode(String(body.lectureCode)) : null;
-  if (schoolCode === '') schoolCode = null;
   if (lectureCode === '') lectureCode = null;
-  if ((schoolCode || lectureCode) && !(schoolCode && lectureCode)) {
-    return res.status(400).json({ error: 'codes_must_pair' });
-  }
-  if (schoolCode && !isValidSchoolCode(schoolCode)) {
-    return res.status(400).json({ error: 'bad_school_code' });
-  }
   if (lectureCode && !isValidLectureCode(lectureCode)) {
     return res.status(400).json({ error: 'bad_lecture_code' });
   }
@@ -80,7 +73,6 @@ module.exports = async (req, res) => {
       tx.set(roomRef, {
         createdBy: user.uid,
         lectureName,
-        schoolCode: schoolCode || null,
         lectureCode: lectureCode || null,
         inviteToken,
         memberUids: [user.uid],   // satisfies firestore.rules create predicate
@@ -106,7 +98,7 @@ module.exports = async (req, res) => {
 
   console.log(
     `[room-create] rid=${roomId} creator=${user.uid} lecture="${lectureName}"` +
-    (lectureCode ? ` code=${schoolCode}/${lectureCode}` : '')
+    (lectureCode ? ` code=${lectureCode}` : '')
   );
 
   return res.status(200).json({ roomId, inviteToken });
