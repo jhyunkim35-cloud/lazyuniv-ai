@@ -170,3 +170,60 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
     if (typeof showToast === 'function') showToast('그룹 페이지 로드 실패');
   }
 })();
+
+// Handle study-room invite link (?roomJoin=<token>): wait for auth, then
+// open the study-room join modal. Separate param from ?join= because group
+// and room tokens have the same shape but live in different collections —
+// we don't want a stale group token to accidentally route to room-join.
+(async function handleStudyRoomJoinCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('roomJoin');
+  if (!token) return;
+
+  await new Promise(resolve => {
+    if (currentUser) resolve();
+    else auth.onAuthStateChanged(u => { if (u) resolve(); });
+  });
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('roomJoin');
+    const q = url.searchParams.toString();
+    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
+  } catch (_) {}
+
+  if (typeof openStudyRoomJoinModal === 'function') {
+    openStudyRoomJoinModal({ token });
+  } else {
+    console.error('[main] openStudyRoomJoinModal not available — study_rooms.js failed to load');
+    if (typeof showToast === 'function') showToast('초대 링크 처리 실패 — 새로고침 후 다시 시도해주세요');
+  }
+})();
+
+// Handle direct study-room page link (?studyRoom=<rid>): wait for auth,
+// then open the page. Used by the "→ 룸 페이지로 이동" buttons inside the
+// create/join success panels and by any externally pasted/bookmarked URL.
+(async function handleStudyRoomPageCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const rid = params.get('studyRoom');
+  if (!rid) return;
+
+  await new Promise(resolve => {
+    if (currentUser) resolve();
+    else auth.onAuthStateChanged(u => { if (u) resolve(); });
+  });
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('studyRoom');
+    const q = url.searchParams.toString();
+    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
+  } catch (_) {}
+
+  if (typeof openStudyRoomPage === 'function') {
+    openStudyRoomPage({ roomId: rid });
+  } else {
+    console.error('[main] openStudyRoomPage not available');
+    if (typeof showToast === 'function') showToast('스터디 룸 페이지 로드 실패');
+  }
+})();
