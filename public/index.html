@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#1a1a2e" />
 
+  <!-- Sentry error monitoring (Loader Script - Sentry CDN auto-loads SDK
+       on first error or trace event; no DSN needed here, the key is in
+       the script URL. Settings tweaked in Sentry > Project Settings.) -->
+  <script
+    src="https://js.sentry-cdn.com/628e32bf3b343aab85d9662c5db41d8e.min.js"
+    crossorigin="anonymous"
+  ></script>
+
   <title>Notyx · 강의 자료를 학습 노트로</title>
   <meta name="description" content="강의 PPT, PDF, 녹음을 업로드하면 AI가 학습 노트와 퀴즈를 자동으로 만들어줍니다. 시험 전 정리 시간을 줄이고 핵심만 빠르게 복습하세요." />
   <meta name="keywords" content="학습노트, AI 노트, 강의 정리, 학습 퀴즈, 시험 공부, 녹취록 분석, PPT 요약, 대학생 공부 도구" />
