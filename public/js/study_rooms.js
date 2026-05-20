@@ -228,6 +228,14 @@
     const lectureInput = $('input', { type: 'text', placeholder: '예: 산업심리학 (월/수)', value: opts.lectureName || '', maxlength: 100 });
     const codeInput    = $('input', { type: 'text', placeholder: '예: PSYC301, 산심2026', value: opts.lectureCode || '', maxlength: 20 });
 
+    // Fresh idempotency key per modal session. Server scopes lookup by
+    // (uid, key) so a retry of the SAME submit returns the same room
+    // instead of double-creating. Cancelling and reopening the modal
+    // gives a new key, so a deliberate re-create works as expected.
+    const idempotencyKey = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'ik_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+
     const statusBox = $('div', { class: 'sr-status-box', style: 'display:none' });
     const submitBtn = $('button', { class: 'sr-btn sr-btn-primary' }, '룸 만들기');
     const cancelBtn = $('button', { class: 'sr-btn sr-btn-secondary' }, '취소');
@@ -260,7 +268,7 @@
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + idToken,
           },
-          body: JSON.stringify({ lectureName, lectureCode }),
+          body: JSON.stringify({ lectureName, lectureCode, idempotencyKey }),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || ('http_' + res.status));
@@ -273,6 +281,7 @@
         const msg = (
           e.message === 'bad_lecture_name' ? '강의명이 너무 길거나 비어있어요' :
           e.message === 'bad_lecture_code' ? '초대 코드 형식이 올바르지 않아요 (영문/숫자/.-_ 1~20자)' :
+          e.message === 'too_many_rooms' ? '활성 스터디 룸을 너무 많이 갖고 있어요 (최대 10개). 기존 룸을 보관한 뒤 다시 시도해주세요' :
           e.message === 'unauthorized' ? '로그인이 만료되었어요. 새로고침 후 다시 시도해주세요' :
           '룸 생성 실패: ' + (e.message || 'unknown')
         );
@@ -462,6 +471,7 @@
           e.message === 'room_not_found' ? '해당 룸을 찾을 수 없어요 (만료된 링크/잘못된 코드일 수 있어요)' :
           e.message === 'room_full' ? '룸 정원이 가득 찼습니다 (최대 30명)' :
           e.message === 'room_inactive' ? '비활성화된 룸입니다' :
+          e.message === 'code_collision' ? '같은 초대 코드를 가진 룸이 여러 개 있어요. 친구가 보낸 초대 링크를 사용해 주세요 (🎟 토큰 탭)' :
           e.message === 'bad_token' ? '초대 토큰 형식이 올바르지 않습니다' :
           e.message === 'bad_lecture_code' ? '초대 코드 형식이 올바르지 않아요 (영문/숫자/.-_ 1~20자)' :
           e.message === 'missing_lookup' ? '초대 토큰 또는 초대 코드 중 하나는 입력해주세요' :
@@ -919,9 +929,11 @@
   // folder.lectureCode -> matching active study rooms and bumps the user's
   // member doc in each: studyMinutes +=1, notesCount=fresh count, lastActiveAt.
   //
-  // Rate-limit: same noteId within 60s = no-op. Protects against accidental
-  // double-opens and click-spamming. Per-tab in-memory map; intentionally
-  // not persisted (refresh = reset is fine for this proxy metric).
+  // Rate-limit: same noteId within 60s = no-op. Stored in localStorage
+  // (with in-memory fallback for private mode / quota errors) so multi-tab
+  // abuse — opening the same note in two tabs to double-count minutes —
+  // is blocked. The check is "best effort, never blocks sync": any storage
+  // read/write error falls through to the in-memory map silently.
   //
   // Privacy: this function only ever touches the caller's own member doc
   // (rules enforce `request.auth.uid == memberId` for writes). Other
@@ -933,7 +945,25 @@
   //   1 read  (notes-in-folder count query)
   //   N writes (one per matching room, usually 1)
   // Fire-and-forget on the caller side — errors get logged, never thrown.
-  const _activitySyncLastSeen = new Map();   // noteId -> Date.now()
+  const _activitySyncFallbackMap = new Map();   // noteId -> Date.now()
+  const _SYNC_STORAGE_PREFIX = 'notyx_syncts_';
+  const _SYNC_RATE_LIMIT_MS = 60_000;
+
+  function _getLastSyncTs(noteId) {
+    // localStorage first (cross-tab), in-memory fallback if storage blocked.
+    try {
+      const v = localStorage.getItem(_SYNC_STORAGE_PREFIX + noteId);
+      if (v) return Number(v) || 0;
+    } catch (_) { /* private mode or quota — use map */ }
+    return _activitySyncFallbackMap.get(noteId) || 0;
+  }
+
+  function _setLastSyncTs(noteId, ts) {
+    try {
+      localStorage.setItem(_SYNC_STORAGE_PREFIX + noteId, String(ts));
+    } catch (_) { /* fall through to map */ }
+    _activitySyncFallbackMap.set(noteId, ts);
+  }
 
   function _normalizeCodeForMatch(s) {
     return String(s || '').trim().replace(/\s+/g, '').toUpperCase();
@@ -944,9 +974,9 @@
     const uid = firebase.auth().currentUser?.uid;
     if (!uid) return;
 
-    const last = _activitySyncLastSeen.get(note.id);
-    if (last && Date.now() - last < 60_000) return;
-    _activitySyncLastSeen.set(note.id, Date.now());
+    const last = _getLastSyncTs(note.id);
+    if (last && Date.now() - last < _SYNC_RATE_LIMIT_MS) return;
+    _setLastSyncTs(note.id, Date.now());
 
     const db = firebase.firestore();
     const FV = firebase.firestore.FieldValue;

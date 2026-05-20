@@ -18,7 +18,7 @@ const {
   verifyUser,
   isValidInviteToken,
   findRoomByToken,
-  findRoomByLectureCode,
+  findActiveRoomsByLectureCode,
   normalizeCode,
   isValidLectureCode,
 } = require('./_room_admin');
@@ -57,8 +57,16 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'missing_lookup' });
     }
     if (!isValidLectureCode(lectureCode)) return res.status(400).json({ error: 'bad_lecture_code' });
-    roomSnap = await findRoomByLectureCode(lectureCode);
-    if (!roomSnap) return res.status(404).json({ error: 'room_not_found' });
+    // Multi-result handling: if two+ active rooms share this code, refuse
+    // to guess. Send the user back with `code_collision` so the UI can
+    // tell them to use the invite link instead of typing a generic code.
+    // 0 -> not found. 1 -> the one they meant. 2+ -> ambiguous, bail.
+    const matches = await findActiveRoomsByLectureCode(lectureCode);
+    if (matches.length === 0) return res.status(404).json({ error: 'room_not_found' });
+    if (matches.length >= 2) {
+      return res.status(409).json({ error: 'code_collision', count: matches.length });
+    }
+    roomSnap = matches[0];
   }
 
   const admin = getAdmin();

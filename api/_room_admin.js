@@ -59,23 +59,44 @@ async function findRoomByToken(token) {
   return q.docs[0];
 }
 
-// Code-based lookup: a single user-chosen code finds an active room. If
-// the user picked a generic code that collides with someone else's room
-// (e.g. "PSYC301" at two different universities), the first active match
-// wins — they can leave and rejoin via the right invite link. Encouraging
-// distinctive codes is a UX job, not a backend job.
-async function findRoomByLectureCode(lectureCode) {
+// Code-based lookup: returns all active rooms with the given code. The
+// caller (room-join) decides how to handle 0 / 1 / 2+ results. With 2+
+// matches we surface a `code_collision` error and tell the user to use
+// the invite link instead — first-match-wins was silently routing users
+// to the wrong room when generic codes ("PSYC301") collided across
+// schools, which is bad for trust.
+//
+// Cap at 10 to bound the query cost; if a code somehow has more than 10
+// active rooms it's almost certainly abuse and the user shouldn't be
+// joining by code anyway.
+async function findActiveRoomsByLectureCode(lectureCode) {
   const c = normalizeCode(lectureCode);
-  if (!isValidLectureCode(c)) return null;
+  if (!isValidLectureCode(c)) return [];
   const admin = getAdmin();
   const db = admin.firestore();
   const q = await db.collection('studyRooms')
     .where('lectureCode', '==', c)
     .where('status', '==', 'active')
-    .limit(1)
+    .limit(10)
     .get();
-  if (q.empty) return null;
-  return q.docs[0];
+  return q.docs;
+}
+
+// Count active rooms the user has created. Used by room-create to cap
+// total active rooms per user (anti-abuse — without this a single user
+// can spam thousands of rooms). 10 is generous for any real use case
+// and trivially raisable once we have abuse signals.
+async function countActiveRoomsByCreator(uid) {
+  const admin = getAdmin();
+  const db = admin.firestore();
+  // `count()` aggregation skips reading the full docs — just returns the
+  // count server-side. Much cheaper than fetching all rooms.
+  const snap = await db.collection('studyRooms')
+    .where('createdBy', '==', uid)
+    .where('status', '==', 'active')
+    .count()
+    .get();
+  return snap.data().count;
 }
 
 module.exports = {
@@ -86,5 +107,6 @@ module.exports = {
   normalizeCode,
   isValidLectureCode,
   findRoomByToken,
-  findRoomByLectureCode,
+  findActiveRoomsByLectureCode,
+  countActiveRoomsByCreator,
 };
