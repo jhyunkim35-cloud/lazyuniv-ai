@@ -133,6 +133,25 @@ service cloud.firestore {
       }
     }
 
+    // Bug reports — write-only sink from the in-app feedback modal.
+    // Any authenticated user can drop a doc; nobody can read/update/delete
+    // from the client. The developer reads these via the Firebase Console
+    // (Admin auth) or an Admin-SDK script.
+    //
+    // We bound the message field length here so a malicious caller can't
+    // inflate documents past Firestore's per-doc cost. recentLogs array
+    // is left unchecked — the client caps each entry at 1000 chars and
+    // limits the array to 200 entries, which is plenty under Firestore's
+    // 1 MiB doc limit.
+    match /bugReports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 2000;
+      allow read, update, delete: if false;
+    }
+
     // Study rooms — same-lecture peers share study time + progress only.
     // Note CONTENT is never shared here; only minutes/progress counters.
     match /studyRooms/{roomId} {
