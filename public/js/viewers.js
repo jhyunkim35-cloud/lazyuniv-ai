@@ -268,6 +268,16 @@ function switchSplitTab(tab) {
   // desktop because the relevant CSS lives inside the mobile media query.
   const splitViewer = document.getElementById('splitViewer');
   if (splitViewer) splitViewer.classList.toggle('tab-slides', tab === 'slides');
+  // Quiz fix: the bottom "슬라이드 이미지 선택" picker steals vertical space
+  // from the active tab content and partially hides the quiz "다음 ▶" button.
+  // The picker is irrelevant during quiz play (you can't insert images into
+  // a quiz), so we hide it for the quiz tab on every viewport size. CSS rule
+  // lives outside the mobile media query in index.html so it applies on
+  // desktop too. `classify` gets the same treatment for the same reason.
+  if (splitViewer) {
+    splitViewer.classList.toggle('tab-quiz', tab === 'quiz');
+    splitViewer.classList.toggle('tab-classify', tab === 'classify');
+  }
 
   const notesEl      = document.getElementById('splitNotes');
   const transcriptEl = document.getElementById('splitTranscript');

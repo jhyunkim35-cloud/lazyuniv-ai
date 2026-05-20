@@ -3858,6 +3858,17 @@
     .folder-color-option { width:20px; height:20px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:border-color 0.15s; }
     .folder-color-option:hover, .folder-color-option.selected { border-color:var(--text); }
 
+    /* ── Quiz/Classify tab: hide the bottom slide-image picker ────────────
+       The picker steals vertical space and partially covers the quiz
+       "다음 ▶" button. Picker is irrelevant during quiz/classify anyway —
+       you can't insert images into a quiz question. Lives outside the
+       mobile media query below so the rule applies on desktop too.
+       Class toggles set in viewers.js switchSplitTab. */
+    #splitViewer.tab-quiz #splitImagePanel,
+    #splitViewer.tab-classify #splitImagePanel {
+      display: none !important;
+    }
+
     /* ── Responsive ──────────────────────────────── */
     @media (max-width: 768px) {
       #sidebar { transform:translateX(-240px); }
