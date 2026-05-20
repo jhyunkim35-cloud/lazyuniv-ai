@@ -1,6 +1,99 @@
 // Global constants, shared state, DOM refs, Firebase init.
 // Loaded BEFORE the main inline script. Everything else depends on this.
 
+// ===== Production console silence + breadcrumb capture =====
+// In production the user should not see any developer logs in their
+// DevTools console — it leaks internal state, looks noisy, and a couple
+// of strings could theoretically read like bugs to a non-technical user.
+//
+// But we still need the logs available when triaging real bug reports.
+// Strategy:
+//   1. Keep a rolling in-memory buffer (last N entries). Exposed via
+//      `window.getRecentLogs()` so the bug-report modal (Phase B) can
+//      attach it to the Firestore feedback document.
+//   2. Forward each call to Sentry as a breadcrumb so any error that
+//      hits Sentry afterwards arrives with the last ~100 log lines
+//      attached automatically.
+//   3. In production, suppress the actual console output. Dev keeps
+//      the noise so we can debug normally on localhost.
+//
+// `console.error` is left wrapped-but-still-printing because (a) Sentry
+// auto-captures it as an event regardless, and (b) suppressing real
+// browser/runtime errors entirely makes JS exceptions invisible even
+// to us when we screenshare with a tester. Trade-off accepted.
+(function () {
+  const IS_PROD = location.hostname !== 'localhost'
+                && !location.hostname.startsWith('127.')
+                && !location.hostname.startsWith('192.168.');
+
+  // Larger than the debugLog buffer below — captures ALL console.* calls,
+  // not just debugLog ones. 300 is comfortable for a single user session
+  // without bloating memory (each entry capped at 1000 chars).
+  const BUFFER_MAX = 300;
+  const buffer = [];
+
+  function stringifyArg(a) {
+    if (typeof a === 'string') return a;
+    if (a instanceof Error) return a.message + (a.stack ? '\n' + a.stack : '');
+    try { return JSON.stringify(a); } catch { return String(a); }
+  }
+
+  function pushBuffer(level, args) {
+    const ts = ((performance.now()) / 1000).toFixed(1) + 's';
+    const msg = args.map(stringifyArg).join(' ');
+    const entry = `[${ts}][${level}] ${msg}`.slice(0, 1000);
+    buffer.push(entry);
+    if (buffer.length > BUFFER_MAX) buffer.shift();
+    return entry;
+  }
+
+  function sendBreadcrumb(level, entry) {
+    try {
+      if (window.Sentry && typeof Sentry.addBreadcrumb === 'function') {
+        Sentry.addBreadcrumb({
+          category: 'console:' + level,
+          level: level === 'warn' ? 'warning' : level === 'error' ? 'error' : 'info',
+          message: entry.slice(0, 500),
+        });
+      }
+    } catch (_) { /* never let logging break the app */ }
+  }
+
+  // Keep original references so we can restore visible output for ERROR
+  // and so dev mode can keep emitting normally.
+  const originals = {
+    log:   console.log.bind(console),
+    debug: console.debug.bind(console),
+    info:  console.info.bind(console),
+    warn:  console.warn.bind(console),
+    error: console.error.bind(console),
+  };
+
+  ['log', 'debug', 'info', 'warn', 'error'].forEach(level => {
+    console[level] = function (...args) {
+      const entry = pushBuffer(level, args);
+      sendBreadcrumb(level, entry);
+      if (!IS_PROD) {
+        originals[level](...args);            // dev: same as before
+      } else if (level === 'error') {
+        originals.error(...args);             // prod: errors stay visible
+      }
+      // prod log/debug/info/warn → silent. Buffer + Sentry still get them.
+    };
+  });
+
+  // Exposed for the bug-report modal (Phase B) to attach the last N lines
+  // to a feedback document. Returns a snapshot copy so callers can't mutate
+  // our buffer.
+  window.getRecentLogs = function (n = BUFFER_MAX) {
+    return buffer.slice(-n);
+  };
+
+  // Also expose env flag for code that wants to gate behaviour on prod
+  // without re-doing the hostname check.
+  window.__NOTYX_IS_PROD = IS_PROD;
+})();
+
 // ===== Firebase init =====
 const firebaseConfig = {
   apiKey: "AIzaSyC68aMiCvyfR3QycxUknmxB3z7NS0qRE2g",
@@ -20,12 +113,17 @@ let currentUser = null;
 let pdfjsLib = null;
 
 // ===== Debug logger =====
+// Kept for backward compatibility — callers still pass a tag and structured
+// data. Internally now just delegates to the wrapped console.log above,
+// which handles the buffer + Sentry breadcrumb + prod-silence concerns.
+// The _debugLog array stays for any code that introspects it directly.
 const _debugLog = [];
 function debugLog(tag, msg, data = null) {
   const ts = ((performance.now()) / 1000).toFixed(1) + 's';
-  const entry = `[${ts}][${tag}] ${msg}` + (data != null ? ' | ' + (typeof data === 'string' ? data : JSON.stringify(data)) : '');
+  const entry = `[${ts}][${tag}] ${msg}` + (data != null ? ' | ' + (typeof data === 'string' ? data : (() => { try { return JSON.stringify(data); } catch { return String(data); } })()) : '');
   _debugLog.push(entry);
-  console.log(entry);
+  if (_debugLog.length > 500) _debugLog.shift();
+  console.log(entry);   // wrapped — silent in prod, captured to buffer + Sentry
 }
 
 // ===== Constants =====
