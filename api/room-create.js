@@ -80,21 +80,28 @@ module.exports = async (req, res) => {
   // ── idempotency: if caller retries with same key, return existing room ──
   // We scope the lookup by (createdBy, idempotencyKey) so two users can
   // accidentally pick the same client-generated key without colliding.
+  // Wrapped in try/catch so the lookup is best-effort: if the composite
+  // index isn't provisioned yet (just-deployed cold start) we log and
+  // proceed to create, rather than failing the whole request.
   if (idempotencyKey) {
-    const dup = await db.collection('studyRooms')
-      .where('createdBy', '==', user.uid)
-      .where('idempotencyKey', '==', idempotencyKey)
-      .where('status', '==', 'active')
-      .limit(1)
-      .get();
-    if (!dup.empty) {
-      const existing = dup.docs[0];
-      console.log(`[room-create] idem hit rid=${existing.id} creator=${user.uid}`);
-      return res.status(200).json({
-        roomId: existing.id,
-        inviteToken: existing.data().inviteToken,
-        idempotent: true,
-      });
+    try {
+      const dup = await db.collection('studyRooms')
+        .where('createdBy', '==', user.uid)
+        .where('idempotencyKey', '==', idempotencyKey)
+        .where('status', '==', 'active')
+        .limit(1)
+        .get();
+      if (!dup.empty) {
+        const existing = dup.docs[0];
+        console.log(`[room-create] idem hit rid=${existing.id} creator=${user.uid}`);
+        return res.status(200).json({
+          roomId: existing.id,
+          inviteToken: existing.data().inviteToken,
+          idempotent: true,
+        });
+      }
+    } catch (err) {
+      console.warn('[room-create] idempotency lookup failed (continuing):', err.message);
     }
   }
 
