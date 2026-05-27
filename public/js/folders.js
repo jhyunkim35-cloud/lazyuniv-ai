@@ -87,15 +87,27 @@ function renameFolderPrompt(id, currentName, currentColor) {
 
 function showFolderEditModal(id, currentName = '', currentColor = null) {
   const chosenColorRef = { value: currentColor || FOLDER_COLORS[0].value };
-  // R3: when editing, look up the existing lectureCode so the input
-  // pre-fills with what the user already chose (or stays blank for new
-  // folders / folders never linked to a room).
+  // R3/R5: when editing an existing folder, look up name, color, and the
+  // existing lectureCode so every field pre-fills with what the user
+  // already chose. Earlier the lookup only handled lectureCode, which
+  // meant any future entry point that calls showFolderEditModal(id)
+  // without passing currentName/currentColor opened with an empty input
+  // (e.g. window.renameFolderPrompt(id) from console).
   let initialLectureCode = '';
   if (id) {
     getAllFoldersFS().then(folders => {
       const f = folders.find(x => x.id === id);
-      const input = overlay.querySelector('.folderEditLectureInput');
-      if (f && f.lectureCode && input) input.value = f.lectureCode;
+      if (!f) return;
+      const nameInput = overlay.querySelector('.folderEditNameInput');
+      if (!currentName && nameInput && !nameInput.value) nameInput.value = f.name || '';
+      if (!currentColor && f.color) {
+        chosenColorRef.value = f.color;
+        overlay.querySelectorAll('.folder-color-option').forEach(d => {
+          d.classList.toggle('selected', d.dataset.color === f.color);
+        });
+      }
+      const lectureInput = overlay.querySelector('.folderEditLectureInput');
+      if (f.lectureCode && lectureInput && !lectureInput.value) lectureInput.value = f.lectureCode;
     }).catch(() => {});
   }
   const overlay = document.createElement('div');

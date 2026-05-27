@@ -102,13 +102,47 @@ function payForSttEntitlement(audioMinutes) {
   });
 }
 
-function showPaymentModal() {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
-  overlay.innerHTML = `
-    <div style="background:var(--surface);border-radius:16px;padding:2rem;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-      <h2 style="margin:0 0 0.5rem;font-size:1.3rem;color:var(--text);">🔒 무료 이용 한도 초과</h2>
-      <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">이번 달 무료 3회를 모두 사용했습니다.</p>
+// R5: showPaymentModal accepts a context so the same modal can serve
+// (a) hard quota-exceeded paths (api/claude.js bounces the request back),
+// (b) voluntary upgrades from the sidebar Pro button, and
+// (c) "you're almost out" nudges before the user is blocked.
+// We read getUserUsage() asynchronously so the headline can reflect the
+// real monthlyCount/plan instead of the hardcoded "3회 모두 사용" string
+// that fired even when the user had 0/3.
+async function showPaymentModal(context = 'quota_exceeded') {
+  // Best-effort usage fetch — modal still works if Firestore is offline.
+  let usage = { monthlyCount: 0, plan: 'free', planExpiry: null };
+  try { usage = await getUserUsage(); } catch (_) {}
+
+  let headline;
+  let sub;
+  // If the user is already on monthly, every entry point should congratulate
+  // them rather than try to upsell — selling a plan they already have is
+  // the most embarrassing failure mode for this modal.
+  if (usage.plan === 'monthly') {
+    headline = '✨ Notyx Pro 구독 중';
+    const expiryStr = usage.planExpiry
+      ? new Date(usage.planExpiry).toLocaleDateString('ko-KR')
+      : '';
+    sub = expiryStr
+      ? `${expiryStr}까지 무제한 이용 가능합니다.`
+      : '무제한 이용 중입니다.';
+  } else if (context === 'voluntary') {
+    headline = '💎 Notyx Pro로 업그레이드';
+    sub = `무제한 노트 생성 · 강의당 ₩500 없음 · 현재 이번 달 ${usage.monthlyCount}/3회 사용`;
+  } else if (context === 'low_remaining') {
+    const remaining = Math.max(0, 3 - usage.monthlyCount);
+    headline = `⚡ 무료 ${remaining}회 남았어요`;
+    sub = '무제한 이용권으로 끊김 없이 분석하세요.';
+  } else {
+    // 'quota_exceeded' (default)
+    headline = '🔒 무료 이용 한도 초과';
+    sub = `이번 달 무료 3회(${usage.monthlyCount}/3)를 모두 사용했습니다.`;
+  }
+
+  // For monthly subscribers, hide the purchase buttons entirely — show
+  // only the close button and a friendly thanks.
+  const buttonsHtml = usage.plan === 'monthly' ? '' : `
       <div style="display:flex;flex-direction:column;gap:0.8rem;margin-bottom:1.5rem;">
         <button onclick="startPayment('single')" style="padding:1rem;border:2px solid var(--primary);border-radius:12px;background:transparent;color:var(--text);cursor:pointer;text-align:left;">
           <div style="font-weight:700;font-size:1rem;">📝 1회 이용권 — ₩500</div>
@@ -118,7 +152,15 @@ function showPaymentModal() {
           <div style="font-weight:700;font-size:1rem;">🎓 월정액 — ₩7,900/월</div>
           <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.3rem;">한 달간 무제한 이용</div>
         </button>
-      </div>
+      </div>`;
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:16px;padding:2rem;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <h2 style="margin:0 0 0.5rem;font-size:1.3rem;color:var(--text);">${headline}</h2>
+      <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.5rem;">${sub}</p>
+      ${buttonsHtml}
       <button onclick="this.closest('div[style*=fixed]').remove()" style="width:100%;padding:0.7rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">닫기</button>
     </div>
   `;

@@ -4104,6 +4104,15 @@
       <i data-lucide="users-round"></i>
       <span>스터디 룸</span>
     </button>
+    <!-- R5: voluntary upgrade entry point. Free users had no way to subscribe
+         to Pro before hitting the quota wall; this surfaces it in the main
+         nav. showPaymentModal('voluntary') reads getUserUsage() and switches
+         to a "Pro 구독 중" thank-you panel for users who already pay, so
+         the button is safe to show to everyone. -->
+    <button class="sidebar-btn" onclick="showPaymentModal('voluntary')" style="background:linear-gradient(135deg,rgba(124,77,255,0.12),rgba(0,180,216,0.12));" id="sidebarUpgradeBtn">
+      <i data-lucide="sparkles" style="color:var(--secondary);"></i>
+      <span>업그레이드</span>
+    </button>
   </div>
   <div style="padding:0.7rem 0.8rem; flex:1; overflow-y:auto;">
     <div class="sidebar-section-label">폴더</div>
