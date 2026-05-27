@@ -67,9 +67,17 @@ async function createFolderFromInput() {
   const input = document.getElementById('newFolderInput');
   const name  = input?.value.trim();
   if (!name) return;
-  await saveFolderFS({ name });
-  input.value = '';
-  await refreshFolderManagerList();
+  // R4: visible-error parity with delete/rename so all folder mutations
+  // toast on failure instead of swallowing the throw.
+  try {
+    await saveFolderFS({ name });
+    input.value = '';
+  } catch (e) {
+    console.error('[createFolderFromInput] failed:', e);
+    showToast('❌ 폴더 생성 실패: ' + (e.message || '알 수 없는 오류'));
+    return;
+  }
+  await refreshFolderManagerList().catch(err => console.warn('[createFolderFromInput] refresh failed:', err));
   renderHomeView();
 }
 
@@ -146,9 +154,14 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
         await saveFolderFS({ name, color: chosenColorRef.value, lectureCode });
       }
       overlay.remove();
-      await refreshFolderManagerList().catch(() => {});
+      await refreshFolderManagerList().catch(err => console.warn('[doSave] refresh failed:', err));
       renderHomeView();
-    } catch(e) { showToast(`❌ ${e.message}`); }
+    } catch(e) {
+      // R4: also log to console so the user can hand the stack to a developer
+      // if the toast message is too terse to diagnose.
+      console.error('[showFolderEditModal/doSave] failed:', e);
+      showToast(`❌ ${e.message || '알 수 없는 오류'}`);
+    }
   };
   overlay.querySelector('.folderEditConfirmBtn').addEventListener('click', doSave);
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
@@ -157,9 +170,23 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
 
 async function deleteFolderConfirm(id) {
   if (!confirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)')) return;
-  await deleteFolderFS(id);
-  await refreshFolderManagerList();
+  // R4 (folder-bug-fix): previously this was unguarded, so any throw inside
+  // deleteFolderFS (now possible since we re-throw the first error to
+  // surface diagnostics) would silently land in unhandled-promise-rejection
+  // and the user would just see nothing happen. Toast + log on failure;
+  // refresh the list even on partial success so any side-effects (e.g.
+  // IDB was purged but Firestore wasn't) are reflected immediately.
+  let ok = true;
+  try {
+    await deleteFolderFS(id);
+  } catch (e) {
+    ok = false;
+    console.error('[deleteFolderConfirm] failed:', e);
+    showToast('❌ 폴더 삭제 실패: ' + (e.message || '알 수 없는 오류') + ' (콘솔 확인)');
+  }
+  await refreshFolderManagerList().catch(err => console.warn('[deleteFolderConfirm] refresh failed:', err));
   // If viewing the deleted folder, return to home
   if (_activeFolderId === id) _activeFolderId = null;
   renderHomeView();
+  if (ok) showToast('🗑️ 폴더가 삭제되었습니다.');
 }

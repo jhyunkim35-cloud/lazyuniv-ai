@@ -309,19 +309,69 @@ async function getAllFoldersFS() {
 async function deleteFolderFS(id) {
   const ref = userFoldersRef();
   if (!ref) return deleteFolder(id);
-  const notes = await getAllNotesFS();
-  for (const note of notes.filter(n => n.folderId === id)) {
-    await saveNoteFS(Object.assign({}, note, { folderId: null }));
+
+  // R4 (folder-bug-fix): the previous version was an unguarded sequence
+  //     getAllNotesFS() → for each note, saveNoteFS(folderId:null)
+  //     → ref.doc(id).delete() → deleteFolder(id)
+  // Any single step could throw — getAllNotesFS hitting a transient
+  // Firestore error, saveNoteFS rejecting on a 1MB-doc edge case,
+  // ref.doc().delete() on a network hiccup — and the function would
+  // throw out before reaching deleteFolder(id), leaving the folder
+  // visible in IDB. Since deleteFolderConfirm had no try/catch, the
+  // error was also invisible to the user.
+  //
+  // New shape: each phase isolated. If notes-detach fails we still
+  // attempt to delete the folder; if the Firestore delete fails we
+  // still purge IDB so the user at least sees the folder disappear
+  // locally and can refresh to retry server-side. Errors are logged
+  // and re-thrown so the caller can show a toast.
+  let firstErr = null;
+
+  // Phase 1: detach notes from the doomed folder. Per-note failures
+  // are collected but don't block the rest — orphan notes-still-tagged
+  // are a smaller problem than a folder that can't be deleted.
+  try {
+    const notes = await getAllNotesFS();
+    for (const note of notes.filter(n => n.folderId === id)) {
+      try {
+        await saveNoteFS(Object.assign({}, note, { folderId: null }));
+      } catch (e) {
+        console.warn('[deleteFolderFS] note detach failed for', note.id, e.message);
+        if (!firstErr) firstErr = e;
+      }
+    }
+  } catch (e) {
+    console.warn('[deleteFolderFS] getAllNotesFS failed, proceeding to delete anyway:', e.message);
+    if (!firstErr) firstErr = e;
   }
-  await ref.doc(id).delete();
-  // Also purge from IndexedDB — prevents ghost folder on next login sync
-  await deleteFolder(id);
+
+  // Phase 2: delete the Firestore doc. .delete() is idempotent (no-op
+  // on missing doc) so this is safe even if the folder was IDB-only.
+  try {
+    await ref.doc(id).delete();
+  } catch (e) {
+    console.error('[deleteFolderFS] Firestore delete failed:', e.message);
+    if (!firstErr) firstErr = e;
+  }
+
+  // Phase 3: purge from IDB *unconditionally*. Without this, a Firestore
+  // failure above would leave the folder visible after refresh — confusing.
+  // Worst case: server-side still has the doc but UI shows it gone; next
+  // login sync will resurface it, which is recoverable. Better than leaving
+  // the user staring at a folder that won't disappear.
+  try {
+    await deleteFolder(id);
+  } catch (e) {
+    console.error('[deleteFolderFS] IDB purge failed:', e.message);
+    if (!firstErr) firstErr = e;
+  }
+
+  if (firstErr) throw firstErr;
 }
 async function renameFolderFS(id, newName, color, lectureCode) {
   const ref = userFoldersRef();
   if (!ref) return renameFolder(id, newName, color);
-  const doc = await ref.doc(id).get();
-  if (!doc.exists) return;
+
   // M1: sanitize color against whitelist before persisting
   const safeColor = color !== undefined ? sanitizeFolderColor(color) : undefined;
   // R3: lectureCode is the per-folder match key for study-room activity
@@ -331,10 +381,45 @@ async function renameFolderFS(id, newName, color, lectureCode) {
   const codePatch = lectureCode !== undefined
     ? { lectureCode: (lectureCode && String(lectureCode).trim()) || null }
     : {};
-  const updated = Object.assign({}, doc.data(), { name: newName },
+
+  // R4 (folder-bug-fix): previously this function did
+  //     `const doc = await ref.doc(id).get(); if (!doc.exists) return;`
+  // which silently no-op'd whenever the user clicked rename on a folder
+  // that existed in IndexedDB but had no matching Firestore doc — a state
+  // that can arise from offline creation, partial sync, or stale local
+  // mirror. The modal would close, the home view would refresh, and the
+  // user would see the old name unchanged with no error toast.
+  //
+  // Now we upsert: read the existing doc if any, merge the patch, and
+  // write back with `set({merge:true})` which creates the doc if missing.
+  // We also mirror the change to IndexedDB *immediately* (instead of
+  // relying on the next getAllFoldersFS to re-mirror) so renderHomeView()
+  // sees the new name on first call after the Firestore round-trip.
+  let existing = {};
+  try {
+    const doc = await ref.doc(id).get();
+    if (doc.exists) existing = doc.data() || {};
+  } catch (e) {
+    console.warn('[renameFolderFS] read failed, will upsert anyway:', e.message);
+  }
+
+  const updated = Object.assign({}, existing, { id, name: newName },
     safeColor !== undefined ? { color: safeColor } : {},
     codePatch);
-  await ref.doc(id).set(updated);
+
+  // createdAt fallback for upsert-of-missing-doc case so listing/sorting works.
+  if (!updated.createdAt) updated.createdAt = new Date().toISOString();
+
+  await ref.doc(id).set(updated, { merge: true });
+
+  // Mirror to IDB so renderHomeView() (which reads IDB) sees new name
+  // without waiting for the next getAllFoldersFS Firestore round-trip.
+  try {
+    await saveFolder(updated);
+  } catch (e) {
+    console.warn('[renameFolderFS] IDB mirror failed (non-fatal):', e.message);
+  }
+
   return updated;
 }
 async function updateNoteOrderFS(orderedIds) {
