@@ -5669,9 +5669,18 @@ window.addEventListener('beforeunload', e => {
 <button id="debugToggle" onclick="const p=document.getElementById('debugPanel'); const v=p.style.display!=='flex'; p.style.display=v?'flex':'none'; if(v){const c=document.getElementById('debugLogContent'); c.textContent=_debugLog.join('\n'); c.scrollTop=c.scrollHeight;}" style="position:fixed; bottom:20px; right:20px; width:40px; height:40px; border-radius:50%; background:var(--surface2); border:1px solid var(--border-bright); color:var(--text-muted); font-size:1.1rem; cursor:pointer; z-index:9999; display:flex; align-items:center; justify-content:center;">🔧</button>
 
 <footer style="text-align:center; padding:1.5rem 1rem; font-size:0.78rem; color:var(--text-muted); border-top:1px solid var(--border); margin-top:2rem;">
-  <a href="/terms.html" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">이용약관</a>
-  <span style="margin:0 0.5rem;">·</span>
-  <a href="/privacy.html" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">개인정보 처리방침</a>
+  <!-- R6: footer business-info disclosure for e-commerce act compliance.
+       사업장 주소는 베타 기간 비공개 (terms.html/privacy.html에 사유 명시),
+       통신판매업 신고번호는 정부24 신청 후 발급되면 업데이트. -->
+  <div style="margin-bottom:0.6rem;">
+    <a href="/terms.html" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">이용약관</a>
+    <span style="margin:0 0.5rem;">·</span>
+    <a href="/privacy.html" style="color:var(--text-muted); text-decoration:none;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'">개인정보 처리방침</a>
+  </div>
+  <div style="font-size:0.7rem; line-height:1.6; opacity:0.85;">
+    노틱스(Notyx) · 대표 김준현 · 사업자등록번호 892-24-02422<br>
+    통신판매업 신고번호 신청 중 · 문의 <a href="mailto:jhyun.kim35@gmail.com" style="color:var(--text-muted); text-decoration:underline;">jhyun.kim35@gmail.com</a>
+  </div>
 </footer>
 
 </body>
