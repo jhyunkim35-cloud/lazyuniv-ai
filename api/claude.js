@@ -60,7 +60,8 @@ function checkRateLimit(ip) {
 
 const ALLOWED_ORIGINS = [
   'https://lazyuniv-ai.vercel.app',  // legacy (pre-rebrand) — keep until DNS swap
-  'https://notyx.vercel.app',        // current production
+  'https://notyx.vercel.app',        // Vercel project alias
+  'https://notyx.co.kr',             // current production (custom domain)
   'http://localhost:3000',           // local dev
 ];
 

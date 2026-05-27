@@ -28,6 +28,7 @@ function isValidInviteToken(t) {
 const CORS_ORIGINS = [
   'https://lazyuniv-ai.vercel.app',
   'https://notyx.vercel.app',
+  'https://notyx.co.kr',
   'http://localhost:3000',
 ];
 

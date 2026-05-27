@@ -8,6 +8,7 @@ module.exports = async function handler(req, res) {
   const allowedOrigins = [
     'https://lazyuniv-ai.vercel.app',
     'https://notyx.vercel.app',
+    'https://notyx.co.kr',
   ];
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
