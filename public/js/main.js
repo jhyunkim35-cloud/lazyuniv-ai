@@ -72,11 +72,33 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
     const plan = params.get('plan'); // kept for diagnostics; not used for state
 
     try {
-      // Wait for auth before sending uid to server
-      await new Promise(resolve => {
-        if (currentUser) resolve();
-        else auth.onAuthStateChanged(u => { if (u) resolve(); });
+      // P1-2: bound the auth wait with a timeout. If the user's session
+      // expired while they sat on the Toss checkout page, the old
+      // `onAuthStateChanged(u => if(u) resolve())` never fired — it
+      // resolves only on a *logged-in* user, so a null callback left this
+      // await hanging forever. Toss charged the card but we never confirmed
+      // the payment and the user just saw a dead spinner. Resolve to a flag
+      // and time out (8s) so we always surface actionable feedback. The
+      // server's paymentLog idempotency makes a later retry safe.
+      const authed = await new Promise(resolve => {
+        if (currentUser) { resolve(true); return; }
+        let settled = false;
+        let unsub = null;
+        const finish = (v) => {
+          if (settled) return;
+          settled = true;
+          if (typeof unsub === 'function') { try { unsub(); } catch (_) {} }
+          resolve(v);
+        };
+        unsub = auth.onAuthStateChanged(u => { if (u) finish(true); });
+        setTimeout(() => finish(false), 8000);
       });
+
+      if (!authed) {
+        console.error('[payment] auth wait timed out; payment unconfirmed. orderId=', orderId);
+        showToast('⚠️ 결제는 완료됐지만 로그인이 만료되어 자동 확인에 실패했습니다. 다시 로그인 후 새로고침해 주세요. 문제가 계속되면 문의 시 주문번호를 알려주세요: ' + (orderId || '알 수 없음'));
+        return;
+      }
 
       // Get fresh Firebase ID token — backend now requires this and
       // ignores any uid in the body. Without the header the server
