@@ -35,27 +35,54 @@ function parseTokensFromSse(sseText) {
   return { inputTokens, outputTokens, cachedTokens };
 }
 
-const rateLimit = new Map();
-const RATE_LIMIT = 10; // requests per minute
-const RATE_WINDOW = 60 * 1000;
+// P1-4: distributed rate limit.
+//
+// The old implementation used `const rateLimit = new Map()` keyed on IP.
+// That is broken on Vercel: each concurrent request can land on a fresh
+// lambda instance with its own empty Map, so the limit never actually
+// bound anyone (a user could open 10 tabs and each got count=1). It also
+// over-limited shared NATs — a problem for our user base (university
+// students behind one campus IP).
+//
+// New model: a per-uid Firestore counter, bucketed per wall-clock minute.
+// Key on the cryptographically-verified uid so the limit follows the user
+// across IPs and cannot be reset by rotating a forged token; fall back to
+// IP only for requests with no usable token (rare / abuse).
+//
+// One flat ceiling for everyone (RATE_LIMIT_PER_MIN). This is purely an
+// anti-burst / DoS guard — economic abuse is already bounded by the B1
+// monthly note quota, so there is no need for a free/paid split here. A
+// tighter free limit would actually break a free user's own note
+// pipeline, which legitimately fires 5–15 calls within a minute.
+//
+// Counter docs live in the top-level `rateLimits` collection with an
+// `expireAt` Timestamp; a Firestore TTL policy on that field reaps them
+// so the collection never grows unbounded.
+const RATE_LIMIT_PER_MIN = 60;
+const RATE_BUCKET_MS = 60 * 1000;
+const RATE_DOC_TTL_MS = 2 * 60 * 1000; // keep the doc ~1 min past its window
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimit.entries()) {
-    if (now - entry.start > RATE_WINDOW * 2) rateLimit.delete(key);
+async function checkRateLimitDistributed(admin, key) {
+  // Returns true if the request is allowed, false if rate-limited.
+  // Fail-open on any Firestore error — a transient hiccup must never block
+  // legitimate traffic (consistent with the B1 billing fail-open policy).
+  try {
+    const bucket = Math.floor(Date.now() / RATE_BUCKET_MS);
+    const ref = admin.firestore().collection('rateLimits').doc(`${key}_${bucket}`);
+    return await admin.firestore().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const count = snap.exists ? (snap.data().count || 0) : 0;
+      if (count >= RATE_LIMIT_PER_MIN) return false;
+      tx.set(ref, {
+        count: admin.firestore.FieldValue.increment(1),
+        expireAt: admin.firestore.Timestamp.fromMillis(Date.now() + RATE_DOC_TTL_MS),
+      }, { merge: true });
+      return true;
+    });
+  } catch (e) {
+    console.error('[rateLimit] fail-open:', e.message);
+    return true;
   }
-}, 60 * 1000);
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = rateLimit.get(ip) || { count: 0, start: now };
-  if (now - entry.start > RATE_WINDOW) {
-    entry.count = 1; entry.start = now;
-  } else {
-    entry.count++;
-  }
-  rateLimit.set(ip, entry);
-  return entry.count <= RATE_LIMIT;
 }
 
 const ALLOWED_ORIGINS = [
@@ -144,8 +171,29 @@ module.exports = async (req, res) => {
 
   const xff = req.headers['x-forwarded-for'] || '';
   const ip = xff.split(',')[0].trim() || req.socket?.remoteAddress || 'unknown';
-  if (!checkRateLimit(ip)) {
-    return res.status(429).json({ error: 'Too many requests. Please wait.' });
+
+  // P1-4: distributed rate limit. Verify the token here (best-effort) so we
+  // can key on uid; fall back to IP for tokenless/invalid requests. Both the
+  // admin init and the verify are wrapped so a failure here never blocks the
+  // request — the rate limit is a guard, not a gate. (noteAnalysis verifies
+  // the token again inside the B1 block; that second verify is a cheap local
+  // signature check once the certs are cached.)
+  try {
+    const rlAdmin = getAdmin();
+    let rlUid = null;
+    try {
+      const d = await rlAdmin.auth().verifyIdToken(req.body?.idToken);
+      rlUid = d.uid;
+    } catch { rlUid = null; }
+    const rlKey = rlUid ? `u_${rlUid}` : `ip_${ip}`;
+    const allowed = await checkRateLimitDistributed(rlAdmin, rlKey);
+    if (!allowed) {
+      res.setHeader('Retry-After', '60');
+      return res.status(429).json({ error: { type: 'rate_limited', message: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' } });
+    }
+  } catch (e) {
+    // Admin unavailable — skip the rate limit rather than block traffic.
+    console.error('[rateLimit] skipped (admin init failed):', e.message);
   }
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
