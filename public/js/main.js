@@ -1,7 +1,9 @@
 // App bootstrap: auth listener, init, initial display state, debug panel ticker, payment callback.
 // MUST load last — depends on all other /js/ files.
 
+let _authResolved = false;
 auth.onAuthStateChanged(user => {
+  _authResolved = true;
   currentUser = user;
   updateAuthUI();
 });
@@ -30,10 +32,21 @@ auth.onAuthStateChanged(user => {
   }
 })();
 
-// Initial state: hide sidebar and content views until auth resolves
+// Initial state: keep all top-level views hidden until the first auth
+// callback fires. Previously we force-showed landingView here, which made a
+// logged-in user flash the landing/login screen for a few hundred ms while
+// Firebase restored the session from IndexedDB — it looked like "not logged
+// in" until it suddenly resolved ("logged in out of nowhere"). Let
+// onAuthStateChanged decide instead, so there is no flash either way.
 document.getElementById('sidebar').style.display = 'none';
 document.getElementById('homeView').style.display = 'none';
-document.getElementById('landingView').style.display = '';
+document.getElementById('landingView').style.display = 'none';
+// Safety net: if Firebase never initializes (SDK load / network failure) the
+// auth callback never fires and the user would stare at a blank page. After
+// 3s with no resolution, fall back to showing the landing/login screen.
+setTimeout(() => {
+  if (!_authResolved) document.getElementById('landingView').style.display = '';
+}, 3000);
 
 // L1: keep interval handle so we can clean it up on unload (defensive — also lets us throttle when hidden)
 const _debugPanelInterval = setInterval(() => {
