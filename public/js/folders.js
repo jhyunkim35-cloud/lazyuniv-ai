@@ -181,7 +181,7 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
 }
 
 async function deleteFolderConfirm(id) {
-  if (!confirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)')) return;
+  if (!await appConfirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)', { danger: true })) return;
   // R4 (folder-bug-fix): previously this was unguarded, so any throw inside
   // deleteFolderFS (now possible since we re-throw the first error to
   // surface diagnostics) would silently land in unhandled-promise-rejection

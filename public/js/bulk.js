@@ -131,7 +131,7 @@ async function bulkExportPdf() {
 
 async function bulkDeleteSelected() {
   if (!_selectedNoteIds.size) return;
-  if (!confirm(`${_selectedNoteIds.size}개의 노트를 삭제하시겠습니까?`)) return;
+  if (!await appConfirm(`${_selectedNoteIds.size}개의 노트를 삭제하시겠습니까?`, { danger: true })) return;
   for (const id of _selectedNoteIds) {
     await deleteNoteFS(id);
     if (currentNoteId === id) currentNoteId = null;

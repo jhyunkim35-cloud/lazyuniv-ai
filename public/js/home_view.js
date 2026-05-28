@@ -49,8 +49,17 @@ function buildFolderCard(folder, noteCount) {
   renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderEditModal(folder.id, folder.name, folder.color || null); });
   deleteBtn.addEventListener('click', async e => {
     e.stopPropagation();
-    if (!confirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)')) return;
-    await deleteFolderFS(folder.id);
+    if (!await appConfirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)', { danger: true })) return;
+    // Guard the delete so a thrown deleteFolderFS (note-detach / Firestore /
+    // IDB failure, all re-thrown) surfaces a toast instead of dying silently
+    // — folders.js had this guard but this home-card path was missing it.
+    try {
+      await deleteFolderFS(folder.id);
+      showToast('🗑️ 폴더가 삭제되었습니다.');
+    } catch (e2) {
+      console.error('[buildFolderCard delete] failed:', e2);
+      showToast('❌ 폴더 삭제 실패: ' + (e2.message || '알 수 없는 오류') + ' (콘솔 확인)');
+    }
     renderHomeView();
   });
 

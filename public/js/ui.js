@@ -243,6 +243,85 @@ function showToast(msg) {
   toastTimer = setTimeout(() => toast.classList.remove('show'), TOAST_DURATION_MS);
 }
 
+/* ═══════════════════════════════════════════════
+   In-app confirm / prompt modals
+   ────────────────────────────────────────────────
+   Replacements for the native window.confirm/prompt, which Chrome silently
+   disables ("이 페이지에서 추가 대화상자를 표시하지 않도록 차단") once a few
+   dialogs fire in quick succession. When that block is active, native
+   confirm() returns false and prompt() returns null with NO dialog shown —
+   so every delete/rename guarded by `if (!confirm(...)) return;` dies
+   silently. These DOM modals are immune to that block.
+   Both return Promises; callers must `await`.
+═══════════════════════════════════════════════ */
+function appConfirm(message, opts = {}) {
+  const okText     = opts.okText || '확인';
+  const cancelText = opts.cancelText || '취소';
+  const danger     = !!opts.danger;
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'db-modal-overlay';
+    overlay.innerHTML = `
+      <div class="db-modal" style="max-width:380px;">
+        <div style="font-size:0.92rem; line-height:1.5; white-space:pre-line; margin-bottom:1.1rem; color:var(--text);">${escHtml(message)}</div>
+        <div class="db-modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+          <button class="appConfirmCancel" style="background:var(--surface3); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.4rem 1rem; cursor:pointer; font-size:0.85rem;">${escHtml(cancelText)}</button>
+          <button class="appConfirmOk" style="background:${danger ? '#e5484d' : 'var(--primary)'}; color:#fff; border:none; border-radius:6px; padding:0.4rem 1rem; cursor:pointer; font-size:0.85rem;">${escHtml(okText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const onKey = e => {
+      if (e.key === 'Escape') done(false);
+      else if (e.key === 'Enter') done(true);
+    };
+    const done = val => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    overlay.querySelector('.appConfirmOk').addEventListener('click', () => done(true));
+    overlay.querySelector('.appConfirmCancel').addEventListener('click', () => done(false));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(false); }); // backdrop click = cancel
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => overlay.querySelector('.appConfirmOk')?.focus(), 50);
+  });
+}
+
+function appPrompt(message, defaultValue = '', opts = {}) {
+  const okText     = opts.okText || '확인';
+  const cancelText = opts.cancelText || '취소';
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'db-modal-overlay';
+    overlay.innerHTML = `
+      <div class="db-modal" style="max-width:380px;">
+        <div style="font-size:0.9rem; line-height:1.5; white-space:pre-line; margin-bottom:0.6rem; color:var(--text);">${escHtml(message)}</div>
+        <input class="appPromptInput" type="text" style="width:100%; padding:0.5rem 0.7rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.9rem; box-sizing:border-box; margin-bottom:1rem;" />
+        <div class="db-modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem;">
+          <button class="appPromptCancel" style="background:var(--surface3); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.4rem 1rem; cursor:pointer; font-size:0.85rem;">${escHtml(cancelText)}</button>
+          <button class="appPromptOk" style="background:var(--primary); color:#fff; border:none; border-radius:6px; padding:0.4rem 1rem; cursor:pointer; font-size:0.85rem;">${escHtml(okText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('.appPromptInput');
+    input.value = defaultValue;
+    const onKey = e => {
+      if (e.key === 'Escape') done(null);
+      else if (e.key === 'Enter') done(input.value);
+    };
+    const done = val => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(val);
+    };
+    overlay.querySelector('.appPromptOk').addEventListener('click', () => done(input.value));
+    overlay.querySelector('.appPromptCancel').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(null); }); // backdrop click = cancel
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+  });
+}
+
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('light');
   localStorage.setItem('theme', isLight ? 'light' : 'dark');

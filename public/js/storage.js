@@ -264,7 +264,7 @@ async function getStorageSize() {
    Clear all storage
 ═══════════════════════════════════════════════ */
 async function clearAllStorage() {
-  if (!confirm('모든 저장된 노트와 폴더를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  if (!await appConfirm('모든 저장된 노트와 폴더를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.', { danger: true })) return;
   try {
     const db = await openDB();
     await new Promise((resolve, reject) => {
