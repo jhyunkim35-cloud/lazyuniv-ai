@@ -15,7 +15,7 @@ auth.onAuthStateChanged(user => {
   // Load theme preference. The button shows the icon for the OPPOSITE
   // theme — in light mode the button shows a moon (click → go dark),
   // and vice versa. This mirrors what toggleTheme does at runtime.
-  if (localStorage.getItem('theme') === 'light') {
+  if (localStorage.getItem('theme') !== 'dark') {
     document.documentElement.classList.add('light');
     const btn = document.getElementById('themeToggleBtn');
     if (btn) {

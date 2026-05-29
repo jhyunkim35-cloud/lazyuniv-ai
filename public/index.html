@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#1a1a2e" />
 
+  <!-- Theme default: LIGHT. Applied before first paint to avoid a dark
+       flash on load. Only users who explicitly chose dark (saved 'dark')
+       stay dark; everyone else (incl. first-time visitors) gets light. -->
+  <script>
+    try {
+      if (localStorage.getItem('theme') !== 'dark') {
+        document.documentElement.classList.add('light');
+      }
+    } catch (e) {}
+  </script>
+
   <!-- Sentry error monitoring (Loader Script - Sentry CDN auto-loads SDK
        on first error or trace event; no DSN needed here, the key is in
        the script URL. Settings tweaked in Sentry > Project Settings.) -->
