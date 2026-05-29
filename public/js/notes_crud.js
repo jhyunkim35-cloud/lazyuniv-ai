@@ -4,11 +4,9 @@
 /* ═══════════════════════════════════════════════
    Auto-save after pipeline
 ═══════════════════════════════════════════════ */
-function promptNoteName(defaultTitle) {
-  return new Promise(resolve => {
-    const name = prompt('노트 이름을 입력하세요:', defaultTitle);
-    resolve(name && name.trim() ? name.trim() : defaultTitle);
-  });
+async function promptNoteName(defaultTitle) {
+  const name = await appPrompt('노트 이름을 입력하세요:', defaultTitle);
+  return name && name.trim() ? name.trim() : defaultTitle;
 }
 
 async function autoSaveNote() {
@@ -163,7 +161,7 @@ async function parseNotionFile(file) {
   // C1: OOM guard — Notion exports can be large; a 500MB zip would crash
   // the JSZip loader. Same 200MB cap as PPT/PDF for consistency.
   if (file.size > MAX_FILE_SIZE_BYTES) {
-    alert(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+    showToast(`파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
     return null;
   }
 
@@ -180,19 +178,19 @@ async function parseNotionFile(file) {
     const zip = await JSZip.loadAsync(file);
     const mdEntries = await collectMdFromZip(zip);
     if (mdEntries.length === 0) {
-      alert('마크다운 파일이 없습니다');
+      showToast('마크다운 파일이 없습니다');
       return null;
     }
     mdEntries.sort((a, b) => a.path.localeCompare(b.path));
     const parts = await Promise.all(mdEntries.map(m => m.getText()));
     combinedMd = parts.join('\n\n---\n\n');
   } else {
-    alert('.md 또는 .zip 파일만 지원됩니다');
+    showToast('.md 또는 .zip 파일만 지원됩니다');
     return null;
   }
 
   if (!combinedMd.trim()) {
-    alert('빈 파일입니다');
+    showToast('빈 파일입니다');
     return null;
   }
 
@@ -228,12 +226,12 @@ async function parseNotionFile(file) {
   combinedMd = combinedMd.trim();
 
   if (!combinedMd) {
-    alert('빈 파일입니다');
+    showToast('빈 파일입니다');
     return null;
   }
 
   if (combinedMd.length > 500000) {
-    const ok = confirm(`파일이 큽니다 (${combinedMd.length.toLocaleString()}자). 계속하시겠습니까?`);
+    const ok = await appConfirm(`파일이 큽니다 (${combinedMd.length.toLocaleString()}자). 계속하시겠습니까?`);
     if (!ok) return null;
   }
 
@@ -244,7 +242,7 @@ async function parseNotionFile(file) {
    Delete note
 ═══════════════════════════════════════════════ */
 async function confirmDeleteNote(id) {
-  if (!confirm('이 노트를 삭제하시겠습니까?')) return;
+  if (!await appConfirm('이 노트를 삭제하시겠습니까?', { danger: true })) return;
   await deleteNoteFS(id);
   if (currentNoteId === id) currentNoteId = null;
   showToast('🗑 노트 삭제 완료');
@@ -475,7 +473,7 @@ function showImportNoteModal() {
 async function renameSavedNote(id) {
   const note = await getNoteFS(id);
   if (!note) return;
-  const newTitle = prompt('노트 이름:', note.title || '');
+  const newTitle = await appPrompt('노트 이름:', note.title || '');
   if (!newTitle || newTitle.trim() === note.title) return;
   const trimmedTitle = newTitle.trim();
   const updatedAt = new Date().toISOString();

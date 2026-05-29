@@ -192,7 +192,7 @@
 
   // ── Action handlers ─────────────────────────────────────
   async function renameTranscriptPrompt(t) {
-    const newTitle = prompt('새 제목을 입력하세요:', t.title || '');
+    const newTitle = await appPrompt('새 제목을 입력하세요:', t.title || '');
     if (newTitle == null) return;
     const trimmed = newTitle.trim();
     if (!trimmed || trimmed === t.title) return;
@@ -266,7 +266,7 @@
   }
 
   async function confirmDeleteTranscript(t) {
-    if (!confirm(`"${t.title}" 녹취록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!await appConfirm(`"${t.title}" 녹취록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, { danger: true })) return;
     try {
       await deleteTranscriptFS(t.id);
       window.showToast?.('🗑 삭제되었습니다.');

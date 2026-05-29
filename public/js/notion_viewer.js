@@ -36,7 +36,7 @@ function openNotionNote(note) {
 
   // Wire up rename/delete
   document.getElementById('notionViewerRenameBtn').onclick = async () => {
-    const newTitle = prompt('노트 이름:', note.title || '');
+    const newTitle = await appPrompt('노트 이름:', note.title || '');
     if (!newTitle || newTitle.trim() === note.title) return;
     const updated = Object.assign({}, note, { title: newTitle.trim() });
     await saveNoteFS(updated);
@@ -47,7 +47,7 @@ function openNotionNote(note) {
   };
 
   document.getElementById('notionViewerDeleteBtn').onclick = async () => {
-    if (!confirm('이 노트를 삭제하시겠습니까?')) return;
+    if (!await appConfirm('이 노트를 삭제하시겠습니까?', { danger: true })) return;
     await deleteNoteFS(note.id);
     _closeNotionViewer();
     showToast('🗑 노트 삭제 완료');
