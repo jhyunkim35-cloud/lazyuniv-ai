@@ -818,7 +818,7 @@
       const footer = $('div', { class: 'sr-page-footer' });
       const archiveBtn = $('button', { class: 'sr-btn sr-btn-secondary sr-archive-btn' }, '📦 룸 보관');
       archiveBtn.addEventListener('click', async () => {
-        if (!confirm('이 룸을 보관하시겠습니까?\n보관 후엔 멤버들의 학습 시간이 더 이상 기록되지 않습니다.')) return;
+        if (!await appConfirm('이 룸을 보관하시겠습니까?\n보관 후엔 멤버들의 학습 시간이 더 이상 기록되지 않습니다.', { danger: true })) return;
         archiveBtn.disabled = true;
         archiveBtn.textContent = '보관 중...';
         try {

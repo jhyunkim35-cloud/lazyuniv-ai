@@ -20,7 +20,7 @@ async function getPdfjsLib() {
 /* ═══════════════════════════════════════════════
    File handling
 ═══════════════════════════════════════════════ */
-function onPptChange(file) {
+async function onPptChange(file) {
   if (!file) return;
   const name = file.name.toLowerCase();
   if (!name.endsWith('.pptx') && !name.endsWith('.pdf')) {
@@ -32,7 +32,7 @@ function onPptChange(file) {
     return;
   }
   if (file.size > WARN_FILE_SIZE_BYTES) {
-    if (!confirm(`파일 크기가 ${(file.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) return;
+    if (!await appConfirm(`파일 크기가 ${(file.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) return;
   }
   pptFile = file;
   document.getElementById('pptIcon').innerHTML = name.endsWith('.pdf')

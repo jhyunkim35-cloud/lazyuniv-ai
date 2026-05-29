@@ -511,7 +511,7 @@
 
   async function onDelete() {
     if (!_modalCtx) return;
-    if (!confirm('이 폴더의 시험 등록을 해제하시겠습니까?')) return;
+    if (!await appConfirm('이 폴더의 시험 등록을 해제하시겠습니까?', { danger: true })) return;
     try {
       await clearFolderExamPlan(_modalCtx.folderId);
       window.showToast?.('🗑 시험 등록이 해제되었습니다.');

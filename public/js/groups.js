@@ -575,7 +575,7 @@
       const footer = $('div', { class: 'groups-page-footer' });
       const archiveBtn = $('button', { class: 'groups-btn groups-btn-secondary groups-archive-btn' }, '📦 그룹 보관');
       archiveBtn.addEventListener('click', async () => {
-        if (!confirm('이 그룹을 보관하시겠습니까?\n보관 후엔 새 멤버를 받을 수 없고, 정산 마킹도 멈춥니다.')) return;
+        if (!await appConfirm('이 그룹을 보관하시겠습니까?\n보관 후엔 새 멤버를 받을 수 없고, 정산 마킹도 멈춥니다.', { danger: true })) return;
         archiveBtn.disabled = true;
         archiveBtn.textContent = '보관 중...';
         try {

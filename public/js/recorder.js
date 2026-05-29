@@ -821,14 +821,14 @@
     if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
   }
 
-  function closeModalIfSafe() {
+  async function closeModalIfSafe() {
     if (modalState.phase === 'recording' || modalState.phase === 'paused') {
-      if (!confirm('녹음을 취소하시겠습니까? 현재까지 녹음한 내용은 사라집니다.')) return;
+      if (!await appConfirm('녹음을 취소하시겠습니까? 현재까지 녹음한 내용은 사라집니다.', { danger: true })) return;
       cancelLiveRecording();
       return;
     }
     if (modalState.phase === 'uploading') {
-      if (!confirm('업로드를 취소하시겠습니까?')) return;
+      if (!await appConfirm('업로드를 취소하시겠습니까?', { danger: true })) return;
     }
     if (modalState.phase === 'transcribing') {
       minimizePill();
@@ -1074,8 +1074,9 @@
         ? priceFor(durationMin)
         : { minutes: Math.ceil(durationMin / 30) * 30, priceKRW: 1500 };
 
-      const confirmed = confirm(
-        `이 강의는 ${minutes}분입니다.\nGoogle STT 변환 비용: ${priceKRW.toLocaleString()}원\n결제하시겠습니까?`
+      const confirmed = await appConfirm(
+        `이 강의는 ${minutes}분입니다.\nGoogle STT 변환 비용: ${priceKRW.toLocaleString()}원\n결제하시겠습니까?`,
+        { okText: '결제하기' }
       );
       if (!confirmed) return; // stay on engine selector
 
