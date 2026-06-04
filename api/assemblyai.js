@@ -16,27 +16,35 @@ const { recordUsage } = require('./_usage');
 
 const ASSEMBLYAI_BASE = 'https://api.assemblyai.com/v2';
 
-const rateLimit = new Map();
-const RATE_LIMIT = 30;
-const RATE_WINDOW = 60 * 1000;
+// Distributed rate limit — mirrors api/claude.js. The old in-memory Map was
+// a no-op on Vercel (each request can hit a fresh lambda with an empty Map)
+// and keyed on IP, which over-limited students sharing one campus NAT. Now a
+// per-uid Firestore counter bucketed per wall-clock minute. STT does a
+// transcribe submit plus repeated status polls, so the ceiling is generous;
+// economic abuse is already bounded by the Storage-URL allowlist below.
+const RATE_LIMIT_PER_MIN = 100;
+const RATE_BUCKET_MS = 60 * 1000;
+const RATE_DOC_TTL_MS = 2 * 60 * 1000;
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of rateLimit.entries()) {
-    if (now - entry.start > RATE_WINDOW * 2) rateLimit.delete(key);
+async function checkRateLimitDistributed(admin, key) {
+  // Fail-open on any Firestore error so a transient hiccup never blocks STT.
+  try {
+    const bucket = Math.floor(Date.now() / RATE_BUCKET_MS);
+    const ref = admin.firestore().collection('rateLimits').doc(`${key}_${bucket}`);
+    return await admin.firestore().runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const count = snap.exists ? (snap.data().count || 0) : 0;
+      if (count >= RATE_LIMIT_PER_MIN) return false;
+      tx.set(ref, {
+        count: admin.firestore.FieldValue.increment(1),
+        expireAt: admin.firestore.Timestamp.fromMillis(Date.now() + RATE_DOC_TTL_MS),
+      }, { merge: true });
+      return true;
+    });
+  } catch (e) {
+    console.error('[assemblyai rateLimit] fail-open:', e.message);
+    return true;
   }
-}, 60 * 1000);
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = rateLimit.get(ip) || { count: 0, start: now };
-  if (now - entry.start > RATE_WINDOW) {
-    entry.count = 1; entry.start = now;
-  } else {
-    entry.count++;
-  }
-  rateLimit.set(ip, entry);
-  return entry.count <= RATE_LIMIT;
 }
 
 const ALLOWED_ORIGINS = [
@@ -92,14 +100,23 @@ module.exports = async (req, res) => {
   setCors(req, res);
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
-  if (!checkRateLimit(ip)) {
-    return res.status(429).json({ error: 'rate_limited' });
-  }
-
+  // Verify first so the rate limit can key on uid, not a shared campus IP.
   const user = await verifyUser(req);
   if (!user) {
     return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  // Distributed per-uid rate limit. Wrapped so an admin/Firestore failure
+  // never blocks STT — the limit is a guard, not a gate.
+  try {
+    const rlAdmin = getAdmin();
+    const allowed = await checkRateLimitDistributed(rlAdmin, `u_${user.uid}`);
+    if (!allowed) {
+      res.setHeader('Retry-After', '30');
+      return res.status(429).json({ error: 'rate_limited' });
+    }
+  } catch (e) {
+    console.error('[assemblyai rateLimit] skipped (admin init failed):', e.message);
   }
 
   const apiKey = process.env.ASSEMBLYAI_API_KEY;
