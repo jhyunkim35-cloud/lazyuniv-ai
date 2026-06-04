@@ -35,15 +35,47 @@ function openNotionNote(note) {
   document.getElementById('notionTabQuiz').onclick = () => _switchNotionTab('quiz');
 
   // Wire up rename/delete
-  document.getElementById('notionViewerRenameBtn').onclick = async () => {
-    const newTitle = await appPrompt('노트 이름:', note.title || '');
-    if (!newTitle || newTitle.trim() === note.title) return;
-    const updated = Object.assign({}, note, { title: newTitle.trim() });
-    await saveNoteFS(updated);
-    document.getElementById('notionViewerTitle').textContent = newTitle.trim();
-    note.title = newTitle.trim();
-    showToast('✏️ 이름 변경 완료');
-    renderHomeView();
+  // Inline title edit (replaces the appPrompt popup an extension was painting
+  // over). Swaps #notionViewerTitle for an input in place; Enter saves, Esc
+  // cancels, blur saves. Save path unchanged (saveNoteFS).
+  document.getElementById('notionViewerRenameBtn').onclick = () => {
+    const titleEl = document.getElementById('notionViewerTitle');
+    if (!titleEl || titleEl.querySelector('input.notion-title-edit')) return;
+    const cur = note.title || '';
+    titleEl.innerHTML =
+      `<input class="notion-title-edit" value="${escHtml(cur)}" maxlength="200" ` +
+      `style="padding:0.2rem 0.5rem; border:1px solid var(--primary); border-radius:5px; ` +
+      `background:var(--surface); color:var(--text); font:inherit; box-sizing:border-box; min-width:240px;" />`;
+    const input = titleEl.querySelector('input.notion-title-edit');
+    let done = false;
+    setTimeout(() => { input.focus(); input.select(); }, 20);
+    const commit = async (save) => {
+      if (done) return;
+      done = true;
+      const newTitle = (input.value || '').trim();
+      if (!save || !newTitle || newTitle === (note.title || '')) {
+        titleEl.textContent = note.title || '제목없음';
+        return;
+      }
+      try {
+        const updated = Object.assign({}, note, { title: newTitle });
+        await saveNoteFS(updated);
+        note.title = newTitle;
+        titleEl.textContent = newTitle;
+        showToast('✏️ 이름 변경 완료');
+        renderHomeView();
+      } catch (e) {
+        console.error('[notion rename] failed:', e);
+        titleEl.textContent = note.title || '제목없음';
+        showToast('❌ 이름 변경 실패: ' + (e.message || '알 수 없는 오류'));
+      }
+    };
+    input.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') commit(true);
+      else if (e.key === 'Escape') commit(false);
+    });
+    input.addEventListener('blur', () => commit(true));
   };
 
   document.getElementById('notionViewerDeleteBtn').onclick = async () => {

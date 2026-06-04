@@ -442,7 +442,7 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
     openSavedNote(note.id);
   });
   const [renameBtn, moveBtn, deleteBtn] = card.querySelectorAll('.note-card-actions button');
-  renameBtn.addEventListener('click', e => { e.stopPropagation(); renameSavedNote(note.id); });
+  renameBtn.addEventListener('click', e => { e.stopPropagation(); enterNoteTitleEdit(card, note); });
   moveBtn.addEventListener('click',   e => { e.stopPropagation(); moveSavedNote(note.id); });
   deleteBtn.addEventListener('click', e => { e.stopPropagation(); confirmDeleteNote(note.id); });
 
@@ -469,6 +469,55 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
   attachNoteDrag(card, note.id);
 
   return card;
+}
+
+/* ═══════════════════════════════════════════════
+   Inline note title edit (replaces appPrompt popup)
+═══════════════════════════════════════════════ */
+// In-place rename for a note card. Swaps .note-card-title for an input so it
+// never relies on the appPrompt modal an extension was painting over. Saves
+// exactly like renameSavedNote: saveNote (IDB) + safeNotePartialUpdate so a
+// missing Firestore doc can't be auto-created as a ghost.
+function enterNoteTitleEdit(card, note) {
+  const titleEl = card.querySelector('.note-card-title');
+  if (!titleEl || titleEl.querySelector('input.note-title-edit')) return;
+  const cur = note.title || '';
+  titleEl.innerHTML =
+    `<input class="note-title-edit" value="${escHtml(cur)}" maxlength="200" ` +
+    `style="width:100%; padding:0.2rem 0.4rem; border:1px solid var(--primary); ` +
+    `border-radius:4px; background:var(--surface); color:var(--text); ` +
+    `font:inherit; box-sizing:border-box;" />`;
+  const input = titleEl.querySelector('input.note-title-edit');
+  input.addEventListener('click', e => e.stopPropagation());
+  let done = false;
+  setTimeout(() => { input.focus(); input.select(); }, 20);
+  const commit = async (save) => {
+    if (done) return;
+    done = true;
+    if (!save) { renderHomeView(); return; }
+    const newTitle = input.value.trim();
+    if (!newTitle || newTitle === (note.title || '')) { renderHomeView(); return; }
+    try {
+      const fresh = await getNoteFS(note.id);
+      if (!fresh) { renderHomeView(); return; }
+      const updatedAt = new Date().toISOString();
+      const updated = Object.assign({}, fresh, { title: newTitle, updatedAt });
+      await saveNote(updated);
+      safeNotePartialUpdate(note.id, { title: newTitle, updatedAt })
+        .catch(e => console.warn('Firestore rename sync failed:', e));
+      showToast('✏️ 이름이 변경되었습니다');
+    } catch (e) {
+      console.error('[enterNoteTitleEdit] failed:', e);
+      showToast('❌ 이름 변경 실패: ' + (e.message || '알 수 없는 오류'));
+    }
+    renderHomeView();
+  };
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') commit(true);
+    else if (e.key === 'Escape') commit(false);
+  });
+  input.addEventListener('blur', () => commit(true));
 }
 
 /* ═══════════════════════════════════════════════
