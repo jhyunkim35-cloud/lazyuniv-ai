@@ -71,8 +71,30 @@ function reorderRecSlots(srcId, dstId) {
   const dstIdx = txtFiles.findIndex(s => s.id === dstId);
   if (srcIdx === -1 || dstIdx === -1 || srcIdx === dstIdx) return;
   const [item] = txtFiles.splice(srcIdx, 1);
-  txtFiles.splice(dstIdx, 0, item);
+  // After removing src, every slot after it shifts left by one. So when the
+  // drop target sat below the source, its index is now one less than before
+  // the splice — drop the item at the corrected index. Without this, the item
+  // lands one slot too early, an off-by-one that compounds and looks broken
+  // once there are many slots.
+  const insertIdx = srcIdx < dstIdx ? dstIdx - 1 : dstIdx;
+  txtFiles.splice(insertIdx, 0, item);
   renderRecSlots();
+}
+
+// Auto-sort slots by filename in natural numeric order (so "2교시" precedes
+// "10교시", "lecture1" precedes "lecture12", etc.). Slots with no file yet
+// are pushed to the end so they don't disrupt the ordering of named ones.
+function sortRecSlotsByName() {
+  txtFiles.sort((a, b) => {
+    const an = a.file ? a.file.name : '';
+    const bn = b.file ? b.file.name : '';
+    if (!an && !bn) return 0;
+    if (!an) return 1;
+    if (!bn) return -1;
+    return an.localeCompare(bn, undefined, { numeric: true, sensitivity: 'base' });
+  });
+  renderRecSlots();
+  checkReady();
 }
 
 function renderRecSlots() {
@@ -118,6 +140,14 @@ function renderRecSlots() {
 
   const hasFiles = txtFiles.some(s => s.file !== null);
   if (zone) zone.classList.toggle('has-files', hasFiles);
+
+  // Show the filename-sort button only when there are ≥2 filled slots —
+  // sorting zero or one file is meaningless.
+  const sortBtn = document.getElementById('sortRecBtn');
+  if (sortBtn) {
+    const filled = txtFiles.filter(s => s.file).length;
+    sortBtn.style.display = filled >= 2 ? '' : 'none';
+  }
 
   if (txtFiles.length === 0) {
     list.innerHTML = '<div class="rec-empty-hint">녹취록이 없으면 PPT만으로 노트를 작성합니다</div>';

@@ -54,6 +54,12 @@ let draggedNoteId  = null;       // id of the note being dragged (legacy, kept f
 }
 
 document.getElementById('addRecBtn').addEventListener('click', () => addRecSlot());
+document.getElementById('sortRecBtn')?.addEventListener('click', () => {
+  if (typeof sortRecSlotsByName === 'function') {
+    sortRecSlotsByName();
+    showToast('📑 파일명 순으로 정렬했습니다');
+  }
+});
 document.getElementById('recordBtn').addEventListener('click', () => {
   if (typeof window.openRecorderModal === 'function') window.openRecorderModal();
 });
@@ -977,4 +983,4 @@ window.addEventListener('beforeunload', e => {
 
 // toggleBulkSelectMode, _updateBulkBar, toggleBulkSelectAll, bulkExportPdf, bulkDeleteSelected moved to /js/bulk.js
 
-// init() IIFE, initial display state moved to /js/main.js
+// init() IIFE, initial display state moved to /js/main.js
