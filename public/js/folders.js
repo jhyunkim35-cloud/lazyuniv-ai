@@ -55,7 +55,23 @@ async function refreshFolderManagerList() {
     deleteBtn.title = '삭제';
     deleteBtn.setAttribute('aria-label', '삭제');
     deleteBtn.innerHTML = '<i data-lucide="trash-2" class="icon-sm"></i>';
-    deleteBtn.addEventListener('click', () => deleteFolderConfirm(folder.id));
+    // Inline two-step confirm (replaces the appConfirm modal, which a browser
+    // extension with max z-index was painting over so it never showed and its
+    // OK click never landed). First click arms the button (red, "삭제?");
+    // a second click within 3s deletes; otherwise it auto-resets. Arming any
+    // row's button resets every other armed button so only one is live.
+    let _delTimer = null;
+    deleteBtn.addEventListener('click', () => {
+      if (deleteBtn.classList.contains('confirm-delete')) {
+        clearTimeout(_delTimer);
+        deleteFolderNow(folder.id);
+      } else {
+        listEl.querySelectorAll('button.confirm-delete').forEach(resetFolderDeleteBtn);
+        deleteBtn.classList.add('confirm-delete');
+        deleteBtn.textContent = '삭제?';
+        _delTimer = setTimeout(() => resetFolderDeleteBtn(deleteBtn), 3000);
+      }
+    });
 
     actions.append(renameBtn, deleteBtn);
     row.append(label, actions);
@@ -180,25 +196,31 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
   lectureInput?.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
 }
 
-async function deleteFolderConfirm(id) {
-  if (!await appConfirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)', { danger: true })) return;
-  // R4 (folder-bug-fix): previously this was unguarded, so any throw inside
-  // deleteFolderFS (now possible since we re-throw the first error to
-  // surface diagnostics) would silently land in unhandled-promise-rejection
-  // and the user would just see nothing happen. Toast + log on failure;
-  // refresh the list even on partial success so any side-effects (e.g.
-  // IDB was purged but Firestore wasn't) are reflected immediately.
+// Resets an armed inline-delete button back to its trash-icon state.
+function resetFolderDeleteBtn(btn) {
+  btn.classList.remove('confirm-delete');
+  btn.innerHTML = '<i data-lucide="trash-2" class="icon-sm"></i>';
+  if (window.lucide && typeof lucide.createIcons === 'function') {
+    try { lucide.createIcons(); } catch (e) {}
+  }
+}
+
+// Performs the actual folder delete. Confirmation is handled inline by the
+// two-step delete button in refreshFolderManagerList (the old appConfirm
+// modal was unusable because an extension painted over it). Folder delete is
+// low-risk: notes are reparented to "uncategorized", never destroyed.
+async function deleteFolderNow(id) {
   let ok = true;
   try {
     await deleteFolderFS(id);
   } catch (e) {
     ok = false;
-    console.error('[deleteFolderConfirm] failed:', e);
+    console.error('[deleteFolderNow] failed:', e);
     showToast('❌ 폴더 삭제 실패: ' + (e.message || '알 수 없는 오류') + ' (콘솔 확인)');
   }
-  await refreshFolderManagerList().catch(err => console.warn('[deleteFolderConfirm] refresh failed:', err));
+  await refreshFolderManagerList().catch(err => console.warn('[deleteFolderNow] refresh failed:', err));
   // If viewing the deleted folder, return to home
   if (_activeFolderId === id) _activeFolderId = null;
   renderHomeView();
-  if (ok) showToast('🗑️ 폴더가 삭제되었습니다.');
+  if (ok) showToast('🗑️ 폴더 삭제됨 (노트는 미분류로 이동)');
 }
