@@ -49,7 +49,7 @@ async function refreshFolderManagerList() {
     renameBtn.title = '이름 변경';
     renameBtn.setAttribute('aria-label', '이름 변경');
     renameBtn.innerHTML = '<i data-lucide="pencil" class="icon-sm"></i>';
-    renameBtn.addEventListener('click', () => renameFolderPrompt(folder.id, folder.name, folder.color));
+    renameBtn.addEventListener('click', () => enterFolderEditMode(row, folder));
 
     const deleteBtn = document.createElement('button');
     deleteBtn.title = '삭제';
@@ -194,6 +194,60 @@ function showFolderEditModal(id, currentName = '', currentColor = null) {
   overlay.querySelector('.folderEditConfirmBtn').addEventListener('click', doSave);
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
   lectureInput?.addEventListener('keydown', e => { if (e.key === 'Enter') doSave(); });
+}
+
+// Inline folder edit (replaces the showFolderEditModal popup for renaming an
+// existing folder — that modal was painted over by an extension at max
+// z-index). Expands the row in place into name + invite-code + color picker
+// + save/cancel. The "new folder" path still uses createFolderFromInput,
+// which lives inside the folder-manager modal and isn't covered by the bug.
+function enterFolderEditMode(row, folder) {
+  const chosen = { value: folder.color || FOLDER_COLORS[0].value };
+  const colorDots = FOLDER_COLORS.map(c =>
+    `<span class="folder-color-option${c.value === chosen.value ? ' selected' : ''}" data-color="${escHtml(c.value)}" style="background:${c.value}" title="${escHtml(c.name)}"></span>`
+  ).join('');
+  row.style.alignItems = 'stretch';
+  row.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:0.5rem; width:100%;">
+      <input class="folderRowNameInput" value="${escHtml(folder.name || '')}" placeholder="폴더 이름..."
+        style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:0.85rem; box-sizing:border-box;" />
+      <input class="folderRowLectureInput" value="${escHtml(folder.lectureCode || '')}" placeholder="스터디룸 초대 코드 (선택)" maxlength="20"
+        style="width:100%; padding:0.35rem 0.6rem; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font-size:0.78rem; box-sizing:border-box;" />
+      <div class="folder-color-picker" style="display:flex; gap:0.3rem; flex-wrap:wrap;">${colorDots}</div>
+      <div style="display:flex; gap:0.4rem; justify-content:flex-end;">
+        <button class="folderRowCancel" style="background:var(--surface3); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.3rem 0.8rem; cursor:pointer; font-size:0.8rem;">취소</button>
+        <button class="folderRowSave" style="background:var(--primary); color:#fff; border:none; border-radius:6px; padding:0.3rem 0.8rem; cursor:pointer; font-size:0.8rem;">저장</button>
+      </div>
+    </div>`;
+  row.querySelectorAll('.folder-color-option').forEach(dot => {
+    dot.addEventListener('click', () => {
+      row.querySelectorAll('.folder-color-option').forEach(d => d.classList.remove('selected'));
+      dot.classList.add('selected');
+      chosen.value = dot.dataset.color;
+    });
+  });
+  const nameInput = row.querySelector('.folderRowNameInput');
+  const lectureInput = row.querySelector('.folderRowLectureInput');
+  setTimeout(() => { nameInput.focus(); nameInput.select(); }, 30);
+  const cancel = () => { refreshFolderManagerList().catch(() => {}); };
+  const save = async () => {
+    const name = nameInput.value.trim();
+    if (!name) { showToast('폴더 이름을 입력하세요.'); nameInput.focus(); return; }
+    const lectureCode = (lectureInput.value || '').trim() || null;
+    try {
+      await renameFolderFS(folder.id, name, chosen.value, lectureCode);
+    } catch (e) {
+      console.error('[enterFolderEditMode/save] failed:', e);
+      showToast('❌ 이름 변경 실패: ' + (e.message || '알 수 없는 오류'));
+      return;
+    }
+    await refreshFolderManagerList().catch(() => {});
+    renderHomeView();
+  };
+  row.querySelector('.folderRowSave').addEventListener('click', save);
+  row.querySelector('.folderRowCancel').addEventListener('click', cancel);
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') cancel(); });
+  lectureInput.addEventListener('keydown', e => { if (e.key === 'Enter') save(); else if (e.key === 'Escape') cancel(); });
 }
 
 // Resets an armed inline-delete button back to its trash-icon state.

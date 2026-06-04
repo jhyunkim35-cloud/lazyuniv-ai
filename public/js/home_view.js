@@ -46,21 +46,40 @@ function buildFolderCard(folder, noteCount) {
       }
     }).catch(() => {});
   }
-  renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderEditModal(folder.id, folder.name, folder.color || null); });
-  deleteBtn.addEventListener('click', async e => {
+  renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderManager(); });
+  // Inline two-step delete (replaces the appConfirm modal that an extension
+  // at max z-index was painting over). First click arms (red "삭제?"); a
+  // second click within 3s deletes; otherwise it auto-resets. Notes are
+  // reparented to "uncategorized", never destroyed.
+  let _cardDelTimer = null;
+  deleteBtn.addEventListener('click', e => {
     e.stopPropagation();
-    if (!await appConfirm('폴더를 삭제하시겠습니까? (폴더 내 노트는 미분류로 이동됩니다)', { danger: true })) return;
-    // Guard the delete so a thrown deleteFolderFS (note-detach / Firestore /
-    // IDB failure, all re-thrown) surfaces a toast instead of dying silently
-    // — folders.js had this guard but this home-card path was missing it.
-    try {
-      await deleteFolderFS(folder.id);
-      showToast('🗑️ 폴더가 삭제되었습니다.');
-    } catch (e2) {
-      console.error('[buildFolderCard delete] failed:', e2);
-      showToast('❌ 폴더 삭제 실패: ' + (e2.message || '알 수 없는 오류') + ' (콘솔 확인)');
+    if (deleteBtn.classList.contains('confirm-delete')) {
+      clearTimeout(_cardDelTimer);
+      (async () => {
+        try {
+          await deleteFolderFS(folder.id);
+          showToast('🗑️ 폴더 삭제됨 (노트는 미분류로 이동)');
+        } catch (e2) {
+          console.error('[buildFolderCard delete] failed:', e2);
+          showToast('❌ 폴더 삭제 실패: ' + (e2.message || '알 수 없는 오류') + ' (콘솔 확인)');
+        }
+        renderHomeView();
+      })();
+    } else {
+      document.querySelectorAll('.folder-card-actions button.confirm-delete').forEach(b => {
+        b.classList.remove('confirm-delete');
+        b.innerHTML = '<i data-lucide="trash-2"></i>';
+      });
+      deleteBtn.classList.add('confirm-delete');
+      deleteBtn.textContent = '삭제?';
+      _cardDelTimer = setTimeout(() => {
+        deleteBtn.classList.remove('confirm-delete');
+        deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+        if (window.lucide && typeof lucide.createIcons === 'function') { try { lucide.createIcons(); } catch (_) {} }
+      }, 3000);
+      if (window.lucide && typeof lucide.createIcons === 'function') { try { lucide.createIcons(); } catch (_) {} }
     }
-    renderHomeView();
   });
 
   // ── Accept note drops (Pointer Events — matches attachNoteDrag system) ──────
@@ -652,7 +671,7 @@ async function renderSidebarFolders(notes, folders) {
       rnBtn.className = 'sidebar-folder-rename';
       rnBtn.title = '이름 변경';
       rnBtn.innerHTML = '<i data-lucide="pencil"></i>';
-      rnBtn.addEventListener('click', e => { e.stopPropagation(); renameFolderPrompt(folderId, folder.name, folder.color); });
+      rnBtn.addEventListener('click', e => { e.stopPropagation(); showFolderManager(); });
       item.appendChild(rnBtn);
 
       item.addEventListener('pointerenter', () => {

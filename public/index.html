@@ -3811,6 +3811,8 @@
     .folder-card:hover .folder-card-actions { opacity:1; }
     .folder-card-actions button { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; color:var(--text-muted); }
     .folder-card-actions button:hover { background:var(--surface3); color:var(--text); }
+    .folder-card-actions button.confirm-delete { background:#e5484d; color:#fff; border-color:#e5484d; font-weight:700; font-size:0.68rem; padding:0.2rem 0.45rem; }
+    .folder-card-actions:has(button.confirm-delete) { opacity:1; }
     .folder-card.folder-drag-over { border-color:var(--primary); background:var(--primary-dim); }
     .sidebar-folder-item.folder-drag-over { background:var(--primary-dim); }
     .note-eject-btn { position:absolute; top:0.5rem; right:0.5rem; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0.2rem 0.4rem; cursor:pointer; font-size:0.75rem; opacity:0; transition:opacity 0.15s; z-index:2; }
