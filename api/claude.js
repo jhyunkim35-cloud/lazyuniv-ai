@@ -58,7 +58,11 @@ function parseTokensFromSse(sseText) {
 // Counter docs live in the top-level `rateLimits` collection with an
 // `expireAt` Timestamp; a Firestore TTL policy on that field reaps them
 // so the collection never grows unbounded.
-const RATE_LIMIT_PER_MIN = 60;
+// Raised from 60 to 200: a single user's batch run makes ~8-10 calls per
+// note (classify + critic loop + patch + quiz), so 6-7 notes used to trip
+// the abuse guard on the user themselves. Real quota is gated separately
+// via analysisId, so this ceiling only needs to stop genuine abuse bursts.
+const RATE_LIMIT_PER_MIN = 200;
 const RATE_BUCKET_MS = 60 * 1000;
 const RATE_DOC_TTL_MS = 2 * 60 * 1000; // keep the doc ~1 min past its window
 
@@ -188,7 +192,7 @@ module.exports = async (req, res) => {
     const rlKey = rlUid ? `u_${rlUid}` : `ip_${ip}`;
     const allowed = await checkRateLimitDistributed(rlAdmin, rlKey);
     if (!allowed) {
-      res.setHeader('Retry-After', '60');
+      res.setHeader('Retry-After', '30');
       return res.status(429).json({ error: { type: 'rate_limited', message: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' } });
     }
   } catch (e) {
