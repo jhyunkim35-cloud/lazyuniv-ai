@@ -12,6 +12,13 @@ async function runSingleNoteAnalysis() {
   const apiKey = 'server-proxied';
   if (!pptFile) return;
 
+  // A new single-mode analysis always produces a NEW note. Clear currentNoteId
+  // so autoSaveNote generates a fresh id instead of reusing the id of whatever
+  // note was last saved or opened. Without this, the second (and every later)
+  // analysis saved under the previous note's id and overwrote it — which is
+  // why only the most recent note survived in the home list.
+  currentNoteId = null;
+
   isRunning = true;
   abortController = new AbortController();
 
