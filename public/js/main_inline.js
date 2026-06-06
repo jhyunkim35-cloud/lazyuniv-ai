@@ -64,6 +64,26 @@ document.getElementById('recordBtn').addEventListener('click', () => {
   if (typeof window.openRecorderModal === 'function') window.openRecorderModal();
 });
 
+// Screen Wake Lock is auto-released when the tab is hidden, so re-acquire it
+// when the user returns mid-generation. Also flag that a background trip
+// happened during generation so we can warn that a mobile browser may have
+// suspended (and interrupted) the streaming request while we were away.
+document.addEventListener('visibilitychange', () => {
+  const generating = (typeof isRunning !== 'undefined' && isRunning) ||
+                     (typeof _batchRunning !== 'undefined' && _batchRunning);
+  if (document.hidden) {
+    if (generating) _genWasHidden = true;
+  } else if (generating) {
+    acquireWakeLock();
+    if (_genWasHidden) {
+      _genWasHidden = false;
+      showToast('⚠️ 화면을 벗어난 사이 생성이 멈췄을 수 있어요. 진행이 안 보이면 다시 시도해주세요.');
+    }
+  } else {
+    _genWasHidden = false;
+  }
+});
+
 // Home-page record button — same handler as the new-note record button,
 // but the modal logic in recorder.js detects _currentView and skips the
 // "auto-add a new rec slot" branch when fired from home (the transcript is
@@ -545,6 +565,12 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
   isRunning = true;
   abortController = new AbortController();
 
+  // Keep the screen awake across the (possibly long) batch run so a mobile
+  // auto-lock doesn't suspend the page and kill the streaming requests.
+  acquireWakeLock();
+  _genWasHidden = false;
+  if (isMobileDevice()) showToast('📱 생성 중에는 화면을 켜두세요 — 화면을 벗어나면 중단될 수 있어요.');
+
   const batchStartBtn  = document.getElementById('batchStartBtn');
   const batchCancelBtn = document.getElementById('batchCancelBtn');
   batchStartBtn.disabled = true;
@@ -732,6 +758,8 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
     isRunning = false;
     _batchRunning = false;
     abortController = null;
+    releaseWakeLock();
+    _genWasHidden = false;
     batchCancelBtn.classList.remove('visible');
     // Hide buddy and go-home button on any exit path
     const _bar = document.getElementById('batchBuddy');

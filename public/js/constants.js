@@ -185,6 +185,8 @@ let currentNoteId  = null;       // id of the note currently loaded
 let _accordionOpenLabels = new Set();
 let _noteDrag      = null;       // active pointer-drag state object
 let _lastGenerationError = '';   // last pipeline error message for debug report
+let _wakeLock = null;            // Screen Wake Lock sentinel held during generation
+let _genWasHidden = false;       // set if tab/app was backgrounded mid-generation
 
 let _classifyCache = null;       // { noteId, items } — cleared when different note loaded
 
@@ -265,4 +267,27 @@ function uuidv4() {
     const r = Math.random() * 16 | 0;
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
+}
+
+function isMobileDevice() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
+// ===== Screen Wake Lock (best-effort) =====
+// A long note generation streams for minutes. On mobile, the screen auto-lock
+// suspends the page and kills the in-flight streaming request — the note then
+// silently stops (this is the iPad bug from the reports). Holding a screen
+// Wake Lock keeps the page alive while the screen is on. It's auto-released
+// when the tab is hidden, so the visibilitychange handler re-acquires it on
+// return. Silently no-ops where the API is unavailable (older Safari, etc.).
+async function acquireWakeLock() {
+  try {
+    if ('wakeLock' in navigator && !_wakeLock) {
+      _wakeLock = await navigator.wakeLock.request('screen');
+      _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+    }
+  } catch (_) { /* unsupported or denied — best-effort, ignore */ }
+}
+function releaseWakeLock() {
+  try { if (_wakeLock) { _wakeLock.release(); _wakeLock = null; } } catch (_) {}
 }

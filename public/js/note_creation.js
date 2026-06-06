@@ -22,6 +22,12 @@ async function runSingleNoteAnalysis() {
   isRunning = true;
   abortController = new AbortController();
 
+  // Keep the screen awake during the long streaming generation so a mobile
+  // auto-lock doesn't suspend the page and kill the request mid-stream.
+  acquireWakeLock();
+  _genWasHidden = false;
+  if (isMobileDevice()) showToast('📱 생성 중에는 화면을 켜두세요 — 화면을 벗어나면 중단될 수 있어요.');
+
   // Reuse buddy system so user can navigate away freely
   _batchRunning      = true;
   _batchProgress     = { done: 0, total: 1 };
@@ -145,6 +151,8 @@ async function runSingleNoteAnalysis() {
   } finally {
     isRunning = false;
     abortController = null;
+    releaseWakeLock();
+    _genWasHidden = false;
     // Clean up buddy state on error/abort (success path already cleared _batchRunning)
     if (_batchRunning) {
       _batchRunning      = false;
