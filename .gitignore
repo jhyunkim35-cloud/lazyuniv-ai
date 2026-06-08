@@ -14,3 +14,6 @@ index_new.html
 
 # sub-claude prompt files (operator-only scratch, not product code)
 .*_prompt.txt
+
+.vercel
+.env*.local
