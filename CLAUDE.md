@@ -13,6 +13,7 @@ Vanilla JS + Vercel 서버리스 + Firebase. 라이브: notyx.co.kr
 - PowerShell 5.1: `&&`·`||`·삼항 금지 → `;` 또는 `if ($?) {}`.
 - JS 수정 후: `node --check public/js/<파일>.js` 로 문법 검증.
 - 캐시버스트: `index.html` 의 `?v=OLD` → `?v=NEW` 교체 필수 (안 하면 stale).
+- 프리커밋 훅: `.githooks/pre-commit`가 JS 문법오류·한글 모지바케 자동 차단. 새 클론 1회만 `git config core.hooksPath .githooks` (안 하면 훅 안 돎).
 
 ## 🛠 작업 방식
 - 코드 수정: **감사/검토 먼저 제시 → 준현 OK → 실행** (건너뛰면 명시적으로 지적).
