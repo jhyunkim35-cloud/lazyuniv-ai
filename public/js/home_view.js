@@ -1,5 +1,5 @@
 // Home view: note card grid, folder cards, drag-reorder, sidebar folders, filter.
-// Depends on: constants.js (_activeFolderId, _bulkSelectMode, _selectedNoteIds, _noteDrag, _currentView, currentNoteId), firestore_sync.js (getAllNotesFS, getAllFoldersFS, getNoteFS, saveNote, userNotesRef, getNextSortOrder, updateNoteOrderFS, getStorageSize), ui.js (showToast, switchView), markdown.js (escHtml, renderMarkdown), notes_crud.js (openSavedNote, renameSavedNote, moveSavedNote, confirmDeleteNote, fmtDate), folders.js (showFolderEditModal, deleteFolderFS, renameFolderPrompt).
+// Depends on: constants.js (_activeFolderId, _bulkSelectMode, _selectedNoteIds, _noteDrag, _currentView, currentNoteId), firestore_sync.js (getAllNotesFS, getAllFoldersFS, getNoteFS, saveNote, userNotesRef, getNextSortOrder, updateNoteOrderFS, getStorageSize), ui.js (showToast, switchView), markdown.js (escHtml, renderMarkdown), notes_crud.js (openSavedNote, renameSavedNote, moveSavedNote, deleteNoteNow, fmtDate), folders.js (showFolderEditModal, deleteFolderFS, renameFolderPrompt).
 
 /* ═══════════════════════════════════════════════
    Home view — note card grid
@@ -444,7 +444,29 @@ function buildNoteCard(note, folderMap, folderColorMap = {}) {
   const [renameBtn, moveBtn, deleteBtn] = card.querySelectorAll('.note-card-actions button');
   renameBtn.addEventListener('click', e => { e.stopPropagation(); enterNoteTitleEdit(card, note); });
   moveBtn.addEventListener('click',   e => { e.stopPropagation(); moveSavedNote(note.id); });
-  deleteBtn.addEventListener('click', e => { e.stopPropagation(); confirmDeleteNote(note.id); });
+  // Inline two-step delete (matches folder-card pattern). First click arms
+  // (red "삭제?"); second click within 3s deletes; otherwise auto-resets.
+  let _noteDelTimer = null;
+  deleteBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    if (deleteBtn.classList.contains('confirm-delete')) {
+      clearTimeout(_noteDelTimer);
+      deleteNoteNow(note.id);
+    } else {
+      document.querySelectorAll('.note-card-actions button.confirm-delete').forEach(b => {
+        b.classList.remove('confirm-delete');
+        b.innerHTML = '<i data-lucide="trash-2"></i>';
+      });
+      deleteBtn.classList.add('confirm-delete');
+      deleteBtn.textContent = '삭제?';
+      _noteDelTimer = setTimeout(() => {
+        deleteBtn.classList.remove('confirm-delete');
+        deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+        if (window.lucide && typeof lucide.createIcons === 'function') { try { lucide.createIcons(); } catch (_) {} }
+      }, 3000);
+      if (window.lucide && typeof lucide.createIcons === 'function') { try { lucide.createIcons(); } catch (_) {} }
+    }
+  });
 
   // Eject button — shown only when viewing inside the note's own folder
   if (note.folderId && _activeFolderId === note.folderId) {

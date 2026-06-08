@@ -241,11 +241,19 @@ async function parseNotionFile(file) {
 /* ═══════════════════════════════════════════════
    Delete note
 ═══════════════════════════════════════════════ */
-async function confirmDeleteNote(id) {
-  if (!await appConfirm('이 노트를 삭제하시겠습니까?', { danger: true })) return;
-  await deleteNoteFS(id);
-  if (currentNoteId === id) currentNoteId = null;
-  showToast('🗑 노트 삭제 완료');
+// Actual delete. Confirmation is handled inline by the 2-step delete button in
+// home_view.js (first click arms "삭제?", second click calls this) — matching
+// the folder-card pattern. No appConfirm modal: a browser extension at max
+// z-index could paint over it so the OK click never landed.
+async function deleteNoteNow(id) {
+  try {
+    await deleteNoteFS(id);
+    if (currentNoteId === id) currentNoteId = null;
+    showToast('🗑 노트 삭제 완료');
+  } catch (e) {
+    console.error('[deleteNoteNow] failed:', e);
+    showToast('❌ 노트 삭제 실패: ' + (e.message || '알 수 없는 오류') + ' (콘솔 확인)');
+  }
   await renderHomeView(); // refresh grid and folder note counts
 }
 
