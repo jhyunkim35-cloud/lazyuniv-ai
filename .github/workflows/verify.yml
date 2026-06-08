@@ -1,0 +1,27 @@
+name: verify
+
+# Server-side gate: re-runs the same checks as the local pre-commit hook and
+# scripts/verify.sh on every push to main (and on PRs), so bad code is caught
+# even if someone bypasses the local hook (--no-verify, fresh clone without
+# core.hooksPath set, etc). Single source of truth: scripts/verify.sh.
+#
+# Local-only checks here (JS syntax + mojibake + cache-version consistency) —
+# NOT --live, because CI runs at/just-before deploy and must not depend on the
+# production deploy having finished. Post-deploy smoke stays a separate manual
+# `bash scripts/verify.sh --live`.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: build verification (scripts/verify.sh)
+        run: bash scripts/verify.sh
