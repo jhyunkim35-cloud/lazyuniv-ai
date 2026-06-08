@@ -41,6 +41,11 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
       const err = await res.json().catch(() => ({}));
       console.error('[callClaudeOnce] API error', res.status, JSON.stringify(err));
       debugLog('API', `Error ${res.status}: ${JSON.stringify(err)}`);
+      // Auto bug report on terminal (non-retry) backend errors — credit
+      // balance, 401 key, 5xx. 429 is transient/expected and skipped.
+      if (res.status !== 429) {
+        try { window.reportAutoError?.('api', (err?.error?.message) || `API ${res.status}`, { status: res.status, endpoint: '/api/claude (once)' }); } catch (_) {}
+      }
       if (res.status === 429) {
         if (attempt === MAX_RETRIES) throw new Error('API 한도 초과 — 잠시 후 다시 시도해주세요.');
         const waitSec = parseInt(res.headers.get('Retry-After') || '30', 10);
@@ -122,6 +127,11 @@ async function callClaudeStream(
       const err = await response.json().catch(() => ({}));
       console.error('[callClaudeStream] API error', response.status, JSON.stringify(err));
       debugLog('API', `Error ${response.status}: ${JSON.stringify(err)}`);
+      // Auto bug report on terminal (non-retry) backend errors — credit
+      // balance, 401 key, 5xx. 429 is transient/expected and skipped.
+      if (response.status !== 429) {
+        try { window.reportAutoError?.('api', (err?.error?.message) || `API ${response.status}`, { status: response.status, endpoint: '/api/claude (stream)' }); } catch (_) {}
+      }
       if (response.status === 429) {
         if (attempt === MAX_RETRIES) throw new Error('API 한도 초과 — 잠시 후 다시 시도해주세요.');
         const waitSec = parseInt(response.headers.get('Retry-After') || '30', 10);

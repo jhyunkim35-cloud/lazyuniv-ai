@@ -187,6 +187,7 @@
       } catch (_) {}
 
       const payload = {
+        source: 'manual',
         userId: user.uid,
         userDisplayName: user.displayName || null,
         email,
