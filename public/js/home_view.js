@@ -46,7 +46,7 @@ function buildFolderCard(folder, noteCount) {
       }
     }).catch(() => {});
   }
-  renameBtn.addEventListener('click', e => { e.stopPropagation(); showFolderManager(); });
+  renameBtn.addEventListener('click', e => { e.stopPropagation(); enterFolderNameEdit(card, folder); });
   // Inline two-step delete (replaces the appConfirm modal that an extension
   // at max z-index was painting over). First click arms (red "삭제?"); a
   // second click within 3s deletes; otherwise it auto-resets. Notes are
@@ -530,6 +530,46 @@ function enterNoteTitleEdit(card, note) {
       showToast('✏️ 이름이 변경되었습니다');
     } catch (e) {
       console.error('[enterNoteTitleEdit] failed:', e);
+      showToast('❌ 이름 변경 실패: ' + (e.message || '알 수 없는 오류'));
+    }
+    renderHomeView();
+  };
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') commit(true);
+    else if (e.key === 'Escape') commit(false);
+  });
+  input.addEventListener('blur', () => commit(true));
+}
+
+// R3: inline folder rename on the home folder card (replaces opening the
+// whole folder manager). Mirrors enterNoteTitleEdit. Name-only — color,
+// lectureCode and examPlan are preserved because renameFolderFS treats
+// undefined args as "leave unchanged".
+function enterFolderNameEdit(card, folder) {
+  const nameEl = card.querySelector('.folder-card-name');
+  if (!nameEl || nameEl.querySelector('input.folder-name-edit')) return;
+  const cur = folder.name || '';
+  nameEl.innerHTML =
+    `<input class="folder-name-edit" value="${escHtml(cur)}" maxlength="60" ` +
+    `style="width:100%; padding:0.2rem 0.4rem; border:1px solid var(--primary); ` +
+    `border-radius:4px; background:var(--surface); color:var(--text); ` +
+    `font:inherit; box-sizing:border-box;" />`;
+  const input = nameEl.querySelector('input.folder-name-edit');
+  input.addEventListener('click', e => e.stopPropagation());
+  let done = false;
+  setTimeout(() => { input.focus(); input.select(); }, 20);
+  const commit = async (save) => {
+    if (done) return;
+    done = true;
+    if (!save) { renderHomeView(); return; }
+    const newName = input.value.trim();
+    if (!newName || newName === (folder.name || '')) { renderHomeView(); return; }
+    try {
+      await renameFolderFS(folder.id, newName); // name-only: color/code preserved
+      showToast('✏️ 폴더 이름이 변경되었습니다');
+    } catch (e) {
+      console.error('[enterFolderNameEdit] failed:', e);
       showToast('❌ 이름 변경 실패: ' + (e.message || '알 수 없는 오류'));
     }
     renderHomeView();
