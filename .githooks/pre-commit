@@ -1,0 +1,47 @@
+#!/bin/sh
+# Notyx pre-commit hook — harness pillar 2 (auto-enforcement).
+# Success silent, failure loud. Blocks commit on JS syntax error or mojibake.
+# Install (once per clone): git config core.hooksPath .githooks
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+
+# 1) JS syntax check (node --check) on staged .js files
+for f in $staged; do
+  case "$f" in
+    *.js)
+      if [ -f "$f" ] && ! node --check "$f" 2>/tmp/_pc_err; then
+        echo "❌ JS 문법 오류: $f"
+        sed 's/^/    /' /tmp/_pc_err 2>/dev/null
+        fail=1
+      fi
+      ;;
+  esac
+done
+
+# 2) Mojibake detection (U+FFFD replacement char = EF BF BD) in staged text files
+# LC_ALL=C + fixed-string byte match (grep -P needs a UTF-8 locale, unavailable here)
+mojibake_pat=$(printf '\xEF\xBF\xBD')
+for f in $staged; do
+  case "$f" in
+    *.js|*.html|*.css|*.md|*.json)
+      if [ -f "$f" ] && LC_ALL=C grep -qF "$mojibake_pat" "$f" 2>/dev/null; then
+        echo "❌ 모지바케 의심 (깨진 문자 U+FFFD): $f — 한글 인코딩 확인"
+        fail=1
+      fi
+      ;;
+  esac
+done
+
+# 3) Cache-bust reminder (warning only, does not block)
+if echo "$staged" | grep -q '^public/js/'; then
+  if ! echo "$staged" | grep -q '^public/index.html$'; then
+    echo "⚠️  public/js 변경됨 — index.html ?v= 캐시버스트 확인 (경고만, 커밋은 진행)"
+  fi
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "🚫 커밋 차단. 위 오류 수정 후 다시 커밋."
+  exit 1
+fi
+exit 0
