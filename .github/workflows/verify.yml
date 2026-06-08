@@ -25,3 +25,5 @@ jobs:
           node-version: '24'
       - name: build verification (scripts/verify.sh)
         run: bash scripts/verify.sh
+      - name: acceptance specs (scripts/acceptance.sh)
+        run: bash scripts/acceptance.sh
