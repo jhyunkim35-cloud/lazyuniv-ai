@@ -1,6 +1,5 @@
 const { getAdmin } = require('./_firebase-admin');
-const { FieldValue } = require('firebase-admin/firestore');
-const { recordUsage } = require('./_usage');
+const { grantEntitlement } = require('./_grant');
 
 module.exports = async function handler(req, res) {
   // CORS — both legacy and post-rebrand origins until DNS swap is complete
@@ -74,119 +73,18 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
 
     if (response.ok && data.status === 'DONE') {
-      const verifiedAmount = data.totalAmount;
-
-      // ── STT per-use entitlement ──────────────────────────────────
-      if (kind === 'sttEntitlement') {
-        const n = Math.max(1, Math.ceil((Number(minutes) || 0) / 30));
-        const expectedPrice = n <= 5 ? 500 + n * 1000 : n === 6 ? 6600 : 6600 + (n - 6) * 1000;
-        if (verifiedAmount !== expectedPrice) {
-          console.error('STT entitlement amount mismatch:', verifiedAmount, 'expected:', expectedPrice);
-          return res.status(400).json({ success: false, message: 'Amount mismatch for STT entitlement' });
-        }
-        try {
-          const admin = getAdmin();
-          const db = admin.firestore();
-          await db.collection('users').doc(uid)
-            .collection('sttEntitlements').doc(paymentKey)
-            .set({
-              minutes: n * 30,
-              priceKRW: verifiedAmount,
-              paidAt: FieldValue.serverTimestamp(),
-              consumed: false,
-              consumedAt: null,
-              transcriptId: null,
-              orderId,
-              paymentKey,
-            });
-        } catch (e) {
-          console.error('Firestore sttEntitlement write failed:', e);
-          return res.status(500).json({ success: false, message: 'Entitlement creation failed: ' + e.message });
-        }
-        try {
-          await recordUsage({ uid, kind: 'sttPayment', increments: { sttPaymentCount: 1, sttPaymentTotalKRW: verifiedAmount } });
-        } catch (e) { console.error('[usage] stt payment record failed:', e.message); }
-        // Seal idempotency — future retries with same paymentKey return immediately.
-        try {
-          const adminSdk = getAdmin();
-          await adminSdk.firestore()
-            .collection('users').doc(uid)
-            .collection('paymentLog').doc(paymentKey)
-            .set({
-              kind: 'sttEntitlement',
-              orderId,
-              paymentKey,
-              priceKRW: verifiedAmount,
-              minutes: n * 30,
-              processedAt: FieldValue.serverTimestamp(),
-            });
-        } catch (e) { console.warn('[toss] paymentLog seal failed:', e.message); }
-        return res.status(200).json({ success: true, data, minutes: n * 30, priceKRW: verifiedAmount });
+      const result = await grantEntitlement({
+        uid, kind, minutes,
+        paymentKey, orderId,
+        verifiedAmount: data.totalAmount,
+      });
+      if (!result.ok) {
+        return res.status(result.status || 400).json({ success: false, message: result.message });
       }
-
-      // ── Plan purchase (monthly / single) ────────────────────────
-      // Derive plan from Toss-verified amount — client URL param is not trusted
-      let verifiedPlan;
-      if (verifiedAmount === 7900) verifiedPlan = 'monthly';
-      else if (verifiedAmount === 500) verifiedPlan = 'single';
-      else {
-        console.error('Unknown payment amount:', verifiedAmount);
-        return res.status(400).json({ success: false, message: 'Unrecognized payment amount: ' + verifiedAmount });
-      }
-
-      // Write plan to Firestore via Admin SDK — client never touches plan field
-      try {
-        const admin = getAdmin();
-        const db = admin.firestore();
-        const userRef = db.collection('users').doc(uid);
-
-        if (verifiedPlan === 'monthly') {
-          const expiry = new Date();
-          expiry.setDate(expiry.getDate() + 30);
-          await userRef.set({
-            plan: 'monthly',
-            planExpiry: expiry.toISOString(),
-            lastOrderId: orderId,
-            lastPaymentAt: new Date().toISOString(),
-          }, { merge: true });
-        } else {
-          await userRef.set({
-            singlePurchases: FieldValue.increment(1),
-            lastOrderId: orderId,
-            lastPaymentAt: new Date().toISOString(),
-          }, { merge: true });
-        }
-      } catch (e) {
-        console.error('Firestore write failed:', e);
-        return res.status(500).json({ success: false, message: 'Plan update failed: ' + e.message });
-      }
-
-      try {
-        await recordUsage({
-          uid,
-          kind: 'payment',
-          increments: { paymentCount: 1, paymentTotalKRW: verifiedAmount },
-        });
-      } catch (e) {
-        console.error('[usage] payment record failed:', e.message);
-      }
-
-      // Seal idempotency for plan purchases too.
-      try {
-        const adminSdk = getAdmin();
-        await adminSdk.firestore()
-          .collection('users').doc(uid)
-          .collection('paymentLog').doc(paymentKey)
-          .set({
-            kind: verifiedPlan,
-            orderId,
-            paymentKey,
-            priceKRW: verifiedAmount,
-            processedAt: FieldValue.serverTimestamp(),
-          });
-      } catch (e) { console.warn('[toss] paymentLog seal failed:', e.message); }
-
-      return res.status(200).json({ success: true, data, plan: verifiedPlan });
+      const extra = result.plan
+        ? { plan: result.plan }
+        : { minutes: result.minutes, priceKRW: result.priceKRW };
+      return res.status(200).json({ success: true, data, ...extra });
     } else {
       return res.status(400).json({ success: false, message: data.message || 'Payment failed' });
     }
