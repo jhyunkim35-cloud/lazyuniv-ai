@@ -94,7 +94,21 @@ async function grantEntitlement({ uid, kind, minutes, paymentKey, orderId, verif
   try {
     const userRef = db.collection('users').doc(uid);
     if (verifiedPlan === 'monthly') {
-      const expiry = new Date();
+      // Stack onto remaining time: if the current plan hasn't expired yet,
+      // extend from its expiry; otherwise start from now. (Idempotency guard
+      // above means a given paymentKey can only stack once.)
+      let base = new Date();
+      try {
+        const cur = await userRef.get();
+        const curExpiry = cur.exists ? cur.data().planExpiry : null;
+        if (curExpiry) {
+          const d = new Date(curExpiry);
+          if (!isNaN(d.getTime()) && d > base) base = d;
+        }
+      } catch (e) {
+        console.warn('[grant] planExpiry read for stacking skipped:', e.message);
+      }
+      const expiry = new Date(base);
       expiry.setDate(expiry.getDate() + 30);
       await userRef.set({
         plan: 'monthly',
