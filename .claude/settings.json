@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Bash(node --check:*)",
+      "Bash(bash scripts/verify.sh:*)",
+      "Bash(bash scripts/acceptance.sh:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "WebFetch(domain:api.github.com)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)",
+      "Read(.env*)",
+      "Edit(.env*)",
+      "Read(//**/.env*)",
+      "Bash(vercel env rm:*)"
+    ]
+  },
+  "defaultMode": "default"
+}
