@@ -3,6 +3,8 @@
 
 async function runAgentPipeline(apiKey, targetBodyEl = null) {
   resetAgentNodes();
+  const _heroEl = document.getElementById('summaryHero');  // R3: hide stale summary hero on new run
+  if (_heroEl) _heroEl.hidden = true;
   iterChipData = [];
   startElapsedTimer();
   debugLog('PIPE', 'Pipeline start');
@@ -408,6 +410,19 @@ function stripLeadingSummary(notes) {
   return notes.replace(/^\s*\*\*요약\*\*\s*[:：][^\n]*\n+/, '');
 }
 
+/* R3: surface the 요약 as a standalone hero so it's scannable without expanding the note.
+   Single mode only — extracts the leading "**요약**:" line from the final note. */
+function renderSummaryHero(notesText) {
+  const hero = document.getElementById('summaryHero');
+  if (!hero) return;
+  const m = (notesText || '').match(/^\s*\*\*요약\*\*\s*[:：]\s*([^\n]+)/);
+  const summary = m ? m[1].trim() : '';
+  const body = document.getElementById('summaryHeroBody');
+  if (!summary || !body) { hero.hidden = true; return; }
+  body.textContent = summary;
+  hero.hidden = false;
+}
+
 /* ═══════════════════════════════════════════════
    Agent 1 — Note Writer / Reviser (streams to hero card)
 ═══════════════════════════════════════════════ */
@@ -577,6 +592,7 @@ ${recText}`;
     document.getElementById('notesActions').classList.add('visible');
     document.getElementById('collapseBtn').classList.add('visible');
     document.getElementById('dotNotes').className = 'status-dot done';
+    renderSummaryHero(notesText);  // R3: surface 요약 as standalone hero
   }
 
   agentLog(1, `노트 ${critiqueText ? '수정' : '작성'} 완료 — ${notesText.length.toLocaleString()}자`);
@@ -661,6 +677,7 @@ ${critiqueText}`;
     document.getElementById('notesActions').classList.add('visible');
     document.getElementById('collapseBtn').classList.add('visible');
     document.getElementById('dotNotes').className = 'status-dot done';
+    renderSummaryHero(patched);  // R3: keep hero in sync after patch
   }
 
   agentLog(1, `Haiku 패치 완료 — 최종 노트 ${patched.length.toLocaleString()}자`);
