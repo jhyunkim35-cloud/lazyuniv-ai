@@ -465,7 +465,7 @@ ${critiqueText}`;
 
         let chunkInstruction;
         if (c === 0) {
-          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. More slides follow in separate calls.`;
+          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. More slides follow in separate calls. Do NOT write a **요약** paragraph — start directly with the first # heading. The summary will be synthesized separately after all slides are processed.`;
         } else {
           chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. Continue from previous notes. Match the same format. Do NOT write a **요약** paragraph or any introduction — start directly with the first # heading for these slides.`;
         }
@@ -482,7 +482,20 @@ ${critiqueText}`;
         accumulatedNotes += chunkText + '\n';
       }
 
-      agentLog(1, `${numChunks}개 청크 완료 — 슬라이드 전체 통합`);
+      agentLog(1, `${numChunks}개 청크 완료 — 전체 노트 기반 요약 합성 중…`);
+
+      /* ── R1 map-reduce: synthesize 요약 from the FULL note (all chunks), not just the first chunk.
+         Chunk 0 no longer writes 요약, so it would otherwise be missing. Failure → note survives without 요약. */
+      try {
+        const summarySystem = '당신은 대학 강의 학습노트 요약 전문가입니다. 한국어로 작성하세요.';
+        const summaryPrompt = `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 2~3문장으로 압축해 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 출력은 요약 문장만 — 머리말·마크다운 헤딩·"요약" 레이블 없이.\n\n[전체 학습 노트]\n${combinedNotes}`;
+        const summaryRaw = await callClaudeOnce(apiKey, summaryPrompt, summarySystem, 1024, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' });
+        const summaryText = (summaryRaw || '').trim().replace(/^\**\s*요약\s*[:：]?\s*/, '').trim();
+        if (summaryText) combinedNotes = `**요약**: ${summaryText}\n\n${combinedNotes}`;
+      } catch (e) {
+        debugLog('PIPE', `Summary reduce failed: ${e.message} — proceeding without 요약`);
+      }
+
       notesText = combinedNotes;
       targetEl.innerHTML = renderMarkdown(notesText);
 
