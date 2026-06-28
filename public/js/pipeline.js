@@ -374,9 +374,45 @@ function applyHighlights(transcript, phrases) {
 }
 
 /* ═══════════════════════════════════════════════
+   R2 — Dedicated summary synthesis + critic verification
+   요약을 노트 파이프라인에서 떼어 1급 산출물로: 전체 노트(곁다리 아님)에서
+   전용 프롬프트로 생성 → critic이 정확성·누락을 따로 검증 → FAIL이면 1회 재생성.
+   모든 노트 경로(청크/단일/PPT)가 이 함수를 거친다. 실패해도 호출부 try/catch로 노트 생존.
+═══════════════════════════════════════════════ */
+async function synthesizeSummary(apiKey, fullNotes) {
+  const sys = '당신은 대학 강의 학습노트 요약 전문가입니다. 한국어로 작성하세요.';
+  const genPrompt = (extra = '') => `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 2~3문장으로 압축해 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 출력은 요약 문장만 — 머리말·마크다운 헤딩·"요약" 레이블 없이.${extra}\n\n[전체 학습 노트]\n${fullNotes}`;
+  const clean = s => (s || '').trim().replace(/^\**\s*요약\s*[:：]?\s*/, '').trim();
+
+  let summary = clean(await callClaudeOnce(apiKey, genPrompt(), sys, 1024, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }));
+  if (!summary) return '';
+
+  /* critic: 요약이 노트 전체를 날조 없이·누락 없이 대표하는지 검증. Haiku, FAIL이면 1회 재생성. */
+  try {
+    const verdict = (await callClaudeOnce(apiKey,
+      `아래 [요약]이 [학습 노트]를 정확히 대표하는지 검증하세요. 노트에 없는 내용을 지어냈거나(날조) 노트의 주요 주제 상당수를 누락했으면 FAIL, 정확하고 포괄적이면 PASS. 출력은 PASS 또는 FAIL 한 단어만.\n\n[요약]\n${summary}\n\n[학습 노트]\n${fullNotes}`,
+      '당신은 요약 검증자입니다.', 16, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' })).trim();
+    debugLog('PIPE', `Summary critic verdict: ${verdict}`);
+    if (/FAIL/i.test(verdict)) {
+      const retry = clean(await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 1024, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }));
+      if (retry) summary = retry;
+    }
+  } catch (e) {
+    debugLog('PIPE', `Summary critic failed: ${e.message} — keeping initial summary`);
+  }
+  return summary;
+}
+
+// remove Agent1's inline "**요약**: …" opening paragraph so the verified one replaces it
+function stripLeadingSummary(notes) {
+  return notes.replace(/^\s*\*\*요약\*\*\s*[:：][^\n]*\n+/, '');
+}
+
+/* ═══════════════════════════════════════════════
    Agent 1 — Note Writer / Reviser (streams to hero card)
 ═══════════════════════════════════════════════ */
 async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', targetBodyEl = null, meta = {}) {
+  let needsSummarySynth = false;  // R2: set by single-pass / PPT-only paths
   setAgentNode(1, 'loading', critiqueText ? '노트 수정 중…' : '노트 작성 중…');
 
   const { formatSection, rulesSection } = getNoteFormatBlocks();
@@ -425,6 +461,7 @@ ${critiqueText}`;
 
   } else if (!hasTxt) {
     /* ── PPT-only mode: single Sonnet call ── */
+    needsSummarySynth = true;  // R2: replace Agent1 inline 요약 with verified summary
     agentLog(1, 'PPT 전용 모드 — Sonnet으로 노트 작성 시작…');
 
     const userPrompt = `위 PPT 자료를 바탕으로 학습 가이드를 작성하세요.
@@ -484,16 +521,14 @@ ${critiqueText}`;
 
       agentLog(1, `${numChunks}개 청크 완료 — 전체 노트 기반 요약 합성 중…`);
 
-      /* ── R1 map-reduce: synthesize 요약 from the FULL note (all chunks), not just the first chunk.
-         Chunk 0 no longer writes 요약, so it would otherwise be missing. Failure → note survives without 요약. */
+      /* ── R1 map-reduce + R2 verify: synthesize 요약 from the FULL note (all chunks),
+         then a dedicated critic verifies coverage/accuracy. Chunk 0 writes no 요약,
+         so it would otherwise be missing. Failure → note survives without 요약. */
       try {
-        const summarySystem = '당신은 대학 강의 학습노트 요약 전문가입니다. 한국어로 작성하세요.';
-        const summaryPrompt = `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 2~3문장으로 압축해 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 출력은 요약 문장만 — 머리말·마크다운 헤딩·"요약" 레이블 없이.\n\n[전체 학습 노트]\n${combinedNotes}`;
-        const summaryRaw = await callClaudeOnce(apiKey, summaryPrompt, summarySystem, 1024, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' });
-        const summaryText = (summaryRaw || '').trim().replace(/^\**\s*요약\s*[:：]?\s*/, '').trim();
+        const summaryText = await synthesizeSummary(apiKey, combinedNotes);
         if (summaryText) combinedNotes = `**요약**: ${summaryText}\n\n${combinedNotes}`;
       } catch (e) {
-        debugLog('PIPE', `Summary reduce failed: ${e.message} — proceeding without 요약`);
+        debugLog('PIPE', `Summary synth failed: ${e.message} — proceeding without 요약`);
       }
 
       notesText = combinedNotes;
@@ -501,6 +536,7 @@ ${critiqueText}`;
 
     } else {
       /* ── Single-pass mode ── */
+      needsSummarySynth = true;  // R2: replace Agent1 inline 요약 with verified summary
       agentLog(1, `PPT + 녹취록 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`);
 
       const userPrompt = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.
@@ -511,6 +547,22 @@ ${recText}`;
       agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
       debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
       notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
+    }
+  }
+
+  /* ── R2: single-pass / PPT-only 경로도 요약을 전용 합성·검증으로 교체.
+     Agent1 곁다리 요약을 떼고 verified 요약 prepend. 실패 시 인라인 요약 유지. ── */
+  if (needsSummarySynth) {
+    agentLog(1, '요약 전용 합성·검증 중…');
+    try {
+      const stripped = stripLeadingSummary(notesText);
+      const summaryText = await synthesizeSummary(apiKey, stripped);
+      if (summaryText) {
+        notesText = `**요약**: ${summaryText}\n\n${stripped}`;
+        targetEl.innerHTML = renderMarkdown(notesText);
+      }
+    } catch (e) {
+      debugLog('PIPE', `Summary synth failed: ${e.message} — keeping inline summary`);
     }
   }
 
