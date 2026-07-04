@@ -681,6 +681,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
             pptText: storedPptText,
             filteredText: storedFilteredText,
             extractedImages: [...(extractedImages || [])],
+            summaryLayers: currentSummaryLayers || null,  // R4: batch path parity with autoSaveNote
           }).then(() => renderHomeView()).catch(e => console.error('[batch] save failed:', e));
         }
         // Usage is now incremented server-side by /api/claude on first call.

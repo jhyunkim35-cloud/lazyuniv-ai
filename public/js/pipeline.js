@@ -5,6 +5,7 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   resetAgentNodes();
   const _heroEl = document.getElementById('summaryHero');  // R3: hide stale summary hero on new run
   if (_heroEl) _heroEl.hidden = true;
+  currentSummaryLayers = null;  // R4: reset multilayer summary so a failed synth doesn't leak the previous note's layers
   iterChipData = [];
   startElapsedTimer();
   debugLog('PIPE', 'Pipeline start');
@@ -383,26 +384,65 @@ function applyHighlights(transcript, phrases) {
 ═══════════════════════════════════════════════ */
 async function synthesizeSummary(apiKey, fullNotes) {
   const sys = '당신은 대학 강의 학습노트 요약 전문가입니다. 한국어로 작성하세요.';
-  const genPrompt = (extra = '') => `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 2~3문장으로 압축해 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 출력은 요약 문장만 — 머리말·마크다운 헤딩·"요약" 레이블 없이.${extra}\n\n[전체 학습 노트]\n${fullNotes}`;
+  // R4: 1콜로 4층(한줄/핵심/문단/챕터)을 고정 마커로 뽑아낸다 — 문단층은 기존 2~3문장 요약과 동일 성격.
+  const genPrompt = (extra = '') => `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 아래 4개 층으로 나눠 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 각 마커는 정확히 그대로 쓰고, 마커 외의 머리말·설명은 출력하지 마세요.${extra}
+
+[한줄]
+(강의 전체를 관통하는 TL;DR 1문장)
+[핵심]
+- (핵심 포인트 5개 불릿)
+[문단]
+(2~3문장 요약)
+[챕터]
+- (노트의 주요 섹션/챕터별 1줄 요약, "섹션명: 내용" 형식)
+
+[전체 학습 노트]
+${fullNotes}`;
   const clean = s => (s || '').trim().replace(/^\**\s*요약\s*[:：]?\s*/, '').trim();
 
-  let summary = clean(await callClaudeOnce(apiKey, genPrompt(), sys, 1024, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }));
-  if (!summary) return '';
+  // R4: 마커([한줄]/[핵심]/[문단]/[챕터]) 기준으로 순서대로 잘라낸다. 마커가 하나도 없으면
+  // (파싱 실패) 응답 전체를 문단층으로 취급하고 나머지 층은 빈 값.
+  const MARKERS = ['[한줄]', '[핵심]', '[문단]', '[챕터]'];
+  const toList = s => (s || '').split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+  function parseLayers(raw) {
+    const text = (raw || '').trim();
+    const idx = MARKERS.map(m => text.indexOf(m));
+    if (idx.every(i => i === -1)) {
+      return { tldr: '', bullets: [], paragraph: clean(text), chapters: [] };
+    }
+    const section = i => {
+      if (idx[i] === -1) return '';
+      const start = idx[i] + MARKERS[i].length;
+      const rest = idx.slice(i + 1).filter(x => x !== -1);
+      const end = rest.length ? Math.min(...rest) : text.length;
+      return text.slice(start, end).trim();
+    };
+    return {
+      tldr: section(0),
+      bullets: toList(section(1)),
+      paragraph: clean(section(2)),
+      chapters: toList(section(3)),
+    };
+  }
+
+  let raw = (await callClaudeOnce(apiKey, genPrompt(), sys, 1536, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+  if (!raw) return { tldr: '', bullets: [], paragraph: '', chapters: [] };
+  let layers = parseLayers(raw);
 
   /* critic: 요약이 노트 전체를 날조 없이·누락 없이 대표하는지 검증. Haiku, FAIL이면 1회 재생성. */
   try {
     const verdict = (await callClaudeOnce(apiKey,
-      `아래 [요약]이 [학습 노트]를 정확히 대표하는지 검증하세요. 노트에 없는 내용을 지어냈거나(날조) 노트의 주요 주제 상당수를 누락했으면 FAIL, 정확하고 포괄적이면 PASS. 출력은 PASS 또는 FAIL 한 단어만.\n\n[요약]\n${summary}\n\n[학습 노트]\n${fullNotes}`,
+      `아래 [요약]이 [학습 노트]를 정확히 대표하는지 검증하세요. 노트에 없는 내용을 지어냈거나(날조) 노트의 주요 주제 상당수를 누락했으면 FAIL, 정확하고 포괄적이면 PASS. 출력은 PASS 또는 FAIL 한 단어만.\n\n[요약]\n${raw}\n\n[학습 노트]\n${fullNotes}`,
       '당신은 요약 검증자입니다.', 16, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' })).trim();
     debugLog('PIPE', `Summary critic verdict: ${verdict}`);
     if (/FAIL/i.test(verdict)) {
-      const retry = clean(await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 1024, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }));
-      if (retry) summary = retry;
+      const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 1536, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+      if (retryRaw) layers = parseLayers(retryRaw);
     }
   } catch (e) {
     debugLog('PIPE', `Summary critic failed: ${e.message} — keeping initial summary`);
   }
-  return summary;
+  return layers;
 }
 
 // remove Agent1's inline "**요약**: …" opening paragraph so the verified one replaces it
@@ -410,15 +450,72 @@ function stripLeadingSummary(notes) {
   return notes.replace(/^\s*\*\*요약\*\*\s*[:：][^\n]*\n+/, '');
 }
 
+/* R4: tab chips over the 4 summary layers. Order = default display order,
+   first non-empty layer is the default tab. */
+const SUMMARY_HERO_TABS = [
+  { key: 'tldr',      label: '한줄' },
+  { key: 'bullets',   label: '핵심' },
+  { key: 'paragraph', label: '문단' },
+  { key: 'chapters',  label: '챕터' },
+];
+
+function renderSummaryHeroLayer(bodyEl, layers, key) {
+  bodyEl.innerHTML = '';
+  const val = layers[key];
+  if (key === 'bullets' || key === 'chapters') {
+    const ul = document.createElement('ul');
+    ul.className = 'summary-hero-list';
+    (val || []).forEach(item => {
+      const li = document.createElement('li');
+      li.textContent = item;  // textContent — never insert raw model output as HTML
+      ul.appendChild(li);
+    });
+    bodyEl.appendChild(ul);
+  } else {
+    bodyEl.textContent = val || '';
+  }
+}
+
 /* R3: surface the 요약 as a standalone hero so it's scannable without expanding the note.
-   Single mode only — extracts the leading "**요약**:" line from the final note. */
+   R4: if currentSummaryLayers is populated, render as tab chips (한줄/핵심/문단/챕터).
+   Falls back to the legacy single-line "**요약**:" extraction for old notes without layers. */
 function renderSummaryHero(notesText) {
   const hero = document.getElementById('summaryHero');
-  if (!hero) return;
+  const body = document.getElementById('summaryHeroBody');
+  const chips = document.getElementById('summaryHeroChips');
+  if (!hero || !body) return;
+
+  const layers = currentSummaryLayers;
+  const available = layers ? SUMMARY_HERO_TABS.filter(t => {
+    const v = layers[t.key];
+    return Array.isArray(v) ? v.length > 0 : !!v;
+  }) : [];
+
+  if (available.length > 0 && chips) {
+    chips.innerHTML = '';
+    available.forEach((t, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'summary-hero-chip' + (i === 0 ? ' active' : '');
+      btn.textContent = t.label;
+      btn.addEventListener('click', () => {
+        chips.querySelectorAll('.summary-hero-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderSummaryHeroLayer(body, layers, t.key);
+      });
+      chips.appendChild(btn);
+    });
+    chips.hidden = false;
+    renderSummaryHeroLayer(body, layers, available[0].key);
+    hero.hidden = false;
+    return;
+  }
+
+  // Fallback: old note without summaryLayers — regex-extract the inline "**요약**:" line.
+  if (chips) chips.hidden = true;
   const m = (notesText || '').match(/^\s*\*\*요약\*\*\s*[:：]\s*([^\n]+)/);
   const summary = m ? m[1].trim() : '';
-  const body = document.getElementById('summaryHeroBody');
-  if (!summary || !body) { hero.hidden = true; return; }
+  if (!summary) { hero.hidden = true; return; }
   body.textContent = summary;
   hero.hidden = false;
 }
@@ -540,8 +637,8 @@ ${critiqueText}`;
          then a dedicated critic verifies coverage/accuracy. Chunk 0 writes no 요약,
          so it would otherwise be missing. Failure → note survives without 요약. */
       try {
-        const summaryText = await synthesizeSummary(apiKey, combinedNotes);
-        if (summaryText) combinedNotes = `**요약**: ${summaryText}\n\n${combinedNotes}`;
+        currentSummaryLayers = await synthesizeSummary(apiKey, combinedNotes);  // R4: multilayer object
+        if (currentSummaryLayers.paragraph) combinedNotes = `**요약**: ${currentSummaryLayers.paragraph}\n\n${combinedNotes}`;
       } catch (e) {
         debugLog('PIPE', `Summary synth failed: ${e.message} — proceeding without 요약`);
       }
@@ -571,9 +668,9 @@ ${recText}`;
     agentLog(1, '요약 전용 합성·검증 중…');
     try {
       const stripped = stripLeadingSummary(notesText);
-      const summaryText = await synthesizeSummary(apiKey, stripped);
-      if (summaryText) {
-        notesText = `**요약**: ${summaryText}\n\n${stripped}`;
+      currentSummaryLayers = await synthesizeSummary(apiKey, stripped);  // R4: multilayer object
+      if (currentSummaryLayers.paragraph) {
+        notesText = `**요약**: ${currentSummaryLayers.paragraph}\n\n${stripped}`;
         targetEl.innerHTML = renderMarkdown(notesText);
       }
     } catch (e) {

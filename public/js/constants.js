@@ -172,6 +172,7 @@ let storedPptText              = '';
 let storedFilteredText         = '';
 let storedNotesText            = '';
 let storedHighlightedTranscript = '';
+let currentSummaryLayers       = null;  // R4: { tldr, bullets, paragraph, chapters } from synthesizeSummary, or null
 
 let extractedImages    = [];   // [{slideNumber, imageBase64, mimeType, fileName}]
 let recommendedSlides  = [];   // [slideNumber, ...]

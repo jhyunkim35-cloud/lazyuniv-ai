@@ -1,5 +1,5 @@
 // Notes CRUD: auto-save, list rendering, open/load, Notion file import, delete, move, rename, detect splits.
-// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea).
+// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero).
 
 /* ═══════════════════════════════════════════════
    Auto-save after pipeline
@@ -41,6 +41,7 @@ async function autoSaveNote() {
       highlightedTranscript: storedHighlightedTranscript,
       extractedImages:      extractedImages,
       audioStoragePath:     audioStoragePath,
+      summaryLayers:        currentSummaryLayers || null,  // R4: multilayer summary (한줄/핵심/문단/챕터)
     });
     if (audioStoragePath) window.recorderLastAudioPath = null;
     currentNoteId = record.id;
@@ -82,6 +83,7 @@ async function openSavedNote(id) {
   storedFilteredText         = note.filteredText         || '';
   storedHighlightedTranscript = note.highlightedTranscript || '';
   extractedImages            = note.extractedImages      || [];
+  currentSummaryLayers       = note.summaryLayers         || null;  // R4: restore multilayer summary
   currentNoteId              = note.id;
 
   const body = document.getElementById('finalNotesBody');
@@ -92,6 +94,7 @@ async function openSavedNote(id) {
   } else {
     body.innerHTML = '<span class="placeholder-msg">노트 내용이 없습니다.</span>';
   }
+  renderSummaryHero(storedNotesText);  // R4: restore hero (multilayer if saved, legacy fallback otherwise)
 
   // Clear cached split-viewer content so it re-renders from restored state
   const splitNotes      = document.getElementById('splitNotes');
