@@ -1539,7 +1539,26 @@
       color: var(--primary);
       text-transform: uppercase;
       margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
+    /* R6: small regen button in the hero title row — same tone as the tab chips */
+    .summary-hero-regen {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: normal;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .summary-hero-regen:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+    .summary-hero-regen:disabled { opacity: 0.6; cursor: default; }
     .summary-hero-body {
       font-size: 1.02rem;
       line-height: 1.6;
@@ -4077,7 +4096,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=r4multi"></script>
+<script defer src="/js/markdown.js?v=r56exam"></script>
 </head>
 <body>
 
@@ -4494,7 +4513,7 @@
 
     <!-- R3: standalone 핵심 요약 hero (single mode) — surfaces 요약 without expanding the note -->
     <div class="result-card summary-hero-card" id="summaryHero" hidden>
-      <div class="summary-hero-title">⚡ 핵심 요약</div>
+      <div class="summary-hero-title">⚡ 핵심 요약<button type="button" class="summary-hero-regen" id="summaryRegenBtn">↻ 재생성</button></div>
       <div class="summary-hero-chips" id="summaryHeroChips" hidden></div>
       <div class="summary-hero-body" id="summaryHeroBody"></div>
     </div>
@@ -4706,43 +4725,43 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=r4multi"></script>
-<script defer src="/js/error_autoreport.js?v=r4multi"></script>
-<script defer src="/js/icons.js?v=r4multi"></script>
-<script defer src="/js/storage.js?v=r4multi"></script>
-<script defer src="/js/firestore_sync.js?v=r4multi"></script>
-<script defer src="/js/transcripts_store.js?v=r4multi"></script>
-<script defer src="/js/api.js?v=r4multi"></script>
-<script defer src="/js/pptx_parser.js?v=r4multi"></script>
-<script defer src="/js/quiz.js?v=r4multi"></script>
-<script defer src="/js/ui.js?v=r4multi"></script>
-<script defer src="/js/viewers.js?v=r4multi"></script>
-<script defer src="/js/image_gallery.js?v=r4multi"></script>
-<script defer src="/js/pipeline.js?v=r4multi"></script>
-<script defer src="/js/batch.js?v=r4multi"></script>
-<script defer src="/js/note_creation.js?v=r4multi"></script>
-<script defer src="/js/notes_crud.js?v=r4multi"></script>
-<script defer src="/js/notion_viewer.js?v=r4multi"></script>
-<script defer src="/js/notion_clipboard.js?v=r4multi"></script>
-<script defer src="/js/folders.js?v=r4multi"></script>
-<script defer src="/js/exam_plan.js?v=r4multi"></script>
-<script defer src="/js/srs.js?v=r4multi"></script>
-<script defer src="/js/timetable.js?v=r4multi"></script>
-<script defer src="/js/gamification.js?v=r4multi"></script>
-<script defer src="/js/achievements.js?v=r4multi"></script>
-<script defer src="/js/srs_review.js?v=r4multi"></script>
-<script defer src="/js/home_view.js?v=r4multi"></script>
-<script defer src="/js/transcripts_view.js?v=r4multi"></script>
-<script defer src="/js/bulk.js?v=r4multi"></script>
-<script defer src="/js/firebase_auth.js?v=r4multi"></script>
-<script defer src="/js/payment.js?v=r4multi"></script>
-<script defer src="/js/recorder.js?v=r4multi"></script>
-<script defer src="/js/groups.js?v=r4multi"></script>
-<script defer src="/js/study_rooms.js?v=r4multi"></script>
-<script defer src="/js/bug_report.js?v=r4multi"></script>
-<script defer src="/js/onboarding_tour.js?v=r4multi"></script>
-<script defer src="/js/main.js?v=r4multi"></script>
-<script defer src="/js/main_inline.js?v=r4multi"></script>
+<script defer src="/js/constants.js?v=r56exam"></script>
+<script defer src="/js/error_autoreport.js?v=r56exam"></script>
+<script defer src="/js/icons.js?v=r56exam"></script>
+<script defer src="/js/storage.js?v=r56exam"></script>
+<script defer src="/js/firestore_sync.js?v=r56exam"></script>
+<script defer src="/js/transcripts_store.js?v=r56exam"></script>
+<script defer src="/js/api.js?v=r56exam"></script>
+<script defer src="/js/pptx_parser.js?v=r56exam"></script>
+<script defer src="/js/quiz.js?v=r56exam"></script>
+<script defer src="/js/ui.js?v=r56exam"></script>
+<script defer src="/js/viewers.js?v=r56exam"></script>
+<script defer src="/js/image_gallery.js?v=r56exam"></script>
+<script defer src="/js/pipeline.js?v=r56exam"></script>
+<script defer src="/js/batch.js?v=r56exam"></script>
+<script defer src="/js/note_creation.js?v=r56exam"></script>
+<script defer src="/js/notes_crud.js?v=r56exam"></script>
+<script defer src="/js/notion_viewer.js?v=r56exam"></script>
+<script defer src="/js/notion_clipboard.js?v=r56exam"></script>
+<script defer src="/js/folders.js?v=r56exam"></script>
+<script defer src="/js/exam_plan.js?v=r56exam"></script>
+<script defer src="/js/srs.js?v=r56exam"></script>
+<script defer src="/js/timetable.js?v=r56exam"></script>
+<script defer src="/js/gamification.js?v=r56exam"></script>
+<script defer src="/js/achievements.js?v=r56exam"></script>
+<script defer src="/js/srs_review.js?v=r56exam"></script>
+<script defer src="/js/home_view.js?v=r56exam"></script>
+<script defer src="/js/transcripts_view.js?v=r56exam"></script>
+<script defer src="/js/bulk.js?v=r56exam"></script>
+<script defer src="/js/firebase_auth.js?v=r56exam"></script>
+<script defer src="/js/payment.js?v=r56exam"></script>
+<script defer src="/js/recorder.js?v=r56exam"></script>
+<script defer src="/js/groups.js?v=r56exam"></script>
+<script defer src="/js/study_rooms.js?v=r56exam"></script>
+<script defer src="/js/bug_report.js?v=r56exam"></script>
+<script defer src="/js/onboarding_tour.js?v=r56exam"></script>
+<script defer src="/js/main.js?v=r56exam"></script>
+<script defer src="/js/main_inline.js?v=r56exam"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

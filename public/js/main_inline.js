@@ -162,6 +162,9 @@ document.getElementById('cancelBtn').addEventListener('click', () => {
   }
 });
 
+// R6: hero 카드의 요약 재생성 버튼 — 단일 노트 뷰 전제 (regenerateSummary 참고)
+document.getElementById('summaryRegenBtn')?.addEventListener('click', regenerateSummary);
+
 /* ═══════════════════════════════════════════════
    Debug report
 ═══════════════════════════════════════════════ */
