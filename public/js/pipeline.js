@@ -1,11 +1,14 @@
 // Agent pipeline orchestration, note writers, critic.
-// Depends on: constants.js (analyzeBtn, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, DONE_SIGNAL, MAX_ITERATIONS, MAX_TOKENS_NOTES, MAX_TOKENS_CRITIQUE, iterChipData, debugLog), markdown.js (renderMarkdown), api.js (callClaudeOnce, callClaudeStream), ui.js (agentLog, setProgress, setAgentNode, resetAgentNodes, makeAgentDot, updateIterCounter, addIterChip, updateETA, startElapsedTimer, stopElapsedTimer).
+// Depends on: constants.js (analyzeBtn, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, currentNoteId, currentSummaryLayers, currentStudyTools, DONE_SIGNAL, MAX_ITERATIONS, MAX_TOKENS_NOTES, MAX_TOKENS_CRITIQUE, iterChipData, debugLog), markdown.js (renderMarkdown, escHtml, citeChip), api.js (callClaudeOnce, callClaudeStream), ui.js (agentLog, setProgress, setAgentNode, resetAgentNodes, makeAgentDot, updateIterCounter, addIterChip, updateETA, startElapsedTimer, stopElapsedTimer, showToast, showSuccessToast), firestore_sync.js (getNoteFS, saveNoteFS).
 
 async function runAgentPipeline(apiKey, targetBodyEl = null) {
   resetAgentNodes();
   const _heroEl = document.getElementById('summaryHero');  // R3: hide stale summary hero on new run
   if (_heroEl) _heroEl.hidden = true;
   currentSummaryLayers = null;  // R4: reset multilayer summary so a failed synth doesn't leak the previous note's layers
+  currentStudyTools = null;  // R8+R9: reset study tools so a new analysis doesn't leak the previous note's mindmap/memorize/concepts
+  const _stCard = document.getElementById('studyToolsCard');  // R8+R9: hide stale card too (same reason as hero above)
+  if (_stCard) _stCard.hidden = true;
   iterChipData = [];
   startElapsedTimer();
   debugLog('PIPE', 'Pipeline start');
@@ -551,6 +554,7 @@ async function regenerateSummary() {
       document.getElementById('finalNotesBody').innerHTML = renderMarkdown(storedNotesText);
     }
     renderSummaryHero(storedNotesText);
+    renderStudyTools();  // R8+R9: keep 학습 도구 카드 in sync (storedNotesText may have changed)
     // R6: quiet in-place save — autoSaveNote() would pop the note-name modal on every regen.
     // Same Object.assign-over-existing pattern as viewers.js. Unsaved note (no id) → skip;
     // it gets persisted by the normal post-pipeline autoSaveNote anyway.
@@ -573,6 +577,289 @@ async function regenerateSummary() {
     btn.disabled = false;
     btn.textContent = prevLabel;
   }
+}
+
+/* ═══════════════════════════════════════════════
+   R8+R9 — 학습 도구: 마인드맵 / 암기 / 개념
+   3개 도구를 하나의 카드에서 탭으로 전환. 각 도구는 on-demand로 생성하고
+   currentStudyTools에 저장, R6과 동일한 quiet in-place save 패턴으로 저장.
+   싱글노트 뷰 전제(batch/targetBodyEl 경로는 대상 밖 — summaryHero와 동일 범위).
+═══════════════════════════════════════════════ */
+let currentStudyToolsTab = 'mindmap';  // UI-only, not persisted
+let _studyToolsBusy = false;  // reentry guard — a DOM-button guard alone breaks when a tab switch re-renders a fresh enabled button mid-generation
+
+// 카드 자체의 표시 여부 — storedNotesText가 있을 때(싱글노트 뷰)만 보인다.
+function renderStudyTools() {
+  const card = document.getElementById('studyToolsCard');
+  if (!card) return;
+  if (!storedNotesText) { card.hidden = true; return; }
+  card.hidden = false;
+  renderStudyToolsBody();
+}
+
+function renderStudyToolsBody() {
+  const body = document.getElementById('studyToolsBody');
+  if (!body) return;
+  document.querySelectorAll('.study-tools-chip').forEach(c => c.classList.toggle('active', c.dataset.tool === currentStudyToolsTab));
+
+  const tool = currentStudyToolsTab;
+  const data = currentStudyTools ? currentStudyTools[tool] : null;
+  const hasData = Array.isArray(data) ? data.length > 0 : !!data;
+  body.innerHTML = '';
+
+  if (!hasData) {
+    const wrap = document.createElement('div');
+    wrap.className = 'study-tools-empty';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'studyToolsGenBtn';
+    btn.className = 'study-tools-gen-btn';
+    btn.textContent = _studyToolsBusy ? '⏳ 생성 중…' : (tool === 'mindmap' ? '✨ 마인드맵 생성' : '✨ 암기·개념 생성');
+    btn.disabled = _studyToolsBusy;
+    btn.addEventListener('click', () => (tool === 'mindmap' ? generateMindmap() : generateStudyAids()));
+    wrap.appendChild(btn);
+    body.appendChild(wrap);
+    return;
+  }
+
+  const regenRow = document.createElement('div');
+  regenRow.className = 'study-tools-regen-row';
+  const regenBtn = document.createElement('button');
+  regenBtn.type = 'button';
+  regenBtn.id = 'studyToolsRegenBtn';
+  regenBtn.className = 'study-tools-regen-btn';
+  regenBtn.textContent = _studyToolsBusy ? '⏳ 생성 중…' : '↻ 재생성';
+  regenBtn.disabled = _studyToolsBusy;
+  regenBtn.addEventListener('click', () => (tool === 'mindmap' ? generateMindmap() : generateStudyAids()));
+  regenRow.appendChild(regenBtn);
+  body.appendChild(regenRow);
+
+  const content = document.createElement('div');
+  content.className = 'study-tools-content';
+  body.appendChild(content);
+
+  if (tool === 'mindmap') renderMindmap(content, data);
+  else if (tool === 'memorize') renderMemorize(content, data);
+  else renderConcepts(content, data);
+}
+
+// R6과 동일한 quiet in-place save — autoSaveNote()의 이름 입력 모달을 매번 띄우지 않는다.
+async function saveStudyToolsQuiet() {
+  if (!currentNoteId) return;  // unsaved note — normal post-pipeline autoSaveNote persists it
+  try {
+    const existing = await getNoteFS(currentNoteId);
+    if (existing) await saveNoteFS(Object.assign({}, existing, { studyTools: currentStudyTools || null }));
+  } catch (e) {
+    showToast(`❌ 학습 도구 저장 실패: ${e.message}`);
+  }
+}
+
+/* ── R8: 마인드맵 — 계층형 아웃라인을 파싱해 <details> 트리로 렌더 ── */
+async function generateMindmap() {
+  if (!storedNotesText || _studyToolsBusy) return;  // no note loaded, or already running
+  _studyToolsBusy = true;
+  renderStudyToolsBody();  // repaint current tab with disabled ⏳ button
+  try {
+    const sys = '당신은 대학 강의 학습노트를 마인드맵 아웃라인으로 정리하는 전문가입니다. 한국어로 작성하세요.';
+    const stripped = stripLeadingSummary(storedNotesText);
+    const prompt = `다음은 한 강의의 전체 학습 노트입니다. 이 강의 전체 주제를 한눈에 파악할 수 있는 마인드맵 아웃라인을 작성하세요.
+
+형식 규칙(정확히 지킬 것):
+- 첫 줄은 강의 전체를 관통하는 주제(루트) — 불릿 없이 텍스트만
+- 이후 줄은 계층형 불릿, 들여쓰기는 깊이 레벨당 정확히 공백 2칸 + "- " 마커
+- 최대 깊이 3단계, 메인 브랜치(1단계) 3~7개
+- 각 노드는 40자 이내
+- 노트에서 출처 슬라이드가 분명한 노드는 끝에 (p.3) 또는 (p.3-5) 형식으로 표시
+- 마커·머리말·설명 없이 아웃라인만 출력
+
+[전체 학습 노트]
+${stripped}`;
+    const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+    const nonBlankLines = raw.split('\n').filter(l => l.trim() !== '');
+    if (nonBlankLines.length < 2) {
+      showToast('❌ 마인드맵 생성 실패');
+      return;
+    }
+    currentStudyTools = Object.assign({ mindmap: null, memorize: null, concepts: null }, currentStudyTools, { mindmap: raw });
+    await saveStudyToolsQuiet();
+    showSuccessToast('🧭 마인드맵 생성 완료');
+  } catch (e) {
+    showToast(`❌ 마인드맵 생성 실패: ${e.message}`);
+  } finally {
+    _studyToolsBusy = false;
+    renderStudyToolsBody();  // fresh un-disabled button reflecting current state either way
+  }
+}
+
+// 들여쓰기(2칸=1레벨, 탭은 2칸 취급) 기준으로 outline 문자열을 트리로 파싱. 매번 렌더 시 재파싱(저장은 원본 문자열만).
+function parseMindmapOutline(raw) {
+  const lines = (raw || '').split('\n').map(l => l.replace(/\t/g, '  ')).filter(l => l.trim() !== '');
+  if (lines.length < 1) return null;
+  const root = { text: lines[0].replace(/^[-*•]\s*/, '').trim(), children: [] };
+  const stack = [{ node: root, depth: -1 }];
+  for (let i = 1; i < lines.length; i++) {
+    const m = lines[i].match(/^(\s*)[-*•]\s*(.+)$/);
+    if (!m) continue;  // malformed line — skip
+    const depth = Math.floor(m[1].length / 2);
+    const node = { text: m[2].trim(), children: [] };
+    while (stack.length && stack[stack.length - 1].depth >= depth) stack.pop();
+    (stack.length ? stack[stack.length - 1].node : root).children.push(node);
+    stack.push({ node, depth });
+  }
+  return root;
+}
+
+function renderMindmap(container, outline) {
+  const root = parseMindmapOutline(outline);
+  container.innerHTML = '';
+  if (!root) return;
+
+  const controls = document.createElement('div');
+  controls.className = 'mindmap-controls';
+  const expandBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 펼치기' });
+  const collapseBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 접기' });
+  const copyBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '📋 복사' });
+  controls.append(expandBtn, collapseBtn, copyBtn);
+  container.appendChild(controls);
+
+  const tree = document.createElement('div');
+  tree.className = 'mindmap-tree';
+  const rootRow = document.createElement('div');
+  rootRow.className = 'mindmap-root';
+  rootRow.innerHTML = citeChip(escHtml(root.text));  // escape THEN chip-ify, same order as renderMarkdown
+  tree.appendChild(rootRow);
+
+  function buildNode(node) {
+    if (!node.children.length) {
+      const row = document.createElement('div');
+      row.className = 'mindmap-leaf';
+      row.innerHTML = citeChip(escHtml(node.text));
+      return row;
+    }
+    const details = document.createElement('details');
+    details.open = true;
+    details.className = 'mindmap-branch';
+    const summary = document.createElement('summary');
+    summary.innerHTML = citeChip(escHtml(node.text));
+    details.appendChild(summary);
+    const childWrap = document.createElement('div');
+    childWrap.className = 'mindmap-children';
+    node.children.forEach(c => childWrap.appendChild(buildNode(c)));
+    details.appendChild(childWrap);
+    return details;
+  }
+  root.children.forEach(c => tree.appendChild(buildNode(c)));
+  container.appendChild(tree);
+
+  expandBtn.addEventListener('click', () => tree.querySelectorAll('details').forEach(d => { d.open = true; }));
+  collapseBtn.addEventListener('click', () => tree.querySelectorAll('details').forEach(d => { d.open = false; }));
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(outline).then(() => showSuccessToast('📋 복사 완료'));
+  });
+}
+
+/* ── R9: 암기(cloze) + 개념(용어집) — 한 번의 호출로 둘 다 생성 ── */
+async function generateStudyAids() {
+  if (!storedNotesText || _studyToolsBusy) return;  // no note loaded, or already running
+  _studyToolsBusy = true;
+  renderStudyToolsBody();  // repaint current tab with disabled ⏳ button
+  try {
+    const sys = '당신은 대학 강의 학습노트에서 암기 포인트와 핵심 개념을 뽑아내는 전문가입니다. 한국어로 작성하세요.';
+    const stripped = stripLeadingSummary(storedNotesText);
+    const prompt = `다음은 한 강의의 전체 학습 노트입니다. 아래 2개 섹션을 정확한 마커로 작성하세요. 마커 외의 머리말·설명은 출력하지 마세요.
+
+[암기]
+- (외울 핵심 문장. 핵심 단어·수치를 {{이렇게}} 이중 중괄호로 감싸고, 필요하면 문장 끝에 (p.N) 표시. 8~15개)
+[개념]
+- (용어 :: 한두 문장 정의. 필요하면 (p.N) 표시. 8~15개)
+
+[전체 학습 노트]
+${stripped}`;
+    const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+
+    const MARKERS = ['[암기]', '[개념]'];
+    const idx = MARKERS.map(m => raw.indexOf(m));
+    const section = i => {
+      if (idx[i] === -1) return '';
+      const start = idx[i] + MARKERS[i].length;
+      const rest = idx.slice(i + 1).filter(x => x !== -1);
+      const end = rest.length ? Math.min(...rest) : raw.length;
+      return raw.slice(start, end).trim();
+    };
+    const toLines = s => (s || '').split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+    const memorize = toLines(section(0));
+    const concepts = toLines(section(1)).map(l => {
+      const parts = l.split('::');
+      if (parts.length < 2) return null;  // malformed line — skip
+      return { term: parts[0].trim(), def: parts.slice(1).join('::').trim() };
+    }).filter(Boolean);
+
+    if (memorize.length === 0 && concepts.length === 0) {
+      showToast('❌ 암기·개념 생성 실패');
+      return;
+    }
+    currentStudyTools = Object.assign({ mindmap: null, memorize: null, concepts: null }, currentStudyTools, {
+      memorize: memorize.length ? memorize : null,
+      concepts: concepts.length ? concepts : null,
+    });
+    await saveStudyToolsQuiet();
+    showSuccessToast('📌 암기·개념 생성 완료');
+  } catch (e) {
+    showToast(`❌ 암기·개념 생성 실패: ${e.message}`);
+  } finally {
+    _studyToolsBusy = false;
+    renderStudyToolsBody();
+  }
+}
+
+function renderMemorize(container, items) {
+  container.innerHTML = '';
+  const controls = document.createElement('div');
+  controls.className = 'study-aids-controls';
+  const showBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 보기' });
+  const hideBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 가리기' });
+  controls.append(showBtn, hideBtn);
+  container.appendChild(controls);
+
+  const list = document.createElement('div');
+  list.className = 'memorize-list';
+  items.forEach(text => {
+    const row = document.createElement('div');
+    row.className = 'memorize-row';
+    // escHtml FIRST, then wrap {{cloze}} spans, then citeChip — same layering order as renderMarkdown.
+    const withCloze = escHtml(text).replace(/\{\{(.+?)\}\}/g, '<span class="cloze" data-revealed="0">$1</span>');
+    row.innerHTML = citeChip(withCloze);
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+
+  // one delegated listener on the list, not one per span
+  list.addEventListener('click', e => {
+    const span = e.target.closest('.cloze');
+    if (!span) return;
+    span.dataset.revealed = span.dataset.revealed === '1' ? '0' : '1';
+  });
+  showBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '1'; }));
+  hideBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '0'; }));
+}
+
+function renderConcepts(container, items) {
+  container.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'concepts-list';
+  items.forEach(({ term, def }) => {
+    const row = document.createElement('div');
+    row.className = 'concept-row';
+    const termEl = document.createElement('div');
+    termEl.className = 'concept-term';
+    termEl.innerHTML = citeChip(escHtml(term));
+    const defEl = document.createElement('div');
+    defEl.className = 'concept-def';
+    defEl.innerHTML = citeChip(escHtml(def));
+    row.append(termEl, defEl);
+    list.appendChild(row);
+  });
+  container.appendChild(list);
 }
 
 /* ═══════════════════════════════════════════════
@@ -745,6 +1032,7 @@ ${recText}`;
     document.getElementById('collapseBtn').classList.add('visible');
     document.getElementById('dotNotes').className = 'status-dot done';
     renderSummaryHero(notesText);  // R3: surface 요약 as standalone hero
+    renderStudyTools();  // R8+R9: show 학습 도구 카드 (single-note mode only)
   }
 
   agentLog(1, `노트 ${critiqueText ? '수정' : '작성'} 완료 — ${notesText.length.toLocaleString()}자`);
@@ -830,6 +1118,7 @@ ${critiqueText}`;
     document.getElementById('collapseBtn').classList.add('visible');
     document.getElementById('dotNotes').className = 'status-dot done';
     renderSummaryHero(patched);  // R3: keep hero in sync after patch
+    renderStudyTools();  // R8+R9: keep 학습 도구 카드 in sync after patch
   }
 
   agentLog(1, `Haiku 패치 완료 — 최종 노트 ${patched.length.toLocaleString()}자`);

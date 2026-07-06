@@ -1615,6 +1615,80 @@
       background: var(--surface);
     }
 
+    /* R8+R9: 학습 도구 카드 — 마인드맵/암기/개념 탭 */
+    .study-tools-chips { display: flex; gap: 0.4rem; padding: 0 1.5rem; margin-bottom: 0.6rem; flex-wrap: wrap; }
+    .study-tools-chip {
+      padding: 0.3rem 0.9rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .study-tools-chip:hover:not(.active) { color: var(--text); }
+    .study-tools-chip.active { border-color: var(--primary); color: var(--primary); background: var(--primary-dim); }
+    .study-tools-body { padding: 0 1.5rem 1.5rem; min-height: 70px; }
+    .study-tools-empty { display: flex; align-items: center; justify-content: center; padding: 2rem 0; }
+    .study-tools-gen-btn, .study-tools-regen-btn {
+      padding: 0.55rem 1.4rem;
+      border-radius: 99px;
+      border: 1px solid var(--primary);
+      background: var(--primary-dim);
+      color: var(--primary);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .study-tools-gen-btn:hover:not(:disabled), .study-tools-regen-btn:hover:not(:disabled) { background: var(--primary); color: #fff; }
+    .study-tools-gen-btn:disabled, .study-tools-regen-btn:disabled { opacity: 0.6; cursor: default; }
+    .study-tools-regen-row { display: flex; justify-content: flex-end; margin-bottom: 0.4rem; }
+    .study-tools-regen-row .study-tools-regen-btn { padding: 0.25rem 0.75rem; font-size: 0.75rem; }
+
+    /* R8: 마인드맵 트리 */
+    .mindmap-controls, .study-aids-controls { display: flex; gap: 0.5rem; margin-bottom: 0.7rem; flex-wrap: wrap; }
+    .mindmap-ctrl-btn {
+      padding: 0.25rem 0.7rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .mindmap-ctrl-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .mindmap-root { font-weight: 700; font-size: 1rem; color: var(--text); margin-bottom: 0.5rem; }
+    .mindmap-tree { font-size: 0.88rem; color: var(--text); line-height: 1.6; }
+    .mindmap-branch { margin: 0.15rem 0; }
+    .mindmap-branch > summary { cursor: pointer; padding: 0.15rem 0; }
+    .mindmap-leaf { padding: 0.15rem 0; color: var(--text-muted); }
+    .mindmap-children { border-left: 1px solid var(--border); margin-left: 0.5rem; padding-left: 0.75rem; }
+
+    /* R9: 암기(cloze) + 개념 목록 */
+    .cloze {
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 0 0.2em;
+      background: var(--border);
+      color: transparent;
+    }
+    .cloze[data-revealed="1"] { background: transparent; color: inherit; }
+    .memorize-list, .concepts-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .memorize-row, .concept-row {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface2);
+      font-size: 0.9rem;
+      line-height: 1.55;
+    }
+    .concept-term { font-weight: 700; color: var(--text); margin-bottom: 0.2rem; }
+    .concept-def { color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; }
+
     /* collapse toggle */
     .collapse-btn {
       display: none;
@@ -4116,7 +4190,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=r7cite"></script>
+<script defer src="/js/markdown.js?v=r8r9tools"></script>
 </head>
 <body>
 
@@ -4564,6 +4638,19 @@
       </div>
     </div>
 
+    <!-- R8+R9: 학습 도구 — 마인드맵/암기/개념 (single mode only) -->
+    <div class="result-card study-tools-card" id="studyToolsCard" hidden>
+      <div class="result-card-header">
+        <div class="result-title"><span>🧭 학습 도구</span></div>
+      </div>
+      <div class="study-tools-chips" id="studyToolsChips">
+        <button type="button" class="study-tools-chip active" data-tool="mindmap">마인드맵</button>
+        <button type="button" class="study-tools-chip" data-tool="memorize">암기</button>
+        <button type="button" class="study-tools-chip" data-tool="concepts">개념</button>
+      </div>
+      <div class="study-tools-body" id="studyToolsBody"></div>
+    </div>
+
     <!-- Image Gallery (populated on analysis start, recommendations shown after Agent 1) -->
     <div class="result-card image-gallery-section" id="imageGallerySection">
       <div class="image-gallery-header">
@@ -4756,43 +4843,43 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=r7cite"></script>
-<script defer src="/js/error_autoreport.js?v=r7cite"></script>
-<script defer src="/js/icons.js?v=r7cite"></script>
-<script defer src="/js/storage.js?v=r7cite"></script>
-<script defer src="/js/firestore_sync.js?v=r7cite"></script>
-<script defer src="/js/transcripts_store.js?v=r7cite"></script>
-<script defer src="/js/api.js?v=r7cite"></script>
-<script defer src="/js/pptx_parser.js?v=r7cite"></script>
-<script defer src="/js/quiz.js?v=r7cite"></script>
-<script defer src="/js/ui.js?v=r7cite"></script>
-<script defer src="/js/viewers.js?v=r7cite"></script>
-<script defer src="/js/image_gallery.js?v=r7cite"></script>
-<script defer src="/js/pipeline.js?v=r7cite"></script>
-<script defer src="/js/batch.js?v=r7cite"></script>
-<script defer src="/js/note_creation.js?v=r7cite"></script>
-<script defer src="/js/notes_crud.js?v=r7cite"></script>
-<script defer src="/js/notion_viewer.js?v=r7cite"></script>
-<script defer src="/js/notion_clipboard.js?v=r7cite"></script>
-<script defer src="/js/folders.js?v=r7cite"></script>
-<script defer src="/js/exam_plan.js?v=r7cite"></script>
-<script defer src="/js/srs.js?v=r7cite"></script>
-<script defer src="/js/timetable.js?v=r7cite"></script>
-<script defer src="/js/gamification.js?v=r7cite"></script>
-<script defer src="/js/achievements.js?v=r7cite"></script>
-<script defer src="/js/srs_review.js?v=r7cite"></script>
-<script defer src="/js/home_view.js?v=r7cite"></script>
-<script defer src="/js/transcripts_view.js?v=r7cite"></script>
-<script defer src="/js/bulk.js?v=r7cite"></script>
-<script defer src="/js/firebase_auth.js?v=r7cite"></script>
-<script defer src="/js/payment.js?v=r7cite"></script>
-<script defer src="/js/recorder.js?v=r7cite"></script>
-<script defer src="/js/groups.js?v=r7cite"></script>
-<script defer src="/js/study_rooms.js?v=r7cite"></script>
-<script defer src="/js/bug_report.js?v=r7cite"></script>
-<script defer src="/js/onboarding_tour.js?v=r7cite"></script>
-<script defer src="/js/main.js?v=r7cite"></script>
-<script defer src="/js/main_inline.js?v=r7cite"></script>
+<script defer src="/js/constants.js?v=r8r9tools"></script>
+<script defer src="/js/error_autoreport.js?v=r8r9tools"></script>
+<script defer src="/js/icons.js?v=r8r9tools"></script>
+<script defer src="/js/storage.js?v=r8r9tools"></script>
+<script defer src="/js/firestore_sync.js?v=r8r9tools"></script>
+<script defer src="/js/transcripts_store.js?v=r8r9tools"></script>
+<script defer src="/js/api.js?v=r8r9tools"></script>
+<script defer src="/js/pptx_parser.js?v=r8r9tools"></script>
+<script defer src="/js/quiz.js?v=r8r9tools"></script>
+<script defer src="/js/ui.js?v=r8r9tools"></script>
+<script defer src="/js/viewers.js?v=r8r9tools"></script>
+<script defer src="/js/image_gallery.js?v=r8r9tools"></script>
+<script defer src="/js/pipeline.js?v=r8r9tools"></script>
+<script defer src="/js/batch.js?v=r8r9tools"></script>
+<script defer src="/js/note_creation.js?v=r8r9tools"></script>
+<script defer src="/js/notes_crud.js?v=r8r9tools"></script>
+<script defer src="/js/notion_viewer.js?v=r8r9tools"></script>
+<script defer src="/js/notion_clipboard.js?v=r8r9tools"></script>
+<script defer src="/js/folders.js?v=r8r9tools"></script>
+<script defer src="/js/exam_plan.js?v=r8r9tools"></script>
+<script defer src="/js/srs.js?v=r8r9tools"></script>
+<script defer src="/js/timetable.js?v=r8r9tools"></script>
+<script defer src="/js/gamification.js?v=r8r9tools"></script>
+<script defer src="/js/achievements.js?v=r8r9tools"></script>
+<script defer src="/js/srs_review.js?v=r8r9tools"></script>
+<script defer src="/js/home_view.js?v=r8r9tools"></script>
+<script defer src="/js/transcripts_view.js?v=r8r9tools"></script>
+<script defer src="/js/bulk.js?v=r8r9tools"></script>
+<script defer src="/js/firebase_auth.js?v=r8r9tools"></script>
+<script defer src="/js/payment.js?v=r8r9tools"></script>
+<script defer src="/js/recorder.js?v=r8r9tools"></script>
+<script defer src="/js/groups.js?v=r8r9tools"></script>
+<script defer src="/js/study_rooms.js?v=r8r9tools"></script>
+<script defer src="/js/bug_report.js?v=r8r9tools"></script>
+<script defer src="/js/onboarding_tour.js?v=r8r9tools"></script>
+<script defer src="/js/main.js?v=r8r9tools"></script>
+<script defer src="/js/main_inline.js?v=r8r9tools"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

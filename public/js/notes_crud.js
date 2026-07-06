@@ -1,5 +1,5 @@
 // Notes CRUD: auto-save, list rendering, open/load, Notion file import, delete, move, rename, detect splits.
-// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero).
+// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, currentStudyTools, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero, renderStudyTools).
 
 /* ═══════════════════════════════════════════════
    Auto-save after pipeline
@@ -42,6 +42,7 @@ async function autoSaveNote() {
       extractedImages:      extractedImages,
       audioStoragePath:     audioStoragePath,
       summaryLayers:        currentSummaryLayers || null,  // R4: multilayer summary (한줄/핵심/문단/챕터)
+      studyTools:           currentStudyTools || null,     // R8+R9: 마인드맵/암기/개념
     });
     if (audioStoragePath) window.recorderLastAudioPath = null;
     currentNoteId = record.id;
@@ -84,6 +85,7 @@ async function openSavedNote(id) {
   storedHighlightedTranscript = note.highlightedTranscript || '';
   extractedImages            = note.extractedImages      || [];
   currentSummaryLayers       = note.summaryLayers         || null;  // R4: restore multilayer summary
+  currentStudyTools          = note.studyTools            || null;  // R8+R9: restore 마인드맵/암기/개념
   currentNoteId              = note.id;
 
   const body = document.getElementById('finalNotesBody');
@@ -95,6 +97,7 @@ async function openSavedNote(id) {
     body.innerHTML = '<span class="placeholder-msg">노트 내용이 없습니다.</span>';
   }
   renderSummaryHero(storedNotesText);  // R4: restore hero (multilayer if saved, legacy fallback otherwise)
+  renderStudyTools();  // R8+R9: restore 학습 도구 카드 (마인드맵/암기/개념)
 
   // Clear cached split-viewer content so it re-renders from restored state
   const splitNotes      = document.getElementById('splitNotes');

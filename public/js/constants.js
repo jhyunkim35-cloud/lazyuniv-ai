@@ -173,6 +173,7 @@ let storedFilteredText         = '';
 let storedNotesText            = '';
 let storedHighlightedTranscript = '';
 let currentSummaryLayers       = null;  // R4: { tldr, bullets, paragraph, chapters } from synthesizeSummary, or null
+let currentStudyTools = null;  // R8+R9: { mindmap: string|null, memorize: array|null, concepts: array|null }
 
 let extractedImages    = [];   // [{slideNumber, imageBase64, mimeType, fileName}]
 let recommendedSlides  = [];   // [slideNumber, ...]
