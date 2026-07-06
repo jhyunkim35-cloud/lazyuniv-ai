@@ -13,9 +13,7 @@
       "Bash(git status:*)",
       "WebFetch(domain:api.github.com)"
     ],
-    "ask": [
-      "Bash(git push:*)"
-    ],
+    "ask": [],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",

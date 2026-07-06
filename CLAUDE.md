@@ -8,7 +8,7 @@ Vanilla JS + Vercel 서버리스 + Firebase. 라이브: notyx.co.kr
 
 **⓪ 세션 시작 — 옵시디언 볼트 무조건 먼저 (예외 없음):**
 - 볼트 루트: `C:\Users\김준현\Documents\Obsidian Vault`
-- `Documents\Obsidian Vault\10 Notyx\작업로그\_타임라인.md` 먼저 읽고 직전 맥락 복원. 디테일 필요하면 해당 작업로그 노트를 Grep로 핀포인트.
+- `Documents\Obsidian Vault\10 Notyx\작업로그\_타임라인.md` 먼저 읽고 직전 맥락 복원(전 트랙 공용, 줄마다 `[트랙]` 태그). 디테일은 `작업로그\<트랙>\`(Notyx 작업이면 `Notyx\`) 노트를 Grep로 핀포인트.
 - 작업 전 `Documents\Obsidian Vault\20 Dev\도구·스킬 카탈로그.md` 확인해 최적 도구/스킬 선택.
 - 이 단계 건너뛰면 스스로 멈추고 먼저 읽는다.
 
@@ -18,7 +18,9 @@ Vanilla JS + Vercel 서버리스 + Firebase. 라이브: notyx.co.kr
 3. JS 수정 후 `node --check`, 캐시버스트 `?v=` 교체.
 4. **관련 파일만** `git add <파일>` 명시 (미관련 변경 안 섞기) → 커밋 → `git push`.
 5. 라이브 검증 (curl로 배포 확인).
-6. **옵시디언 즉시 기록** ← 제일 자주 까먹는 거. **라운드 끝 = 기록 끝.** `Documents\Obsidian Vault\10 Notyx\작업로그\YYYY-MM-DD 작업명.md`(뭘·어떻게·결과·커밋·교훈) + `_타임라인.md` 맨 위 한 줄.
+6. **옵시디언 즉시 기록 (작업 끝 = 기록 끝)** ← 제일 자주 까먹는 거. **모든 트랙 공통 — git 라운드뿐 아니라 볼트·채팅 작업도.**
+   - `_타임라인.md` 맨 위 한 줄: `- **YYYY-MM-DD** ` + `` `[트랙]` `` + ` · 한 줄 요약` (Notyx 작업이면 `[Notyx]`).
+   - 분량 있으면 `작업로그\<트랙>\YYYY-MM-DD 작업명.md`(뭘·어떻게·결과·커밋·교훈). Notyx는 `작업로그\Notyx\`.
 
 **③ 세션 종료:** 위 6번이 모든 라운드에 대해 됐는지 확인.
 
