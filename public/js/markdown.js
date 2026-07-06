@@ -7,8 +7,26 @@ function getImgSrc(img) {
 function renderMarkdown(raw) {
   const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+  // R7: turn "p.N" / "p.N-M" / "p.N~M" page references into clickable
+  // citation chips. Click handling (openSlideCite) lives in ui.js.
+  // Skips inline code spans (`...`) so code samples are left untouched;
+  // \b word boundaries keep "p.5x" etc. from matching.
+  // ponytail: no special URL exclusion beyond word boundaries — a literal
+  // "p.N" inside a URL would still get chip-ified. Notes here are
+  // AI-generated Korean lecture text without embedded URLs, so this is a
+  // non-issue in practice; revisit if that changes.
+  function citeChip(s) {
+    return s.split(/(`[^`]*`)/).map((part, i) => {
+      if (i % 2 === 1) return part; // backtick code span — leave verbatim
+      return part.replace(/\bp\.(\d+)(?:[-~](\d+))?\b/g, (m, n1, n2) => {
+        const endAttr = n2 ? ` data-slide-end="${n2}"` : '';
+        return `<button type="button" class="page-cite-chip" data-slide="${n1}" data-slide-start="${n1}"${endAttr}>${m}</button>`;
+      });
+    }).join('');
+  }
+
   function inlineFormat(s) {
-    return s
+    return citeChip(s)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g,     '<em>$1</em>')
       .replace(/`(.+?)`/g,       '<code>$1</code>');

@@ -372,8 +372,11 @@ document.getElementById('splitCloseBtn').addEventListener('click', () => {
 });
 
 // Round 1: delegate p.N anchor clicks anywhere inside the split viewer to jumpToSlide.
+// R7: page-cite-chip buttons carry the same data-slide-start dataset, so a
+// click there also scrolls the left slide list (in addition to opening the
+// slide-cite overlay via the document-level listener in ui.js).
 document.getElementById('splitViewer').addEventListener('click', (e) => {
-  const a = e.target.closest('a.slide-ref');
+  const a = e.target.closest('a.slide-ref, .page-cite-chip');
   if (!a) return;
   e.preventDefault();
   const start = parseInt(a.dataset.slideStart, 10);

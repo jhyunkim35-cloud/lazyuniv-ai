@@ -1,5 +1,5 @@
 // UI utilities: toasts, progress bar, activity feed, timers, theme, sidebar, view switching.
-// Depends on: constants.js (toast, toastTimer, TOAST_DURATION_MS, progressWrap, progressFill, progressLabel, progressPct, PROGRESS_HIDE_DELAY_MS, progressHideTimer, feedStartTime, AGENT_META, elapsedStart, elapsedTimer, iterChipData, _notesCollapsed, _currentView, _batchRunning, isBatchMode, currentNoteId), markdown.js (escHtml), quiz.js (clearQuizInlineArea, updateNoteWeaknessBadges).
+// Depends on: constants.js (toast, toastTimer, TOAST_DURATION_MS, progressWrap, progressFill, progressLabel, progressPct, PROGRESS_HIDE_DELAY_MS, progressHideTimer, feedStartTime, AGENT_META, elapsedStart, elapsedTimer, iterChipData, _notesCollapsed, _currentView, _batchRunning, isBatchMode, currentNoteId, extractedImages, storedPptText), markdown.js (escHtml, getImgSrc), quiz.js (clearQuizInlineArea, updateNoteWeaknessBadges).
 
 function showSuccessToast(msg) {
   clearTimeout(toastTimer);
@@ -321,6 +321,69 @@ function appPrompt(message, defaultValue = '', opts = {}) {
     setTimeout(() => { input.focus(); input.select(); }, 50);
   });
 }
+
+/* ═══════════════════════════════════════════════
+   R7: Page-citation chip overlay
+   ────────────────────────────────────────────────
+   markdown.js renders "p.N" / "p.N-M" refs as clickable
+   <button class="page-cite-chip" data-slide="N"> elements (in every note
+   view — renderMarkdown is the single choke point). This delegated
+   listener opens the original slide (image if extracted, else the raw
+   PPT text section) in a lightweight overlay so users can check the
+   source without leaving the note.
+═══════════════════════════════════════════════ */
+function openSlideCite(n) {
+  const overlay = document.getElementById('slideCiteOverlay');
+  const title   = document.getElementById('slideCiteTitle');
+  const body    = document.getElementById('slideCiteBody');
+  if (!overlay || !title || !body) return;
+
+  const img = extractedImages.find(i => i.slideNumber === n);
+  body.innerHTML = ''; // cleared; refilled below with createElement + textContent only (no raw HTML)
+
+  if (img) {
+    const el = document.createElement('img');
+    el.src = getImgSrc(img);
+    el.alt = `슬라이드 ${n}`;
+    el.style.cssText = 'max-width:100%; display:block; margin:0 auto; border-radius:6px;';
+    body.appendChild(el);
+  } else {
+    const m = storedPptText.match(new RegExp(`\\[슬라이드 ${n}\\]([\\s\\S]*?)(?=\\[슬라이드 \\d+\\]|$)`));
+    if (!m) {
+      showToast('원본 슬라이드를 찾을 수 없습니다');
+      return;
+    }
+    // ponytail: batch mode reuses storedPptText per active card, so in a
+    // batch view this can show a different session's slide text if the
+    // chip belongs to a non-active card. Known limitation, not fixed here.
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'white-space:pre-wrap; font-family:inherit; font-size:0.85rem; line-height:1.6; color:var(--text); margin:0;';
+    pre.textContent = m[0].trim();
+    body.appendChild(pre);
+  }
+
+  title.textContent = `슬라이드 ${n}`;
+  overlay.style.display = 'flex';
+}
+
+function closeSlideCite() {
+  const overlay = document.getElementById('slideCiteOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  const chip = e.target.closest('.page-cite-chip');
+  if (chip) {
+    const n = parseInt(chip.dataset.slide, 10);
+    if (!isNaN(n)) openSlideCite(n);
+    return;
+  }
+  if (e.target.id === 'slideCiteOverlay' || e.target.closest('#slideCiteCloseBtn')) closeSlideCite();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeSlideCite();
+});
 
 function toggleTheme() {
   const isLight = document.documentElement.classList.toggle('light');

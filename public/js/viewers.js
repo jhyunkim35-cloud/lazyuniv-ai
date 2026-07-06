@@ -98,13 +98,17 @@ function populateSplitImagePanel() {
 // Round 1: Walk text nodes under rootEl and replace "p.3" / "p.3-4" patterns
 // with anchor elements that jump to the corresponding slide on click.
 // Skips text already inside an <a> to avoid double-linking.
+// R7: also skips <button> — markdown.js's renderMarkdown now renders p.N
+// refs as .page-cite-chip buttons directly, so by the time this runs on a
+// copy of that HTML (splitViewBtn), those refs are already "linked" and
+// must not be re-wrapped in a nested <a>.
 function linkifySlideRefs(rootEl) {
   if (!rootEl) return;
   const re = /\bp\.(\d+)(?:-(\d+))?\b/gi;
   const walker = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       if (!node.textContent || !/p\./i.test(node.textContent)) return NodeFilter.FILTER_SKIP;
-      if (node.parentElement && node.parentElement.closest('a')) return NodeFilter.FILTER_REJECT;
+      if (node.parentElement && node.parentElement.closest('a, button')) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     }
   });
@@ -213,7 +217,10 @@ function scrollNotesToFirstSlideRef(slideNumber) {
   if (!splitNotes) return;
 
   // Always search inside the notes pane (source of truth, accordion is derived).
-  const anchors = splitNotes.querySelectorAll('a.slide-ref');
+  // R7: page-cite-chip buttons carry the same data-slide-start/-end dataset
+  // as a.slide-ref, so they're matched here too — otherwise this reverse
+  // lookup would always miss now that most p.N refs render as chips.
+  const anchors = splitNotes.querySelectorAll('a.slide-ref, .page-cite-chip');
   let target = null;
   for (const a of anchors) {
     const start = parseInt(a.dataset.slideStart, 10);
@@ -429,7 +436,9 @@ function buildSlideAccordion(sourceEl) {
   let current = null;
 
   for (const el of nodes) {
-    const firstRef = el.querySelector && el.querySelector('a.slide-ref');
+    // R7: page-cite-chip buttons carry the same data-slide-start/-end dataset
+    // as a.slide-ref (see linkifySlideRefs) — match either.
+    const firstRef = el.querySelector && el.querySelector('a.slide-ref, .page-cite-chip');
     if (firstRef) {
       const start = parseInt(firstRef.dataset.slideStart, 10);
       if (Number.isFinite(start)) {

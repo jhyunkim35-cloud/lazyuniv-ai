@@ -758,6 +758,25 @@
     .md-content blockquote { border-left: 3px solid var(--primary); margin: 0.5rem 0; padding: 0.4rem 0.8rem; background: var(--surface3); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
     .md-content blockquote p { margin: 0.15rem 0; color: var(--text-muted); }
 
+    /* R7: page-citation chips (p.N refs rendered by markdown.js) */
+    .page-cite-chip {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: 0.05em;
+      font-size: 0.7rem;
+      font-family: inherit;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--primary);
+      background: rgba(124, 58, 237, 0.12);
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 0.15em 0.55em;
+      margin: 0 0.15em;
+      cursor: pointer;
+    }
+    .page-cite-chip:hover { background: rgba(124, 58, 237, 0.22); }
+
     .md-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .md-table th, .md-table td { border: 1px solid var(--border-bright); padding: 0.4rem 0.7rem; text-align: left; min-width: 60px; }
     .md-table th { background: var(--surface3); color: var(--secondary); font-weight: 600; }
@@ -1997,6 +2016,7 @@
       .cancel-btn, .collapse-btn { display: none !important; }
       .md-content * { color: #111 !important; }
       .highlight-important { background: #fef3c7 !important; color: #92400e !important; border-color: #fde68a !important; }
+      .page-cite-chip { background: none !important; border: none !important; padding: 0 !important; }
       .image-gallery-section { display: none !important; }
       .inserted-slide-img { width: 100%; max-width: 100%; }
       .inserted-slide-caption { font-size: 9pt; color: #666; text-align: center; margin-top: 0.3em; }
@@ -4096,7 +4116,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=r56exam"></script>
+<script defer src="/js/markdown.js?v=r7cite"></script>
 </head>
 <body>
 
@@ -4725,43 +4745,54 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=r56exam"></script>
-<script defer src="/js/error_autoreport.js?v=r56exam"></script>
-<script defer src="/js/icons.js?v=r56exam"></script>
-<script defer src="/js/storage.js?v=r56exam"></script>
-<script defer src="/js/firestore_sync.js?v=r56exam"></script>
-<script defer src="/js/transcripts_store.js?v=r56exam"></script>
-<script defer src="/js/api.js?v=r56exam"></script>
-<script defer src="/js/pptx_parser.js?v=r56exam"></script>
-<script defer src="/js/quiz.js?v=r56exam"></script>
-<script defer src="/js/ui.js?v=r56exam"></script>
-<script defer src="/js/viewers.js?v=r56exam"></script>
-<script defer src="/js/image_gallery.js?v=r56exam"></script>
-<script defer src="/js/pipeline.js?v=r56exam"></script>
-<script defer src="/js/batch.js?v=r56exam"></script>
-<script defer src="/js/note_creation.js?v=r56exam"></script>
-<script defer src="/js/notes_crud.js?v=r56exam"></script>
-<script defer src="/js/notion_viewer.js?v=r56exam"></script>
-<script defer src="/js/notion_clipboard.js?v=r56exam"></script>
-<script defer src="/js/folders.js?v=r56exam"></script>
-<script defer src="/js/exam_plan.js?v=r56exam"></script>
-<script defer src="/js/srs.js?v=r56exam"></script>
-<script defer src="/js/timetable.js?v=r56exam"></script>
-<script defer src="/js/gamification.js?v=r56exam"></script>
-<script defer src="/js/achievements.js?v=r56exam"></script>
-<script defer src="/js/srs_review.js?v=r56exam"></script>
-<script defer src="/js/home_view.js?v=r56exam"></script>
-<script defer src="/js/transcripts_view.js?v=r56exam"></script>
-<script defer src="/js/bulk.js?v=r56exam"></script>
-<script defer src="/js/firebase_auth.js?v=r56exam"></script>
-<script defer src="/js/payment.js?v=r56exam"></script>
-<script defer src="/js/recorder.js?v=r56exam"></script>
-<script defer src="/js/groups.js?v=r56exam"></script>
-<script defer src="/js/study_rooms.js?v=r56exam"></script>
-<script defer src="/js/bug_report.js?v=r56exam"></script>
-<script defer src="/js/onboarding_tour.js?v=r56exam"></script>
-<script defer src="/js/main.js?v=r56exam"></script>
-<script defer src="/js/main_inline.js?v=r56exam"></script>
+<!-- R7: page-citation chip overlay (opened by ui.js openSlideCite) -->
+<div id="slideCiteOverlay" class="db-modal-overlay" style="display:none;">
+  <div class="db-modal" style="max-width:640px;">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <h3 id="slideCiteTitle">슬라이드</h3>
+      <button id="slideCiteCloseBtn" type="button" style="background:transparent; border:none; cursor:pointer; font-size:1.1rem; color:var(--text-muted); padding:0.2rem 0.4rem;">✕</button>
+    </div>
+    <div id="slideCiteBody" style="overflow:auto;"></div>
+  </div>
+</div>
+
+<script defer src="/js/constants.js?v=r7cite"></script>
+<script defer src="/js/error_autoreport.js?v=r7cite"></script>
+<script defer src="/js/icons.js?v=r7cite"></script>
+<script defer src="/js/storage.js?v=r7cite"></script>
+<script defer src="/js/firestore_sync.js?v=r7cite"></script>
+<script defer src="/js/transcripts_store.js?v=r7cite"></script>
+<script defer src="/js/api.js?v=r7cite"></script>
+<script defer src="/js/pptx_parser.js?v=r7cite"></script>
+<script defer src="/js/quiz.js?v=r7cite"></script>
+<script defer src="/js/ui.js?v=r7cite"></script>
+<script defer src="/js/viewers.js?v=r7cite"></script>
+<script defer src="/js/image_gallery.js?v=r7cite"></script>
+<script defer src="/js/pipeline.js?v=r7cite"></script>
+<script defer src="/js/batch.js?v=r7cite"></script>
+<script defer src="/js/note_creation.js?v=r7cite"></script>
+<script defer src="/js/notes_crud.js?v=r7cite"></script>
+<script defer src="/js/notion_viewer.js?v=r7cite"></script>
+<script defer src="/js/notion_clipboard.js?v=r7cite"></script>
+<script defer src="/js/folders.js?v=r7cite"></script>
+<script defer src="/js/exam_plan.js?v=r7cite"></script>
+<script defer src="/js/srs.js?v=r7cite"></script>
+<script defer src="/js/timetable.js?v=r7cite"></script>
+<script defer src="/js/gamification.js?v=r7cite"></script>
+<script defer src="/js/achievements.js?v=r7cite"></script>
+<script defer src="/js/srs_review.js?v=r7cite"></script>
+<script defer src="/js/home_view.js?v=r7cite"></script>
+<script defer src="/js/transcripts_view.js?v=r7cite"></script>
+<script defer src="/js/bulk.js?v=r7cite"></script>
+<script defer src="/js/firebase_auth.js?v=r7cite"></script>
+<script defer src="/js/payment.js?v=r7cite"></script>
+<script defer src="/js/recorder.js?v=r7cite"></script>
+<script defer src="/js/groups.js?v=r7cite"></script>
+<script defer src="/js/study_rooms.js?v=r7cite"></script>
+<script defer src="/js/bug_report.js?v=r7cite"></script>
+<script defer src="/js/onboarding_tour.js?v=r7cite"></script>
+<script defer src="/js/main.js?v=r7cite"></script>
+<script defer src="/js/main_inline.js?v=r7cite"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">
