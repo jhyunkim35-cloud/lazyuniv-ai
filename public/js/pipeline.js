@@ -388,7 +388,7 @@ function applyHighlights(transcript, phrases) {
 async function synthesizeSummary(apiKey, fullNotes) {
   const sys = '당신은 대학 강의 학습노트 요약 전문가입니다. 한국어로 작성하세요.';
   // R4: 1콜로 4층(한줄/핵심/문단/챕터)을 고정 마커로 뽑아낸다 — 문단층은 기존 2~3문장 요약과 동일 성격.
-  const genPrompt = (extra = '') => `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 아래 5개 층으로 나눠 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 각 마커는 정확히 그대로 쓰고, 마커 외의 머리말·설명은 출력하지 마세요.${extra}
+  const genPrompt = (extra = '') => `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 아래 6개 층으로 나눠 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 각 마커는 정확히 그대로 쓰고, 마커 외의 머리말·설명은 출력하지 마세요.${extra}
 
 [한줄]
 (강의 전체를 관통하는 TL;DR 1문장)
@@ -400,20 +400,22 @@ async function synthesizeSummary(apiKey, fullNotes) {
 - (노트의 주요 섹션/챕터별 1줄 요약, "섹션명: 내용" 형식)
 [시험]
 - (시험 출제 가능성 높은 포인트 5개 불릿 — 교수가 강조·반복한 부분, 개념 정의, 비교/구분 포인트, 계산·적용 문제가 될 만한 것 위주. "~가 출제될 수 있음" 같은 사족 없이 포인트 자체만)
+[쉬운]
+(이 강의를 처음 듣는 비전공자도 이해할 수 있는 쉬운 말로 핵심을 설명하는 4~6문장 — 전문용어는 일상어로 풀어 쓰고, 일상 비유 또는 실생활 예시를 1개 이상 포함)
 
 [전체 학습 노트]
 ${fullNotes}`;
   const clean = s => (s || '').trim().replace(/^\**\s*요약\s*[:：]?\s*/, '').trim();
 
-  // R4: 마커([한줄]/[핵심]/[문단]/[챕터]) 기준으로 순서대로 잘라낸다. R5: [시험] 층 추가.
+  // R4: 마커([한줄]/[핵심]/[문단]/[챕터]) 기준으로 순서대로 잘라낸다. R5: [시험] 층 추가. R10: [쉬운] 층 추가.
   // 마커가 하나도 없으면(파싱 실패) 응답 전체를 문단층으로 취급하고 나머지 층은 빈 값.
-  const MARKERS = ['[한줄]', '[핵심]', '[문단]', '[챕터]', '[시험]'];
+  const MARKERS = ['[한줄]', '[핵심]', '[문단]', '[챕터]', '[시험]', '[쉬운]'];
   const toList = s => (s || '').split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
   function parseLayers(raw) {
     const text = (raw || '').trim();
     const idx = MARKERS.map(m => text.indexOf(m));
     if (idx.every(i => i === -1)) {
-      return { tldr: '', bullets: [], paragraph: clean(text), chapters: [], exam: [] };
+      return { tldr: '', bullets: [], paragraph: clean(text), chapters: [], exam: [], easy: '' };
     }
     const section = i => {
       if (idx[i] === -1) return '';
@@ -428,11 +430,12 @@ ${fullNotes}`;
       paragraph: clean(section(2)),
       chapters: toList(section(3)),
       exam: toList(section(4)),  // R5: 시험 관점 포인트
+      easy: section(5),          // R10: 쉬운 설명 (비유·실생활 예시 포함)
     };
   }
 
-  let raw = (await callClaudeOnce(apiKey, genPrompt(), sys, 2048, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
-  if (!raw) return { tldr: '', bullets: [], paragraph: '', chapters: [], exam: [] };
+  let raw = (await callClaudeOnce(apiKey, genPrompt(), sys, 3072, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+  if (!raw) return { tldr: '', bullets: [], paragraph: '', chapters: [], exam: [], easy: '' };
   let layers = parseLayers(raw);
 
   /* critic: 요약이 노트 전체를 날조 없이·누락 없이 대표하는지 검증. Haiku, FAIL이면 1회 재생성. */
@@ -442,7 +445,7 @@ ${fullNotes}`;
       '당신은 요약 검증자입니다.', 16, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' })).trim();
     debugLog('PIPE', `Summary critic verdict: ${verdict}`);
     if (/FAIL/i.test(verdict)) {
-      const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 2048, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+      const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 3072, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
       if (retryRaw) layers = parseLayers(retryRaw);
     }
   } catch (e) {
@@ -464,6 +467,7 @@ const SUMMARY_HERO_TABS = [
   { key: 'paragraph', label: '문단' },
   { key: 'chapters',  label: '챕터' },
   { key: 'exam',      label: '시험' },  // R5: 시험 관점 요약 탭
+  { key: 'easy',      label: '쉬운' },  // R10: 쉬운 설명 (univ '쉬운 설명' 토글 대응 — 비유·실생활 예시 포함)
 ];
 
 function renderSummaryHeroLayer(bodyEl, layers, key) {
@@ -542,7 +546,7 @@ async function regenerateSummary() {
     const stripped = stripLeadingSummary(storedNotesText);
     const newLayers = await synthesizeSummary('server-proxied', stripped);
     const hasContent = newLayers.tldr || newLayers.bullets.length || newLayers.paragraph
-      || newLayers.chapters.length || newLayers.exam.length;
+      || newLayers.chapters.length || newLayers.exam.length || newLayers.easy;
     if (!hasContent) {
       // synthesizeSummary failed silently (all layers blank) — keep the existing summary, don't overwrite with empty
       showToast('❌ 요약 재생성 실패: 빈 결과');
