@@ -51,10 +51,23 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
         debugLog('PIPE', `Iter ${iter} — Agent1 done, notes=${notesText.length}chars`);
         if (!targetBodyEl) document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
 
-        /* ── Iter 1: Sonnet critiques ── */
+        /* ── Iter 1: Sonnet critiques (parallel with transcript highlight) ── */
         analyzeBtn.textContent = `⏳ Agent 2: ${iter}차 검토 중…`;
         setProgress(45, `Agent 2: ${iter}차 검토 중…`);
-        critiqueText = await agent2_critiqueNotes(apiKey, notesText, storedPptText, storedFilteredText, iter);
+        // Fix 4 (Q3): agent2_critiqueNotes and highlightTranscript are both read-only
+        // over notesText/storedFilteredText and don't depend on each other's output —
+        // run them concurrently instead of strictly serial. highlightTranscript used
+        // to wait until AFTER the entire iteration loop (including a possible iter2
+        // Haiku patch), even though it only ever reads iter1's notes. If iter2 later
+        // patches [CRITICAL] fixes, the highlighted transcript stays keyed off the
+        // pre-patch notes — acceptable drift since patches are small string fixes
+        // (same tradeoff already accepted for summary synthesis inside agent1_writeNotes).
+        const [critiqued, highlighted] = await Promise.all([
+          agent2_critiqueNotes(apiKey, notesText, storedPptText, storedFilteredText, iter),
+          storedFilteredText ? highlightTranscript(apiKey, storedFilteredText, notesText) : Promise.resolve(null),
+        ]);
+        critiqueText = critiqued;
+        if (highlighted !== null) storedHighlightedTranscript = highlighted;
 
         // Guard: if Agent2 returned a meta-report instead of a real critique, keep Agent1 notes as-is
         const CRITIC_META_MARKERS = ['검토 보고서', '제출된 학습 노트', '요청사항', '수정 불가'];
@@ -144,10 +157,8 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
       }
     }
 
-    /* ── Transcript highlighting ── */
-    if (storedFilteredText) {
-      storedHighlightedTranscript = await highlightTranscript(apiKey, storedFilteredText, storedNotesText);
-    }
+    // Fix 4 (Q3): transcript highlighting now runs inside the iter1 branch above,
+    // concurrently with agent2_critiqueNotes — no separate post-loop call needed.
     debugLog('PIPE', 'Pipeline complete');
     if (typeof markNoteCreated === 'function') markNoteCreated().catch(() => {});
   } catch (err) {
@@ -410,10 +421,30 @@ function applyHighlights(transcript, phrases) {
    전용 프롬프트로 생성 → critic이 정확성·누락을 따로 검증 → FAIL이면 1회 재생성.
    모든 노트 경로(청크/단일/PPT)가 이 함수를 거친다. 실패해도 호출부 try/catch로 노트 생존.
 ═══════════════════════════════════════════════ */
+// Fix 5 (Q3): shared cache layout for every on-demand Sonnet call that reads the
+// full note (summary synth/regen here, plus mindmap/암기/quiz elsewhere) — must be
+// byte-identical across all of them so they share one Anthropic prompt cache entry
+// (same model=claude-sonnet-4-6) when used back-to-back within the ~5min cache TTL.
+// Only the per-tool instruction that follows this prefix differs and stays uncached.
+// Anthropic requires >=2048 tokens for a Sonnet cache write — shorter notes just
+// won't cache, harmless.
+function buildToolsCachePrefix(strippedNotes) {
+  return `다음 강의 학습 노트를 바탕으로 작업하세요.\n\n[전체 학습 노트]\n${strippedNotes}`;
+}
+// Anthropic cache matching covers the ENTIRE prefix — tools, then system, then
+// messages — so the three tools must also share ONE system string, or the
+// byte-identical cache block above never matches across them.
+const TOOLS_SYS = '당신은 대학 강의 학습노트 분석 전문가입니다. 요약·마인드맵·암기·개념 추출을 정확하게 수행합니다. 한국어로 작성하세요.';
+
 async function synthesizeSummary(apiKey, fullNotes) {
-  const sys = '당신은 대학 강의 학습노트 요약 전문가입니다. 한국어로 작성하세요.';
+  const sys = TOOLS_SYS;
+  // Fix 5 (Q3): fullNotes moves into the shared tools cache block instead of being
+  // embedded in every genPrompt() call — this function alone calls genPrompt up to
+  // 3x (initial + marker-retry + critic-FAIL-retry), so the retries now hit cache
+  // too, on top of sharing with mindmap/암기/quiz calls on the same note.
+  const cachePrefix = buildToolsCachePrefix(fullNotes);
   // R4: 1콜로 4층(한줄/핵심/문단/챕터)을 고정 마커로 뽑아낸다 — 문단층은 기존 2~3문장 요약과 동일 성격.
-  const genPrompt = (extra = '') => `다음은 한 강의의 전체 학습 노트입니다. 강의 전체를 포괄하는 핵심 요약을 아래 6개 층으로 나눠 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 각 마커는 정확히 그대로 쓰고, 마커 외의 머리말·설명은 출력하지 마세요.${extra}
+  const genPrompt = (extra = '') => `강의 전체를 포괄하는 핵심 요약을 아래 6개 층으로 나눠 작성하세요. 앞부분만이 아니라 노트 전체 범위를 반영해야 합니다. 각 마커는 정확히 그대로 쓰고, 마커 외의 머리말·설명은 출력하지 마세요.${extra}
 
 [한줄]
 (강의 전체를 관통하는 TL;DR 1문장)
@@ -426,10 +457,7 @@ async function synthesizeSummary(apiKey, fullNotes) {
 [시험]
 - (시험 출제 가능성 높은 포인트 5개 불릿 — 교수가 강조·반복한 부분, 개념 정의, 비교/구분 포인트, 계산·적용 문제가 될 만한 것 위주. "~가 출제될 수 있음" 같은 사족 없이 포인트 자체만)
 [쉬운]
-(이 강의를 처음 듣는 비전공자도 이해할 수 있는 쉬운 말로 핵심을 설명하는 4~6문장 — 전문용어는 일상어로 풀어 쓰고, 일상 비유 또는 실생활 예시를 1개 이상 포함)
-
-[전체 학습 노트]
-${fullNotes}`;
+(이 강의를 처음 듣는 비전공자도 이해할 수 있는 쉬운 말로 핵심을 설명하는 4~6문장 — 전문용어는 일상어로 풀어 쓰고, 일상 비유 또는 실생활 예시를 1개 이상 포함)`;
   const clean = s => (s || '').trim().replace(/^\**\s*요약\s*[:：]?\s*/, '').trim();
 
   // R4: 마커([한줄]/[핵심]/[문단]/[챕터]) 기준으로 순서대로 잘라낸다. R5: [시험] 층 추가. R10: [쉬운] 층 추가.
@@ -459,7 +487,7 @@ ${fullNotes}`;
     };
   }
 
-  let raw = (await callClaudeOnce(apiKey, genPrompt(), sys, 3072, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+  let raw = (await callClaudeOnce(apiKey, genPrompt(), sys, 3072, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
   if (!raw) return { tldr: '', bullets: [], paragraph: '', chapters: [], exam: [], easy: '' };
   let layers = parseLayers(raw);
 
@@ -468,7 +496,7 @@ ${fullNotes}`;
   const countMarkers = t => MARKERS.filter(m => (t || '').includes(m)).length;
   if (countMarkers(raw) < 4) {
     debugLog('PIPE', `Summary markers found=${countMarkers(raw)}/6 — retrying with explicit marker instruction`);
-    const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 6개 마커([한줄][핵심][문단][챕터][시험][쉬운])를 반드시 정확히 그대로 출력하세요.'), sys, 3072, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+    const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 6개 마커([한줄][핵심][문단][챕터][시험][쉬운])를 반드시 정확히 그대로 출력하세요.'), sys, 3072, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
     if (retryRaw && countMarkers(retryRaw) > countMarkers(raw)) {
       raw = retryRaw;
       layers = parseLayers(retryRaw);
@@ -482,7 +510,7 @@ ${fullNotes}`;
       '당신은 요약 검증자입니다.', 16, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' })).trim();
     debugLog('PIPE', `Summary critic verdict: ${verdict}`);
     if (/FAIL/i.test(verdict)) {
-      const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 3072, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+      const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 3072, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
       if (retryRaw) layers = parseLayers(retryRaw);
     }
   } catch (e) {
@@ -701,9 +729,10 @@ async function generateMindmap() {
   _studyToolsBusy = true;
   renderStudyToolsBody();  // repaint current tab with disabled ⏳ button
   try {
-    const sys = '당신은 대학 강의 학습노트를 마인드맵 아웃라인으로 정리하는 전문가입니다. 한국어로 작성하세요.';
+    const sys = TOOLS_SYS;  // shared with summary/암기 so the note cache actually matches cross-tool
     const stripped = stripLeadingSummary(storedNotesText);
-    const prompt = `다음은 한 강의의 전체 학습 노트입니다. 이 강의 전체 주제를 한눈에 파악할 수 있는 마인드맵 아웃라인을 작성하세요.
+    const cachePrefix = buildToolsCachePrefix(stripped);  // Fix 5 (Q3): shared with summary/암기/quiz on the same note
+    const prompt = `이 강의 전체 주제를 한눈에 파악할 수 있는 마인드맵 아웃라인을 작성하세요.
 
 형식 규칙(정확히 지킬 것):
 - 첫 줄은 강의 전체를 관통하는 주제(루트) — 불릿 없이 텍스트만
@@ -711,11 +740,8 @@ async function generateMindmap() {
 - 최대 깊이 3단계, 메인 브랜치(1단계) 3~7개
 - 각 노드는 40자 이내
 - 노트에서 출처 슬라이드가 분명한 노드는 끝에 (p.3) 또는 (p.3-5) 형식으로 표시
-- 마커·머리말·설명 없이 아웃라인만 출력
-
-[전체 학습 노트]
-${stripped}`;
-    const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+- 마커·머리말·설명 없이 아웃라인만 출력`;
+    const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
     const nonBlankLines = raw.split('\n').filter(l => l.trim() !== '');
     if (nonBlankLines.length < 2) {
       showToast('❌ 마인드맵 생성 실패');
@@ -805,18 +831,16 @@ async function generateStudyAids() {
   _studyToolsBusy = true;
   renderStudyToolsBody();  // repaint current tab with disabled ⏳ button
   try {
-    const sys = '당신은 대학 강의 학습노트에서 암기 포인트와 핵심 개념을 뽑아내는 전문가입니다. 한국어로 작성하세요.';
+    const sys = TOOLS_SYS;  // shared with summary/마인드맵 so the note cache actually matches cross-tool
     const stripped = stripLeadingSummary(storedNotesText);
-    const prompt = `다음은 한 강의의 전체 학습 노트입니다. 아래 2개 섹션을 정확한 마커로 작성하세요. 마커 외의 머리말·설명은 출력하지 마세요.
+    const cachePrefix = buildToolsCachePrefix(stripped);  // Fix 5 (Q3): shared with summary/mindmap/quiz on the same note
+    const prompt = `아래 2개 섹션을 정확한 마커로 작성하세요. 마커 외의 머리말·설명은 출력하지 마세요.
 
 [암기]
 - (외울 핵심 문장. 핵심 단어·수치를 {{이렇게}} 이중 중괄호로 감싸고, 필요하면 문장 끝에 (p.N) 표시. 8~15개)
 [개념]
-- (용어 :: 한두 문장 정의. 필요하면 (p.N) 표시. 8~15개)
-
-[전체 학습 노트]
-${stripped}`;
-    const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis' }) || '').trim();
+- (용어 :: 한두 문장 정의. 필요하면 (p.N) 표시. 8~15개)`;
+    const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
 
     const MARKERS = ['[암기]', '[개념]'];
     const idx = MARKERS.map(m => raw.indexOf(m));
@@ -903,6 +927,19 @@ function renderConcepts(container, items) {
   container.appendChild(list);
 }
 
+/* Fix 3 (Q3): compact "already covered" digest for the chunk loop — extracts only
+   heading lines (#/##) and unique **bold** terms from the notes written so far,
+   instead of embedding the full accumulated notes. Keeps the per-chunk UNCACHED
+   prompt roughly constant-size instead of growing every chunk (O(N) chunks x
+   full accumulated-notes size = O(N^2) total prompt tokens sent over the loop). */
+function buildPrevNotesDigest(notes, maxChars = 4000) {
+  const headings = notes.match(/^#{1,2}\s.+$/gm) || [];
+  const boldTerms = [...new Set(notes.match(/\*\*([^*]+)\*\*/g) || [])];
+  let digest = [...headings, ...boldTerms].join('\n');
+  if (digest.length > maxChars) digest = digest.slice(digest.length - maxChars);  // drop oldest first, keep the tail
+  return digest;
+}
+
 /* ═══════════════════════════════════════════════
    Agent 1 — Note Writer / Reviser (streams to hero card)
 ═══════════════════════════════════════════════ */
@@ -919,7 +956,13 @@ async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', ta
   let notesText;
 
   const systemPrompt = getAgent1SystemPrompt();
-  const cachePrefix = `${systemPrompt}
+  // Fix 6 (Q3): systemPrompt is the first thing inside cachePrefix below (cached).
+  // Sending the same text again via the separate uncached `system` field would
+  // double-bill it on every call — worst in chunked mode, where it used to repeat
+  // per chunk. All calls below pass this minimal string as `system` instead; the
+  // full instructions the model needs are already in the cached user content.
+  const MINIMAL_SYSTEM = '위 사용자 메시지에 포함된 지시사항을 정확히 따르세요. 모든 답변은 한국어로 작성하세요.';
+  let cachePrefix = `${systemPrompt}
 
 [형식]
 ${formatSection}
@@ -931,6 +974,11 @@ ${PPT_STRUCTURE_CLAUSE}
 
 [PPT 참고 자료]
 ${pptText}`;
+  // Fix 1 (Q3) sanity: fold the full transcript into the shared cache block too
+  // (not just the PPT) whenever this call has one — single-pass mode sends the
+  // whole recText uncached today; chunked mode reuses this same cachePrefix as its
+  // chunkCache below. Revision mode's recSection is dropped for the same reason.
+  if (hasTxt) cachePrefix += `\n\n[강의 녹취록]\n${recText}`;
   agentLog(1, `형식: ${getFormatDisplayName()}`);
 
   if (critiqueText) {
@@ -946,15 +994,15 @@ ${pptText}`;
 [비평 피드백]
 ${critiqueText}`;
 
-    const recSection = hasTxt ? `\n\n[강의 녹취록]\n${recText}` : '';
-    // cachePrefix already contains formatSection, rulesSection, PPT_STRUCTURE_CLAUSE, and pptText —
-    // repeat only the revision-specific instruction and transcript here to avoid ~3 KB of redundancy.
-    const userPrompt = `위 형식·규칙·PPT 자료를 참고하여 학습 노트를 수정하세요.${revisionClause}${recSection}`;
+    // cachePrefix already contains formatSection, rulesSection, PPT_STRUCTURE_CLAUSE, pptText,
+    // and (Fix 1, Q3) the full recText when hasTxt — repeat only the revision-specific
+    // instruction here to avoid resending the transcript a second time uncached.
+    const userPrompt = `위 형식·규칙·PPT 자료를 참고하여 학습 노트를 수정하세요.${revisionClause}`;
 
     agentLog(1, 'Claude AI 응답 스트리밍 수신 중…');
     const revisionMeta = { isFirstCall: false, feature: 'noteAnalysis' };
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', revisionMeta);
-    notesText = await continueIfTruncated(apiKey, notesText, userPrompt, systemPrompt, cachePrefix, revisionMeta, targetEl);
+    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, MINIMAL_SYSTEM, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', revisionMeta);
+    notesText = await continueIfTruncated(apiKey, notesText, userPrompt, MINIMAL_SYSTEM, cachePrefix, revisionMeta, targetEl);
 
   } else if (!hasTxt) {
     /* ── PPT-only mode: single Sonnet call ── */
@@ -965,8 +1013,8 @@ ${critiqueText}`;
 녹취록이 없으므로 슬라이드 내용만을 기반으로 핵심 개념을 충실히 정리하세요.`;
 
     agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
-    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
-    notesText = await continueIfTruncated(apiKey, notesText, userPrompt, systemPrompt, cachePrefix, meta, targetEl);
+    notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, MINIMAL_SYSTEM, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
+    notesText = await continueIfTruncated(apiKey, notesText, userPrompt, MINIMAL_SYSTEM, cachePrefix, meta, targetEl);
 
   } else {
     /* ── First write: single or chunked Sonnet call with full transcript ── */
@@ -985,31 +1033,41 @@ ${critiqueText}`;
         chunks.push(slideMatches.slice(start, end));
       }
 
+      // Fix 1 (Q3): cachePrefix above already carries the FULL ppt + FULL transcript
+      // (via `if (hasTxt) cachePrefix += ...`) and is built once per agent1_writeNotes
+      // call — reuse it as-is so every chunk's cache block is byte-identical. Chunk 1
+      // pays the 1.25x cache write, chunks 2..N read at 0.1x. Previously each chunk
+      // rebuilt its own cache scoped to only that chunk's slides (pptChunk), which
+      // never matched between calls and so never hit.
+      const chunkCache = cachePrefix;
+
       let combinedNotes = '';
       let accumulatedNotes = '';
       for (let c = 0; c < chunks.length; c++) {
         const chunkSlides = chunks[c];
         const slideStart = parseInt(chunkSlides[0][1], 10);
         const slideEnd = parseInt(chunkSlides[chunkSlides.length - 1][1], 10);
-        const pptChunk = chunkSlides.map(m => m[0]).join('');
 
         debugLog('PIPE', `Chunk ${c+1}/${numChunks} — slides ${slideStart}-${slideEnd}`);
         agentLog(1, `청크 ${c+1}/${numChunks} 스트리밍 중 (슬라이드 ${slideStart}-${slideEnd})…`);
 
-        const chunkCache = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptChunk}`;
-
+        // Fix 1 (Q3): the model now sees ALL slides via the shared chunkCache above,
+        // so the per-chunk instruction must explicitly restrict output to this
+        // chunk's own slide range — the chunkCache no longer scopes that for it.
         let chunkInstruction;
         if (c === 0) {
-          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. More slides follow in separate calls. Do NOT write a **요약** paragraph — start directly with the first # heading. The summary will be synthesized separately after all slides are processed.`;
+          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} ONLY — the PPT and transcript above cover ALL slides, but do not write content for any other slide range in this call; later calls handle those. Do NOT write a **요약** paragraph — start directly with the first # heading. The summary will be synthesized separately after all slides are processed.`;
         } else {
-          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} only. Continue from previous notes. Match the same format. Do NOT write a **요약** paragraph or any introduction — start directly with the first # heading for these slides.`;
+          chunkInstruction = `Write notes for slides ${slideStart}-${slideEnd} ONLY — the PPT and transcript above cover ALL slides, but do not write content for any other slide range in this call; later calls handle those. Continue from the previous chunk's notes below. Match the same format. Do NOT write a **요약** paragraph or any introduction — start directly with the first # heading for these slides.`;
         }
 
+        // Fix 3 (Q3): compact digest (headings + bold terms) instead of the full
+        // accumulated notes — keeps this uncached block from growing every chunk.
         const prevNotesBlock = c > 0
-          ? `[이전 청크에서 작성된 노트 — 동일 개념 반복 금지, 새 맥락/예시/심화는 포함]\n${accumulatedNotes}\n---\n`
+          ? `\n\n[이미 작성된 섹션·용어 (중복 금지)]\n${buildPrevNotesDigest(accumulatedNotes)}`
           : '';
 
-        const chunkPrompt = `${prevNotesBlock}위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}\n\n[강의 녹취록]\n${recText}`;
+        const chunkPrompt = `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}${prevNotesBlock}`;
         const chunkMeta = c === 0 ? meta : { isFirstCall: false, feature: 'noteAnalysis' };
 
         // Fix 4 (Q1): one retry with backoff on chunk failure. If the FIRST
@@ -1018,14 +1076,14 @@ ${critiqueText}`;
         // whole pipeline over one flaky chunk. User cancels always rethrow.
         let chunkText;
         try {
-          chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6', chunkMeta);
+          chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, MINIMAL_SYSTEM, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6', chunkMeta);
         } catch (e) {
           if (e.name === 'AbortError') throw e;
           debugLog('PIPE', `Chunk ${c+1} failed: ${e.message} — retrying once`);
           agentLog(1, `⚠️ 청크 ${c+1} 생성 실패 — 재시도 중…`);
           await new Promise(r => setTimeout(r, 3000));
           try {
-            chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6', chunkMeta);
+            chunkText = await callClaudeStream(apiKey, chunkPrompt, targetEl, dot, MINIMAL_SYSTEM, MAX_TOKENS_NOTES, chunkCache, 'claude-sonnet-4-6', chunkMeta);
           } catch (e2) {
             if (e2.name === 'AbortError') throw e2;
             if (c === 0 || !combinedNotes) throw e2;  // nothing to salvage from
@@ -1037,7 +1095,7 @@ ${critiqueText}`;
           }
         }
 
-        chunkText = await continueIfTruncated(apiKey, chunkText, chunkPrompt, systemPrompt, chunkCache, chunkMeta, targetEl);
+        chunkText = await continueIfTruncated(apiKey, chunkText, chunkPrompt, MINIMAL_SYSTEM, chunkCache, chunkMeta, targetEl);
         combinedNotes += (c > 0 ? '\n\n' : '') + chunkText;
         accumulatedNotes += chunkText + '\n';
       }
@@ -1062,15 +1120,14 @@ ${critiqueText}`;
       needsSummarySynth = true;  // R2: replace Agent1 inline 요약 with verified summary
       agentLog(1, `PPT + 녹취록 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`);
 
-      const userPrompt = `위 PPT 자료와 아래 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.
-
-[강의 녹취록]
-${recText}`;
+      // Fix 1 (Q3): recText already lives in cachePrefix (see `if (hasTxt)` above) —
+      // don't resend it uncached here too.
+      const userPrompt = `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.`;
 
       agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
       debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
-      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, systemPrompt, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
-      notesText = await continueIfTruncated(apiKey, notesText, userPrompt, systemPrompt, cachePrefix, meta, targetEl);
+      notesText = await callClaudeStream(apiKey, userPrompt, targetEl, dot, MINIMAL_SYSTEM, MAX_TOKENS_NOTES, cachePrefix, 'claude-sonnet-4-6', meta);
+      notesText = await continueIfTruncated(apiKey, notesText, userPrompt, MINIMAL_SYSTEM, cachePrefix, meta, targetEl);
     }
   }
 
@@ -1238,7 +1295,13 @@ async function agent2_critiqueNotes(apiKey, notesText, pptText, recText, iter) {
   agentLog(2, `${iter}차 노트를 원본 자료와 비교 검토 중…`);
 
   const systemPrompt = '당신은 엄격한 학문적 검토자입니다. 모든 출력은 한국어로 작성하세요.';
-  const cachePrefix = systemPrompt + `
+  // Fix 2 (Q3): agent2 runs exactly once per analysis (no re-critique loop), so a
+  // cache_control block here pays the 1.25x write premium and is never read back —
+  // pure surcharge on ~57k Haiku tokens. It also can't be shared with agent1's cache
+  // even in principle (Anthropic caches are model-scoped; agent1 is Sonnet, agent2 is
+  // Haiku). Build the same content as a plain (uncached) string instead — see the
+  // null cachePrefix in the callClaudeOnce call below.
+  const criticInstructions = systemPrompt + `
 
 당신은 엄격한 학문적 비평가입니다. 아래 3단계 절차를 순서대로 실행하세요.
 
@@ -1279,10 +1342,14 @@ ${recText}`;
 ${notesText}`;
 
   // R2-A: critic moved to Haiku 4.5 — verification step doesn't need Sonnet
-  // (Haiku reads a fully-cached prefix anyway, so quality drop is minimal
-  // and cost falls ~3x). If [CRITICAL] miss rate climbs post-launch, revert
-  // this single string back to 'claude-sonnet-4-6'.
-  const raw     = await callClaudeOnce(apiKey, userPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-haiku-4-5-20251001', cachePrefix, { feature: 'noteAnalysis' });
+  // (this call is uncached anyway now, so quality drop is minimal and cost
+  // falls ~3x). If [CRITICAL] miss rate climbs post-launch, revert this
+  // single string back to 'claude-sonnet-4-6'.
+  // Fix 2 (Q3): pass null cachePrefix — see criticInstructions comment above.
+  // combinedPrompt keeps the exact same content/order the model saw before
+  // (criticInstructions then userPrompt), just as one uncached string.
+  const combinedPrompt = `${criticInstructions}\n\n${userPrompt}`;
+  const raw     = await callClaudeOnce(apiKey, combinedPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' });
   const cleaned = raw.trim();
 
   /* render critique into tab */

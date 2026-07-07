@@ -2,7 +2,8 @@
 // Depends on: constants.js (QUIZ_CHOICES_PREFIX, CLASSIFY_LABELS, CLASSIFY_COLORS, currentNoteId, storedNotesText, uuidv4),
 //             storage.js (saveQuizResult, getQuizResultsByNote),
 //             firestore_sync.js (getAllNotesFS, getAllFoldersFS),
-//             markdown.js (renderMarkdown, escHtml).
+//             markdown.js (renderMarkdown, escHtml),
+//             pipeline.js (stripLeadingSummary, buildToolsCachePrefix — Fix 5 Q3 cache reuse).
 
 /* ═══════════════════════════════════════════════
    Quiz
@@ -145,12 +146,20 @@ Before finalizing each question you generate, check it against the list above. I
   const t0  = Date.now();
   let idToken = null;
   try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
+  // Fix 5 (Q3): cache the note text with the exact same layout as the summary/
+  // mindmap/암기 tools in pipeline.js (all claude-sonnet-4-6, via buildToolsCachePrefix)
+  // so a quiz generated soon after one of those reuses the cache instead of
+  // re-paying full input cost.
+  const cachePrefix = buildToolsCachePrefix(stripLeadingSummary(noteText));
   const makeStreamBody = () => JSON.stringify({
     model: MODEL,
     max_tokens: maxTokens,
     stream: true,
     system: systemPrompt,
-    messages: [{ role: 'user', content: noteText }],
+    messages: [{ role: 'user', content: [
+      { type: 'text', text: cachePrefix, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: '위 학습 노트를 바탕으로 문제를 출제하세요.' }
+    ]}],
     idToken,
     isFirstCall: false,
     feature: 'quiz',
