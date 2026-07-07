@@ -1,12 +1,19 @@
 // Claude API calls: non-streaming and streaming with SSE parsing.
 // Depends on: constants.js (MAX_TOKENS_NOTES, USE_ADVISOR, abortController, abortableSleep, debugLog, isBatchMode), markdown.js (renderMarkdown).
 
+// Fix 1 (Q1): stop_reason from the most recent callClaudeOnce/callClaudeStream
+// call, so pipeline.js can detect max_tokens truncation right after a call
+// returns. Reset at the start of each call, set once the value is known.
+let lastStopReason = null;
+function getLastStopReason() { return lastStopReason; }
+
 /* ═══════════════════════════════════════════════
    Claude API — non-streaming
 ═══════════════════════════════════════════════ */
-async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_TOKENS_NOTES, model = 'claude-haiku-4-5-20251001', cachePrefix = null, meta = {}) {
+async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_TOKENS_NOTES, model = 'claude-haiku-4-5-20251001', cachePrefix = null, meta = {}, assistantPrefill = null) {
   let idToken = null;
   try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
+  lastStopReason = null;
   const MAX_RETRIES = 3;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     debugLog('API', `callOnce model=${model} prompt=${userPrompt.length}chars max_tokens=${maxTokens} cache=${!!cachePrefix}`);
@@ -16,6 +23,9 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
           { type: 'text', text: userPrompt }
         ]}]
       : [{ role: 'user', content: userPrompt }];
+    // Fix 3 (Q1): optional continuation turn — appended so the model resumes
+    // exactly where a previous max_tokens cutoff left off.
+    if (assistantPrefill) messages.push({ role: 'assistant', content: assistantPrefill });
     // B1: auto-inject the active analysisId. The pipeline sets this once
     // at runAgentPipeline start and clears it in finally; every billable
     // fetch in between picks it up automatically without callers having
@@ -31,12 +41,24 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
         max_uses: 1
       }]);
     }
-    const res = await fetch('/api/claude', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: abortController ? abortController.signal : undefined,
-      body: JSON.stringify(body),
-    });
+    let res;
+    try {
+      res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortController ? abortController.signal : undefined,
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      // Fix 4 (Q1): network-level failure (fetch throws TypeError, e.g. offline/DNS/reset).
+      // AbortError isn't a TypeError so a user cancel still propagates immediately.
+      if (e instanceof TypeError && attempt < MAX_RETRIES) {
+        debugLog('API', `Network error — retry ${attempt+1}: ${e.message}`);
+        await abortableSleep(2000);
+        continue;
+      }
+      throw e;
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       console.error('[callClaudeOnce] API error', res.status, JSON.stringify(err));
@@ -54,10 +76,17 @@ async function callClaudeOnce(apiKey, userPrompt, systemPrompt, maxTokens = MAX_
         await abortableSleep(waitSec * 1000);
         continue;
       }
+      // Fix 4 (Q1): retry once on transient 5xx, same backoff as network errors. Never retry 4xx.
+      if (res.status >= 500 && attempt < MAX_RETRIES) {
+        debugLog('API', `${res.status} server error — retry ${attempt+1}`);
+        await abortableSleep(2000);
+        continue;
+      }
       if (res.status === 401) throw new Error('API 키가 유효하지 않습니다. 키를 확인해주세요.');
       throw new Error(err?.error?.message || `API 오류 (${res.status})`);
     }
     const data = await res.json();
+    lastStopReason = data.stop_reason || null;
     const result = data.content.filter(b => b.type === 'text').map(b => b.text).join('') || '';
     debugLog('API', `Response ${result.length}chars`);
     return result;
@@ -78,6 +107,7 @@ async function callClaudeStream(
 ) {
   let idToken = null;
   try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
+  lastStopReason = null;
 
   dotEl.className = 'status-dot loading';
   if (!isBatchMode) document.getElementById('dotNotes').className = 'status-dot loading';
@@ -117,12 +147,22 @@ async function callClaudeStream(
   let response;
   debugLog('API', `callStream model=${model} prompt=${userPrompt.length}chars max_tokens=${maxTokens} cache=${!!cachePrefix}`);
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    response = await fetch('/api/claude', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: abortController ? abortController.signal : undefined,
-      body: JSON.stringify(body),
-    });
+    try {
+      response = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortController ? abortController.signal : undefined,
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      // Fix 4 (Q1): network-level failure — see callClaudeOnce for rationale.
+      if (e instanceof TypeError && attempt < MAX_RETRIES) {
+        debugLog('API', `Network error — retry ${attempt+1}: ${e.message}`);
+        await abortableSleep(2000);
+        continue;
+      }
+      throw e;
+    }
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       console.error('[callClaudeStream] API error', response.status, JSON.stringify(err));
@@ -137,6 +177,12 @@ async function callClaudeStream(
         const waitSec = parseInt(response.headers.get('Retry-After') || '30', 10);
         agentLog(0, `Rate limit hit — waiting ${waitSec}s… (시도 ${attempt}/${MAX_RETRIES})`);
         await abortableSleep(waitSec * 1000);
+        continue;
+      }
+      // Fix 4 (Q1): retry once on transient 5xx, same backoff as network errors.
+      if (response.status >= 500 && attempt < MAX_RETRIES) {
+        debugLog('API', `${response.status} server error — retry ${attempt+1}`);
+        await abortableSleep(2000);
         continue;
       }
       if (response.status === 401) throw new Error('API 키가 유효하지 않습니다. 키를 확인해주세요.');
@@ -166,29 +212,37 @@ async function callClaudeStream(
         const data = line.slice(6).trim();
         if (data === '[DONE]') continue;
 
-        try {
-          const json = JSON.parse(data);
-          if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
-            if (firstChunk) { targetEl.innerHTML = ''; firstChunk = false; }
-            fullText += json.delta.text;
-            targetEl.innerHTML = renderMarkdown(fullText);
-            // scroll hero body to bottom while streaming
-            targetEl.scrollTop = targetEl.scrollHeight;
-          } else if (json.type === 'content_block_start') {
-            const blockType = json.content_block?.type || 'unknown';
-            if (blockType === 'advisor_tool_use') {
-              agentLog(1, '🧠 Opus 자문 요청 중…');
-            } else if (blockType === 'advisor_tool_result') {
-              agentLog(1, '🧠 Opus 자문 수신 완료');
-            } else if (blockType !== 'text') {
-              debugLog('SSE', `content_block_start type=${blockType}`);
-            }
-          } else if (json.type === 'content_block_stop' || json.type === 'message_delta') {
-            // silently ignore
-          } else if (json.type !== 'message_start' && json.type !== 'message_stop' && json.type !== 'ping') {
-            debugLog('SSE', `event type=${json.type} ${JSON.stringify(json).slice(0, 200)}`);
+        let json;
+        try { json = JSON.parse(data); } catch (_) { continue; /* ignore malformed SSE line */ }
+
+        // Fix 2 (Q1): a mid-stream error event must abort the call, not vanish
+        // into a debugLog line — the caller would otherwise treat a partial/
+        // failed stream as a successful (truncated) note.
+        if (json.type === 'error') {
+          throw new Error(json.error?.message || 'stream error');
+        } else if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+          if (firstChunk) { targetEl.innerHTML = ''; firstChunk = false; }
+          fullText += json.delta.text;
+          targetEl.innerHTML = renderMarkdown(fullText);
+          // scroll hero body to bottom while streaming
+          targetEl.scrollTop = targetEl.scrollHeight;
+        } else if (json.type === 'content_block_start') {
+          const blockType = json.content_block?.type || 'unknown';
+          if (blockType === 'advisor_tool_use') {
+            agentLog(1, '🧠 Opus 자문 요청 중…');
+          } else if (blockType === 'advisor_tool_result') {
+            agentLog(1, '🧠 Opus 자문 수신 완료');
+          } else if (blockType !== 'text') {
+            debugLog('SSE', `content_block_start type=${blockType}`);
           }
-        } catch (_) { /* ignore SSE parse errors */ }
+        } else if (json.type === 'message_delta') {
+          // Fix 1 (Q1): stop_reason arrives here (e.g. 'max_tokens', 'end_turn').
+          if (json.delta?.stop_reason) lastStopReason = json.delta.stop_reason;
+        } else if (json.type === 'content_block_stop') {
+          // silently ignore
+        } else if (json.type !== 'message_start' && json.type !== 'message_stop' && json.type !== 'ping') {
+          debugLog('SSE', `event type=${json.type} ${JSON.stringify(json).slice(0, 200)}`);
+        }
       }
     }
   } finally {
