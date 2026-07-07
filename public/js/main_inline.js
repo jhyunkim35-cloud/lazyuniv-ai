@@ -1021,7 +1021,9 @@ document.addEventListener('keydown', e => {
 });
 
 window.addEventListener('beforeunload', e => {
-  if (isRunning) { e.preventDefault(); e.returnValue = ''; }
+  // Q2: also warn while a recording/upload/STT job is in flight — recorder.js
+  // keeps that state module-scoped, so we go through its exposed getter.
+  if (isRunning || window.recorderIsActive?.()) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // toggleBulkSelectMode, _updateBulkBar, toggleBulkSelectAll, bulkExportPdf, bulkDeleteSelected moved to /js/bulk.js

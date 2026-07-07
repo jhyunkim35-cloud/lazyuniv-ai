@@ -413,6 +413,11 @@
     sttEngine: 'assemblyai', // 'assemblyai' | 'google' — set by engine selector
     pendingBlob: null,       // audio Blob held between engine selector and handleAudioBlob
     pendingFilename: null,
+    lastBlob: null,          // Q2: retained audio Blob/File — survives upload/STT failure for retry
+    lastFilename: null,
+    transcriptId: null,      // Q2: AssemblyAI/Google job id — lets retry resume polling instead of re-uploading
+    sttApi: null,            // Q2: which STT endpoint the current transcriptId belongs to
+    pollFailCount: 0,        // Q2: consecutive poll() failures — only fail after 5
   };
 
   function ensureModal() {
@@ -602,7 +607,18 @@
         setTimeout(() => addRecSlot(file), 80);
       }
     });
-    modalEl.querySelector('#recErrorRetryBtn').addEventListener('click', () => switchScreen('idle'));
+    modalEl.querySelector('#recErrorRetryBtn').addEventListener('click', () => {
+      // Q2: prefer resuming an in-flight STT job over redoing the whole upload,
+      // fall back to re-uploading the retained blob, else nothing to salvage.
+      if (modalState.transcriptId) {
+        resumePolling();
+      } else if (modalState.lastBlob) {
+        const blob = modalState.lastBlob, filename = modalState.lastFilename;
+        handleAudioBlob(blob, filename);
+      } else {
+        switchScreen('idle');
+      }
+    });
 
     // Engine selector
     modalEl.querySelector('#recEngineProceedBtn').addEventListener('click', onEngineProceed);
@@ -797,7 +813,19 @@
     const minimizeBtn = modalEl.querySelector('#recMinimizeBtn');
     if (minimizeBtn) minimizeBtn.classList.toggle('is-visible', name === 'live' || name === 'stt');
 
+    if (name === 'error') updateErrorRetryButton();
+
     window.mountLucideIcons?.();
+  }
+
+  // Q2: label the error-screen retry button based on what's salvageable —
+  // resuming a still-running STT job beats re-uploading, which beats a bare restart.
+  function updateErrorRetryButton() {
+    const btn = document.getElementById('recErrorRetryBtn');
+    if (!btn) return;
+    if (modalState.transcriptId)   btn.textContent = '이어서 확인';
+    else if (modalState.lastBlob)  btn.textContent = '다시 업로드';
+    else                            btn.textContent = '처음으로';
   }
 
   function showModal(targetSlotId = null) {
@@ -886,8 +914,13 @@
     });
     modalState.rec.addEventListener('error', (e) => {
       console.error('[recorder] MediaRecorder error', e);
+      handleMicDeath();
     });
     modalState.rec.addEventListener('stop', onRecorderStopped);
+
+    // Mic-death detection: if a track ends unexpectedly (device unplugged,
+    // OS killed the input, etc.) salvage what's recorded instead of losing it.
+    modalState.stream.getTracks().forEach((t) => { t.onended = handleMicDeath; });
 
     // Small timeslice keeps memory bounded and enables partial-crash recovery
     modalState.rec.start(5000);
@@ -1007,9 +1040,23 @@
 
   function releaseStream() {
     if (modalState.stream) {
-      try { modalState.stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+      try {
+        modalState.stream.getTracks().forEach(t => {
+          t.onended = null; // detach before intentional stop — avoid double-firing handleMicDeath
+          t.stop();
+        });
+      } catch (e) {}
       modalState.stream = null;
     }
+  }
+
+  // Fires on MediaRecorder 'error' or a track's 'ended' event (mic unplugged,
+  // OS revoked access, etc). Auto-stop via the normal stop path so whatever
+  // chunks were captured still flow into the usual blob→upload pipeline.
+  function handleMicDeath() {
+    if (!modalState.rec || modalState.rec.state === 'inactive') return;
+    window.showToast?.('⚠️ 마이크 연결이 끊겨 녹음을 종료했습니다 — 지금까지 녹음은 저장됩니다');
+    stopRecording();
   }
 
   async function onRecorderStopped() {
@@ -1134,6 +1181,13 @@
       window.showToast?.('🔑 로그인 후 이용할 수 있습니다.');
       return;
     }
+    modalState.phase = 'uploading';
+    // Q2: retain the blob until STT completes so a failed upload/transcribe/poll
+    // can retry without asking the user to re-record.
+    modalState.lastBlob = blob;
+    modalState.lastFilename = filename;
+    modalState.transcriptId = null;
+    modalState.pollFailCount = 0;
     switchScreen('upload');
     document.getElementById('recUploadStatus').textContent = '업로드 중…';
     document.getElementById('recUploadBar').style.width = '0%';
@@ -1172,25 +1226,11 @@
     // Determine STT endpoint based on selected engine
     const sttApi = modalState.sttEngine === 'google' ? '/api/google-stt' : '/api/assemblyai';
 
+    modalState.sttApi = sttApi;
+
     // Track when polling started for elapsed display and long-wait warning
     modalState.pollStart = Date.now();
-
-    // MM:SS elapsed counter — updates every second while STT is in progress
-    if (modalState.sttElapsedHandle) clearInterval(modalState.sttElapsedHandle);
-    modalState.sttElapsedHandle = setInterval(() => {
-      const sec = Math.floor((Date.now() - modalState.pollStart) / 1000);
-      const mm  = String(Math.floor(sec / 60)).padStart(2, '0');
-      const ss  = String(sec % 60).padStart(2, '0');
-      const el  = document.getElementById('recSttElapsed');
-      if (el) el.textContent = `경과 ${mm}:${ss}`;
-      const pillElapsed = document.getElementById('recPillSttElapsed');
-      if (pillElapsed) pillElapsed.textContent = `${mm}:${ss}`;
-      if (sec >= 300) {
-        const warn = document.getElementById('recSttLongWarn');
-        if (warn) warn.style.display = '';
-        if (modalEl) modalEl.classList.add('recorder-modal--stt-long');
-      }
-    }, 1000);
+    startSttElapsedTimer();
 
     let transcriptId;
     try {
@@ -1216,62 +1256,115 @@
       return;
     }
 
+    modalState.transcriptId = transcriptId;
     document.getElementById('recSttStatus').textContent = '대기열에서 차례를 기다리는 중…';
-    const pollStart = Date.now();
-    const POLL_INTERVAL = 6000;
-    const MAX_POLL_MS = 90 * 60 * 1000;
+    modalState.pollHandle = setTimeout(pollOnce, 1500);
+  }
 
-    async function poll() {
-      try {
-        const idToken = await currentUser.getIdToken();
-        const r = await fetch(sttApi + '?action=status&id=' + encodeURIComponent(transcriptId), {
-          headers: { 'authorization': 'Bearer ' + idToken },
-        });
-        const j = await r.json();
-        if (!r.ok) {
-          throw new Error(j.error || 'status_failed');
-        }
-        const lbl      = document.getElementById('recSttStatus');
-        const stLabel  = document.getElementById('recSttStage2Label');
-        const pillLbl  = document.getElementById('recPillSttLabel');
-
-        if (j.status === 'queued') {
-          lbl.textContent = '대기열에서 차례를 기다리는 중…';
-          if (stLabel)  stLabel.textContent = '② 변환 대기 중';
-          if (pillLbl)  pillLbl.textContent = '대기 중…';
-        } else if (j.status === 'processing') {
-          lbl.textContent = '텍스트 변환 중…';
-          if (stLabel)  stLabel.textContent = '② 텍스트 변환 중';
-          if (pillLbl)  pillLbl.textContent = '변환 중…';
-        } else if (j.status === 'completed') {
-          deliverTranscript(j.text || '', filename);
-          return;
-        } else if (j.status === 'error') {
-          throw new Error(j.error_msg || 'transcription_error');
-        }
-
-        if (Date.now() - pollStart > MAX_POLL_MS) {
-          throw new Error('처리 시간이 너무 오래 걸립니다. 잠시 후 다시 시도해주세요.');
-        }
-        modalState.pollHandle = setTimeout(poll, POLL_INTERVAL);
-      } catch (err) {
-        console.error('[recorder] poll failed', err);
-        if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
-        modalState.phase = 'error';
-        if (modalEl) {
-          modalEl.classList.remove('recorder-modal--minimized');
-          modalEl.classList.remove('recorder-modal--stt');
-          modalEl.classList.remove('recorder-modal--stt-long');
-          modalEl.classList.remove('hidden');
-          const panelEl = modalEl.querySelector('.recorder-panel');
-          if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
-        }
-        switchScreen('error');
-        document.getElementById('recErrorStatus').textContent =
-          '변환 중 오류가 발생했습니다. (' + (err.message || 'unknown') + ')';
+  // MM:SS elapsed counter — updates every second while STT is in progress.
+  // Shared by the initial upload flow and resumePolling() after a retry.
+  function startSttElapsedTimer() {
+    if (modalState.sttElapsedHandle) clearInterval(modalState.sttElapsedHandle);
+    modalState.sttElapsedHandle = setInterval(() => {
+      const sec = Math.floor((Date.now() - modalState.pollStart) / 1000);
+      const mm  = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss  = String(sec % 60).padStart(2, '0');
+      const el  = document.getElementById('recSttElapsed');
+      if (el) el.textContent = `경과 ${mm}:${ss}`;
+      const pillElapsed = document.getElementById('recPillSttElapsed');
+      if (pillElapsed) pillElapsed.textContent = `${mm}:${ss}`;
+      if (sec >= 300) {
+        const warn = document.getElementById('recSttLongWarn');
+        if (warn) warn.style.display = '';
+        if (modalEl) modalEl.classList.add('recorder-modal--stt-long');
       }
+    }, 1000);
+  }
+
+  const POLL_INTERVAL = 6000;
+  const MAX_POLL_MS = 90 * 60 * 1000;
+
+  // Q2: single poll step, reads transcriptId/sttApi off modalState so both the
+  // original upload flow and resumePolling() (after a retry) can drive it.
+  // Only escalates to the error screen after 5 CONSECUTIVE failures — one
+  // flaky fetch no longer discards a transcription job that's still running
+  // server-side.
+  async function pollOnce() {
+    try {
+      const idToken = await currentUser.getIdToken();
+      const r = await fetch(modalState.sttApi + '?action=status&id=' + encodeURIComponent(modalState.transcriptId), {
+        headers: { 'authorization': 'Bearer ' + idToken },
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        throw new Error(j.error || 'status_failed');
+      }
+      modalState.pollFailCount = 0;
+
+      const lbl      = document.getElementById('recSttStatus');
+      const stLabel  = document.getElementById('recSttStage2Label');
+      const pillLbl  = document.getElementById('recPillSttLabel');
+
+      if (j.status === 'queued') {
+        lbl.textContent = '대기열에서 차례를 기다리는 중…';
+        if (stLabel)  stLabel.textContent = '② 변환 대기 중';
+        if (pillLbl)  pillLbl.textContent = '대기 중…';
+      } else if (j.status === 'processing') {
+        lbl.textContent = '텍스트 변환 중…';
+        if (stLabel)  stLabel.textContent = '② 텍스트 변환 중';
+        if (pillLbl)  pillLbl.textContent = '변환 중…';
+      } else if (j.status === 'completed') {
+        deliverTranscript(j.text || '', modalState.lastFilename);
+        return;
+      } else if (j.status === 'error') {
+        // Terminal: the job itself failed server-side — re-polling it is useless.
+        // Clear transcriptId so the retry button falls back to re-upload (blob
+        // is still retained), and escalate immediately instead of 5 retries.
+        modalState.transcriptId = null;
+        modalState.pollFailCount = 4;
+        throw new Error(j.error_msg || 'transcription_error');
+      }
+
+      if (Date.now() - modalState.pollStart > MAX_POLL_MS) {
+        modalState.transcriptId = null;  // terminal, same as above
+        modalState.pollFailCount = 4;
+        throw new Error('처리 시간이 너무 오래 걸립니다. 잠시 후 다시 시도해주세요.');
+      }
+      modalState.pollHandle = setTimeout(pollOnce, POLL_INTERVAL);
+    } catch (err) {
+      modalState.pollFailCount = (modalState.pollFailCount || 0) + 1;
+      console.error('[recorder] poll failed (' + modalState.pollFailCount + '/5)', err);
+      if (modalState.pollFailCount < 5) {
+        // Transient — the AssemblyAI/Google job keeps running server-side, just retry.
+        modalState.pollHandle = setTimeout(pollOnce, POLL_INTERVAL);
+        return;
+      }
+      if (modalState.sttElapsedHandle) { clearInterval(modalState.sttElapsedHandle); modalState.sttElapsedHandle = null; }
+      modalState.phase = 'error';
+      if (modalEl) {
+        modalEl.classList.remove('recorder-modal--minimized');
+        modalEl.classList.remove('recorder-modal--stt');
+        modalEl.classList.remove('recorder-modal--stt-long');
+        modalEl.classList.remove('hidden');
+        const panelEl = modalEl.querySelector('.recorder-panel');
+        if (panelEl) { panelEl.style.left = ''; panelEl.style.top = ''; }
+      }
+      switchScreen('error');
+      document.getElementById('recErrorStatus').textContent =
+        '변환 중 오류가 발생했습니다. (' + (err.message || 'unknown') + ')';
     }
-    modalState.pollHandle = setTimeout(poll, 1500);
+  }
+
+  // Q2: retry button when a transcriptId survived a terminal poll failure —
+  // resumes checking that same job instead of re-uploading the audio.
+  function resumePolling() {
+    if (!modalState.transcriptId) { switchScreen('idle'); return; }
+    modalState.pollFailCount = 0;
+    modalState.phase = 'transcribing';
+    switchScreen('stt');
+    document.getElementById('recSttStatus').textContent = '이어서 확인하는 중…';
+    startSttElapsedTimer();
+    modalState.pollHandle = setTimeout(pollOnce, 500);
   }
 
   function formatElapsed(sec) {
@@ -1291,6 +1384,12 @@
         '변환된 텍스트가 비어있습니다. 녹음 파일을 확인해주세요.';
       return;
     }
+
+    // Q2: STT succeeded — nothing left to retry, drop the retained blob/job id.
+    modalState.lastBlob = null;
+    modalState.lastFilename = null;
+    modalState.transcriptId = null;
+    modalState.pollFailCount = 0;
 
     // Step 1: persist to transcript store
     let savedTranscript = null;
@@ -1398,5 +1497,12 @@
   // ── Public entry ────────────────────────────────────────
   window.openRecorderModal = function (targetSlotId) {
     showModal(targetSlotId);
+  };
+
+  // Q2: modalState is module-scoped — expose a getter so main_inline.js's
+  // beforeunload handler can warn on unsaved recording/upload/STT work too.
+  window.recorderIsActive = function () {
+    return modalState.phase === 'recording' || modalState.phase === 'paused'
+        || modalState.phase === 'uploading' || modalState.phase === 'transcribing';
   };
 })();
