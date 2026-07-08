@@ -133,6 +133,7 @@ const MAX_FILE_SIZE_BYTES  = 200 * 1024 * 1024;  // 200MB hard limit
 const WARN_FILE_SIZE_BYTES = 100 * 1024 * 1024;  // 100MB soft warning
 const MAX_PDF_PAGES        = 200;                  // hard page count limit
 const WARN_PDF_PAGES       = 100;                  // soft page count warning
+const MAX_IMAGE_UPLOAD_COUNT = 30;                 // U8: standalone image upload page cap
 const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];
 const MAX_TOKENS_NOTES      = 24000;
 const MAX_TOKENS_CRITIQUE   = 8192;
@@ -165,6 +166,7 @@ const AGENT_META = {
 
 // ===== Mutable shared state =====
 let pptFile  = null;
+let imageFiles = [];  // U8: standalone image upload (photos of slides/handwritten notes), mutually exclusive with pptFile
 let txtFiles = [];   // [{id, file}] — ordered slots for multi-recording
 let recIdCounter   = 0;
 

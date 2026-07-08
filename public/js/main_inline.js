@@ -127,7 +127,9 @@ document.getElementById('homeRecordBtn').addEventListener('click', () => {
 });
 
 document.getElementById('pptInput').addEventListener('change', e => {
-  if (e.target.files[0]) onPptChange(e.target.files[0]);
+  // U8: pptInput now allows multi-select (images = pages of one lecture) —
+  // pass the whole FileList so onPptChange can tell single vs multiple apart.
+  if (e.target.files.length) onPptChange(e.target.files);
 });
 
 

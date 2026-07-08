@@ -1,5 +1,5 @@
 // PPTX/PDF parsing: text extraction, image extraction, speaker separation.
-// Depends on: constants.js (pdfjsLib, pptFile, txtFiles, recIdCounter, abortController, REC_ORDINALS, dragSrcRecId, debugLog).
+// Depends on: constants.js (pdfjsLib, pptFile, imageFiles, MAX_IMAGE_UPLOAD_COUNT, txtFiles, recIdCounter, abortController, REC_ORDINALS, dragSrcRecId, debugLog).
 
 /* ═══════════════════════════════════════════════
    PDF.js — load worker via importScripts-compatible shim.
@@ -20,11 +20,66 @@ async function getPdfjsLib() {
 /* ═══════════════════════════════════════════════
    File handling
 ═══════════════════════════════════════════════ */
-async function onPptChange(file) {
-  if (!file) return;
+const IMAGE_UPLOAD_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+function isImageUploadFile(file) {
+  const name = file.name.toLowerCase();
+  return IMAGE_UPLOAD_EXTS.some(ext => name.endsWith(ext));
+}
+
+function setDocSlotTag(iconHtml, tagText) {
+  document.getElementById('pptIcon').innerHTML = iconHtml;
+  document.getElementById('pptTagName').textContent = tagText;
+  document.getElementById('pptTag').style.display = 'inline-flex';
+  document.getElementById('pptZone').classList.add('has-file');
+}
+
+/* U8: document slot accepts .pptx/.pdf/.docx (single file) OR standalone
+   image(s) (photos of slides/handwritten notes — multiple = pages of one
+   lecture, transcribed via vision in note_creation.js). The two kinds are
+   mutually exclusive: picking one clears the other. `files` is a FileList
+   or single File (drag-drop passes a FileList too, see main_inline.js). */
+async function onPptChange(files) {
+  const list = files instanceof FileList || Array.isArray(files) ? Array.from(files) : [files];
+  if (!list.length) return;
+
+  if (list.length > 1) {
+    // Multiple files selected → document slot only supports this for images.
+    if (!list.every(isImageUploadFile)) {
+      showToast('⚠️ 여러 파일을 한 번에 올리려면 모두 이미지(.jpg, .png, .webp)여야 합니다.');
+      return;
+    }
+    if (list.length > MAX_IMAGE_UPLOAD_COUNT) {
+      showToast(`⚠️ 이미지는 최대 ${MAX_IMAGE_UPLOAD_COUNT}장까지 업로드할 수 있습니다.`);
+      return;
+    }
+    const oversized = list.find(f => f.size > MAX_FILE_SIZE_BYTES);
+    if (oversized) {
+      showToast(`⚠️ "${oversized.name}" 파일이 너무 큽니다 (${(oversized.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+      return;
+    }
+    imageFiles = list;
+    pptFile = null;
+    setDocSlotTag('<i data-lucide="image"></i>', `이미지 ${list.length}장`);
+    checkReady();
+    return;
+  }
+
+  const file = list[0];
+  if (isImageUploadFile(file)) {
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      showToast(`⚠️ 파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(0)}MB). 최대 200MB까지 업로드할 수 있습니다.`);
+      return;
+    }
+    imageFiles = [file];
+    pptFile = null;
+    setDocSlotTag('<i data-lucide="image"></i>', '이미지 1장');
+    checkReady();
+    return;
+  }
+
   const name = file.name.toLowerCase();
   if (!name.endsWith('.pptx') && !name.endsWith('.pdf') && !name.endsWith('.docx')) {
-    showToast('⚠️ .pptx, .pdf 또는 .docx 파일만 업로드할 수 있습니다.');
+    showToast('⚠️ .pptx, .pdf, .docx 또는 이미지(.jpg, .png, .webp) 파일만 업로드할 수 있습니다.');
     return;
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -34,13 +89,12 @@ async function onPptChange(file) {
   if (file.size > WARN_FILE_SIZE_BYTES) {
     if (!await appConfirm(`파일 크기가 ${(file.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) return;
   }
+  imageFiles = [];  // mutual exclusion: a deck/doc replaces any staged images
   pptFile = file;
-  document.getElementById('pptIcon').innerHTML = name.endsWith('.pptx')
-    ? '<i data-lucide="presentation"></i>'
-    : '<i data-lucide="file-text"></i>';
-  document.getElementById('pptTagName').textContent = file.name;
-  document.getElementById('pptTag').style.display = 'inline-flex';
-  document.getElementById('pptZone').classList.add('has-file');
+  setDocSlotTag(
+    name.endsWith('.pptx') ? '<i data-lucide="presentation"></i>' : '<i data-lucide="file-text"></i>',
+    file.name
+  );
   checkReady();
 }
 
@@ -289,10 +343,11 @@ function checkReady() {
     checkBatchReady();
   } else {
     const hasRecordings = txtFiles.some(s => s.file !== null);
+    const hasDoc = !!pptFile || imageFiles.length > 0;  // U8: image upload also fills the document slot
     // U1: transcript-only analysis is now allowed — enable when either input exists.
-    analyzeBtn.disabled = isRunning || (!pptFile && !hasRecordings);
+    analyzeBtn.disabled = isRunning || (!hasDoc && !hasRecordings);
     const notice = document.getElementById('pptOnlyNotice');
-    if (pptFile && !hasRecordings) notice.classList.add('visible');
+    if (hasDoc && !hasRecordings) notice.classList.add('visible');
     else notice.classList.remove('visible');
 
     // Inject a hint (once) when a transcript is loaded but no PPT yet
@@ -316,7 +371,7 @@ function checkReady() {
       notice.parentNode.insertBefore(recOnlyHint, notice.nextSibling);
     }
     if (recOnlyHint) {
-      recOnlyHint.style.display = (!pptFile && hasRecordings) ? '' : 'none';
+      recOnlyHint.style.display = (!hasDoc && hasRecordings) ? '' : 'none';
     }
   }
 }
@@ -821,6 +876,122 @@ async function extractPdfPageImages(file) {
     console.warn('PDF 페이지 이미지 추출 오류:', e);
   }
   return images;
+}
+
+/* ── U8: standalone image upload → text transcription via Claude vision ──
+   Competitor feature parity: users can upload photos of slides/handwritten
+   notes directly (no deck required). Each image is transcribed and wrapped
+   in a [페이지 N] header so the existing pipeline/chunking/cite-chip
+   machinery — which already matches /\[(?:슬라이드|페이지) (\d+)\]/ — works
+   unchanged. Single-note only; see note_creation.js. */
+const IMAGE_VISION_BATCH_SIZE = 4;   // images per vision call, matches image_gallery.js content-array style
+
+/* Downscale to Anthropic's ~1568px long-edge sweet spot before base64 —
+   uploaded phone photos can be several MB / 4000px+ otherwise. */
+async function downscaleImageForVision(file, maxEdge = 1568) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+    return { mimeType: 'image/jpeg', base64: dataURL.split(',')[1] };
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+/* items: [{mimeType, base64, pageNum}, ...] (≤ IMAGE_VISION_BATCH_SIZE).
+   Same /api/claude fetch shape as image_gallery.js's analyzeImagesWithVision
+   (model/idToken/feature:'vision'), reused here for transcription instead
+   of slide description. */
+async function transcribeImageBatch(items) {
+  const content = [];
+  items.forEach((it, i) => {
+    content.push({ type: 'text', text: `[이미지 ${i + 1} — 페이지 ${it.pageNum}]` });
+    content.push({ type: 'image', source: { type: 'base64', media_type: it.mimeType, data: it.base64 } });
+  });
+  const headerLines = items.map((it, i) => `이미지 ${i + 1}은 [페이지 ${it.pageNum}] 헤더로 시작하세요.`).join('\n');
+  content.push({
+    type: 'text',
+    text: `각 이미지의 모든 텍스트·수식·필기 내용을 순서대로 전사하세요.\n${headerLines}\n표는 마크다운 표로, 수식은 텍스트로 표현하세요. 설명·해석은 넣지 말고 내용만 전사하세요.`,
+  });
+
+  let idToken = null;
+  try { idToken = await firebase.auth().currentUser?.getIdToken(); } catch (_) {}
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: abortController?.signal,
+    // ponytail: haiku — this is transcription, not reasoning; sonnet would only add cost.
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4096, messages: [{ role: 'user', content }], idToken, isFirstCall: false, feature: 'vision' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `이미지 인식 API 오류 (${res.status})`);
+  }
+  const data = await res.json();
+  return data.content?.[0]?.text || '';
+}
+
+/* Transcribes `files` (in selection order = page order) into a single
+   [페이지 N]-marked pptText string, plus the `imgs` array shape
+   renderImageGallery expects (same shape extractPptxImages/extractPdfPageImages
+   produce) so cite chips + the slide overlay work unchanged.
+   Per-image failure salvages a placeholder and continues; only throws if
+   every single image failed. AbortError always propagates immediately. */
+async function extractImagesText(files) {
+  const downscaled = [];
+  for (const file of files) {
+    try {
+      downscaled.push({ file, ...(await downscaleImageForVision(file)) });
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      debugLog('IMG', `downscale failed for ${file.name}: ${e.message}`);
+      downscaled.push({ file, mimeType: null, base64: null });
+    }
+  }
+
+  const imgs = downscaled.map((d, i) => ({
+    slideNumber: i + 1,
+    imageBase64: d.base64 || '',
+    mimeType: d.mimeType || 'image/jpeg',
+    fileName: d.file.name,
+  }));
+
+  const blocks = [];
+
+  for (let start = 0; start < downscaled.length; start += IMAGE_VISION_BATCH_SIZE) {
+    const slice = downscaled.slice(start, start + IMAGE_VISION_BATCH_SIZE)
+      .map((d, i) => ({ ...d, pageNum: start + i + 1 }));
+    const usable = slice.filter(d => d.base64);
+    const sliceBlocks = slice.filter(d => !d.base64)
+      .map(d => ({ pageNum: d.pageNum, text: `[페이지 ${d.pageNum}]\n(이미지 인식 실패)` }));
+
+    if (usable.length) {
+      try {
+        const text = await transcribeImageBatch(usable);
+        sliceBlocks.push({ pageNum: usable[0].pageNum, text: text.trim() });
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        debugLog('IMG', `vision batch failed at page ${usable[0].pageNum}: ${e.message}`);
+        usable.forEach(d => sliceBlocks.push({ pageNum: d.pageNum, text: `[페이지 ${d.pageNum}]\n(이미지 인식 실패)` }));
+      }
+    }
+
+    sliceBlocks.sort((a, b) => a.pageNum - b.pageNum);
+    blocks.push(...sliceBlocks.map(b => b.text));
+  }
+
+  const failCount = blocks.filter(b => b.includes('(이미지 인식 실패)')).length;
+  if (failCount === downscaled.length) {
+    throw new Error('모든 이미지 인식에 실패했습니다.');
+  }
+
+  return { pptText: blocks.join('\n\n'), imgs };
 }
 
 /* ═══════════════════════════════════════════════

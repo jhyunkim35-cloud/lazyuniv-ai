@@ -1,5 +1,5 @@
 // Single-note analysis flow — analyzeBtn handler body.
-// Depends on: constants.js (pptFile, txtFiles, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, extractedImages, currentUser, isRunning, abortController, _batchRunning, _batchProgress, _batchBuddyVisible, _currentView, _notesCollapsed, resultsEl, analyzeBtn, quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn, REC_ORDINALS, _lastGenerationError, debugLog), pptx_parser.js, image_gallery.js (renderImageGallery), ui.js, pipeline.js (runAgentPipeline), firestore_sync.js (autoSaveNote), payment.js (canAnalyze, showPaymentModal).
+// Depends on: constants.js (pptFile, imageFiles, txtFiles, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, extractedImages, currentUser, isRunning, abortController, _batchRunning, _batchProgress, _batchBuddyVisible, _currentView, _notesCollapsed, resultsEl, analyzeBtn, quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn, REC_ORDINALS, _lastGenerationError, debugLog), pptx_parser.js (extractImagesText, U8), image_gallery.js (renderImageGallery), ui.js, pipeline.js (runAgentPipeline), firestore_sync.js (autoSaveNote), payment.js (canAnalyze, showPaymentModal).
 
 async function runSingleNoteAnalysis() {
   if (!currentUser) { showToast('🔑 로그인 후 이용할 수 있습니다.'); return; }
@@ -11,8 +11,9 @@ async function runSingleNoteAnalysis() {
   if (isRunning) return;  // double-click guard
   const apiKey = 'server-proxied';
   // U1: allow transcript-only analysis — PPT/PDF is now optional as long as
-  // at least one transcript slot is filled.
-  if (!pptFile && !txtFiles.some(s => s.file !== null)) return;
+  // at least one transcript slot is filled. U8: image upload also fills the
+  // document slot.
+  if (!pptFile && !imageFiles.length && !txtFiles.some(s => s.file !== null)) return;
 
   // A new single-mode analysis always produces a NEW note. Clear currentNoteId
   // so autoSaveNote generates a fresh id instead of reusing the id of whatever
@@ -88,6 +89,15 @@ async function runSingleNoteAnalysis() {
         if (imgs.length) agentLog(0, `PDF 페이지 이미지 ${imgs.length}개 렌더링`);
       }
       // .docx has no images to extract — falls through here with none, which is fine.
+    } else if (imageFiles.length) {
+      // U8: standalone image upload (photos of slides/handwritten notes) — transcribe
+      // via vision into [페이지 N] blocks so the rest of the pipeline is unaware
+      // the document didn't come from a deck.
+      setProgress(5, `이미지 텍스트 인식 중… (${imageFiles.length}장)`);
+      const { pptText, imgs } = await extractImagesText(imageFiles);
+      storedPptText = pptText;
+      renderImageGallery(imgs);
+      agentLog(0, `이미지 ${imageFiles.length}장 텍스트 인식 완료`);
     } else {
       // U1: transcript-only — no PPT/PDF to parse, no images to extract.
       storedPptText = '';

@@ -24,5 +24,5 @@ assert_contains public/js/srs_review.js "card.type === 'cloze'" "U6-6: 리뷰 UI
 assert_contains public/js/srs_review.js "'암기 카드'" "U6-6: cloze 카드 전용 라벨 존재"
 assert_contains public/js/srs_review.js "escHtml(card.back)" "U6-6: cloze 뒷면이 escHtml로 이스케이프됨 (모델 생성 텍스트)"
 
-assert_contains public/index.html "?v=u6srs" "U6-7: 캐시버스트 버전 갱신"
+assert_contains public/index.html "?v=u8image" "U6-7: 캐시버스트 버전 갱신 (U8에서 u8image로 추가 상향, u6srs 세대 잔존 없음 확인이 목적)"
 assert_absent public/index.html "?v=u34tools" "U6-7: 이전 캐시버스트 버전 잔존 없음"
