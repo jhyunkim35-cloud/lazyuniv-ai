@@ -35,6 +35,6 @@ assert_contains public/js/pipeline.js "URL.revokeObjectURL(url)" "U4-1g: object 
 assert_contains public/js/pipeline.js "canvas.width = width * 2" "U4-1h: 2x 레티나 스케일 적용"
 assert_contains public/js/pipeline.js "documentElement.classList.contains('light')" "U4-1i: 라이트/다크 팔레트 분기가 스펙과 동일한 클래스 체크 사용"
 
-# 캐시버스트
-assert_contains public/index.html "pipeline.js?v=u34tools" "cache-bust: pipeline.js 신규 버전"
+# 캐시버스트 (버전 무관 — 매 라운드 공유 마커가 갱신되므로 특정 리터럴 대신 존재 여부만 확인. U6에서 u34tools → u6srs로 교체됨)
+assert_matches public/index.html "pipeline\.js\?v=" "cache-bust: pipeline.js 버전 마커 존재"
 assert_absent public/index.html "?v=u2quiz" "cache-bust: 구버전 잔존 없음"

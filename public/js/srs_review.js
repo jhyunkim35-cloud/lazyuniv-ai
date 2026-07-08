@@ -374,7 +374,9 @@
     const pct  = Math.round((_current / _queue.length) * 100);
     const prog = `${_current + 1} / ${_queue.length}`;
 
-    const title = escHtml(card.sectionTitle || card.id || '?');
+    const isCloze = card.type === 'cloze';
+    const hint  = isCloze ? '암기 카드' : '섹션 복습';
+    const title = escHtml((isCloze ? card.front : card.sectionTitle) || card.id || '?');
     rv.innerHTML = `
 <div class="srs-review-wrap">
   <div class="srs-review-header">
@@ -386,7 +388,7 @@
   </div>
   <div class="srs-card" id="srsCard">
     <div class="srs-card-front">
-      <div class="srs-card-hint">섹션 복습</div>
+      <div class="srs-card-hint">${hint}</div>
       <div class="srs-card-title">${title}</div>
       <div class="srs-card-note-hint" id="srsNoteHint"></div>
     </div>
@@ -414,9 +416,12 @@
 
     srsCard.classList.add('flipped');
 
+    const isCloze = card.type === 'cloze';
     let contentHtml = '<em style="color:var(--text-muted);">(내용을 찾을 수 없습니다)</em>';
     try {
-      if (card.noteId && typeof getNoteFS === 'function') {
+      if (isCloze) {
+        contentHtml = card.back ? escHtml(card.back) : '<em style="color:var(--text-muted);">(내용이 없습니다)</em>';
+      } else if (card.noteId && typeof getNoteFS === 'function') {
         const note = await getNoteFS(card.noteId);
         if (note) {
           const rawText = note.notesText || note.markdownContent || '';
@@ -428,10 +433,11 @@
       }
     } catch (e) {}
 
-    const title = escHtml(card.sectionTitle || card.id || '?');
+    const hint  = isCloze ? '암기 카드' : '섹션 복습';
+    const title = escHtml((isCloze ? card.front : card.sectionTitle) || card.id || '?');
     srsCard.innerHTML = `
 <div class="srs-card-front" style="text-align:left;align-items:flex-start;justify-content:flex-start;padding-bottom:0.5rem;">
-  <div class="srs-card-hint">섹션 복습</div>
+  <div class="srs-card-hint">${hint}</div>
   <div class="srs-card-title" style="font-size:1.15rem;">${title}</div>
 </div>
 <div class="srs-card-answer">

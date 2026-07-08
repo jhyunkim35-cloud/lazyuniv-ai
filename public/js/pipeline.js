@@ -1041,7 +1041,9 @@ function renderMemorize(container, items) {
   controls.className = 'study-aids-controls';
   const showBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 보기' });
   const hideBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 가리기' });
-  controls.append(showBtn, hideBtn);
+  const srsBtn  = Object.assign(document.createElement('button'), { type: 'button', id: 'memorizeSrsBtn', className: 'mindmap-ctrl-btn', textContent: '🔁 복습 카드로 추가' });
+  srsBtn.addEventListener('click', pushMemorizeToSrs);
+  controls.append(showBtn, hideBtn, srsBtn);
   container.appendChild(controls);
 
   const list = document.createElement('div');
@@ -1086,6 +1088,63 @@ function renderMemorize(container, items) {
   });
   showBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '1'; s.textContent = s.dataset.answer || ''; }));
   hideBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '0'; s.textContent = ''; }));
+}
+
+// U6: {{cloze}} 문장 → SRS front/back. front는 정답을 ＿＿＿로 가림, back은 괄호 벗긴 원문 그대로.
+function _clozeFrontBack(text) {
+  return {
+    front: text.replace(/\{\{(.+?)\}\}/g, '＿＿＿'),
+    back:  text.replace(/\{\{(.+?)\}\}/g, '$1'),
+  };
+}
+
+let _srsPushBusy = false;  // reentry guard while pushing cloze cards into the SRS queue
+
+// U6: 현재 암기(cloze) 항목들을 SRS 복습 큐에 opt-in으로 밀어넣는다. 재생성 후 다시 누르면
+// 같은 index의 카드 id를 재사용해 front/back만 갱신하고 기존 SM-2 스케줄(interval 등)은 보존한다.
+async function pushMemorizeToSrs() {
+  if (_srsPushBusy) return;
+  const items = currentStudyTools && currentStudyTools.memorize;
+  if (!items || !items.length) return;
+  if (typeof cardIdFor !== 'function' || typeof saveSrsCard !== 'function' || typeof getSrsCard !== 'function') return;
+
+  _srsPushBusy = true;
+  const btn = document.getElementById('memorizeSrsBtn');
+  const prevLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 추가 중…'; }
+  try {
+    if (!currentNoteId) {
+      await autoSaveNote();  // 다른 학습 도구와 동일한 저장 경로 — 이름 프롬프트 뜸
+      if (!currentNoteId) { showToast('먼저 노트를 저장하세요'); return; }
+    }
+    const note = await getNoteFS(currentNoteId).catch(() => null);
+    const folderId = note?.folderId || '';
+    const today = _accSrsToday();
+
+    let added = 0, updated = 0;
+    for (let i = 0; i < items.length; i++) {
+      const { front, back } = _clozeFrontBack(items[i]);
+      const id = cardIdFor(folderId, currentNoteId, 'cloze-' + i);
+      const existing = await getSrsCard(id).catch(() => null);
+      if (existing) {
+        await saveSrsCard(Object.assign({}, existing, { type: 'cloze', folderId, noteId: currentNoteId, front, back }));
+        updated++;
+      } else {
+        await saveSrsCard({
+          id, type: 'cloze', folderId, noteId: currentNoteId, front, back,
+          nextReviewDate: today, interval: 0, repetitions: 0, easeFactor: 2.5,
+        });
+        added++;
+      }
+    }
+    showToast(added > 0 ? `🔁 복습 큐에 ${added + updated}개 추가됨` : `🔁 복습 큐에 ${updated}개 갱신됨`);
+  } catch (e) {
+    showToast(`❌ 복습 카드 추가 실패: ${e.message}`);
+  } finally {
+    _srsPushBusy = false;
+    const btnAfter = document.getElementById('memorizeSrsBtn');
+    if (btnAfter) { btnAfter.disabled = false; btnAfter.textContent = prevLabel || '🔁 복습 카드로 추가'; }
+  }
 }
 
 function renderConcepts(container, items) {
