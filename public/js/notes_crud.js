@@ -1,12 +1,50 @@
 // Notes CRUD: auto-save, list rendering, open/load, Notion file import, delete, move, rename, detect splits.
-// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, currentStudyTools, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero, renderStudyTools).
+// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, currentStudyTools, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero, renderStudyTools), folders.js (buildFolderSelectOptions).
 
 /* ═══════════════════════════════════════════════
    Auto-save after pipeline
 ═══════════════════════════════════════════════ */
+// U14: also lets the user pick a destination folder at save time (instead of
+// always landing in 미분류). Returns {title, folderId} — folderId is '' /
+// null when 미분류 stays selected. Cancel/Escape still saves (matches prior
+// behavior: only the title falls back to defaultTitle, the folder choice —
+// whatever was selected — is kept either way).
 async function promptNoteName(defaultTitle) {
-  const name = await appPrompt('노트 이름을 입력하세요:', defaultTitle);
-  return name && name.trim() ? name.trim() : defaultTitle;
+  const folders = await getAllFoldersFS().catch(() => []);
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'db-modal-overlay';
+    overlay.innerHTML = `
+      <div class="db-modal" style="max-width:380px;">
+        <div style="font-size:0.9rem; line-height:1.5; margin-bottom:0.6rem; color:var(--text);">노트 이름을 입력하세요:</div>
+        <input class="appPromptInput" type="text" style="width:100%; padding:0.5rem 0.7rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.9rem; box-sizing:border-box; margin-bottom:0.7rem;" />
+        <label style="font-size:0.78rem; font-weight:600; color:var(--text-muted); display:block; margin-bottom:0.3rem;">저장 폴더</label>
+        <select class="folder-save-select" style="width:100%; padding:0.4rem 0.6rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.85rem; box-sizing:border-box;">${buildFolderSelectOptions(folders, '')}</select>
+        <div class="db-modal-footer" style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1rem;">
+          <button class="appPromptCancel" style="background:var(--surface3); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:0.4rem 1rem; cursor:pointer; font-size:0.85rem;">취소</button>
+          <button class="appPromptOk" style="background:var(--primary); color:#fff; border:none; border-radius:6px; padding:0.4rem 1rem; cursor:pointer; font-size:0.85rem;">확인</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input        = overlay.querySelector('.appPromptInput');
+    const folderSelect = overlay.querySelector('.folder-save-select');
+    input.value = defaultTitle;
+    const onKey = e => {
+      if (e.key === 'Escape') done(null);
+      else if (e.key === 'Enter' && document.activeElement === input) done(input.value);
+    };
+    const done = val => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      const title = val && val.trim() ? val.trim() : defaultTitle;
+      resolve({ title, folderId: folderSelect.value || null });
+    };
+    overlay.querySelector('.appPromptOk').addEventListener('click', () => done(input.value));
+    overlay.querySelector('.appPromptCancel').addEventListener('click', () => done(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(null); }); // backdrop click = cancel (title falls back, folder kept)
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+  });
 }
 
 async function autoSaveNote() {
@@ -17,7 +55,7 @@ async function autoSaveNote() {
     const headingTitle     = headingMatch?.[1].replace(/\*\*/g, '').trim();
     const fileTitle        = pptFile?.name?.replace(/\.[^.]+$/, '') || document.getElementById('pptTagName')?.textContent || '새 노트';
     const autoTitle        = slide1Title || headingTitle || fileTitle;
-    const title = await promptNoteName(autoTitle);
+    const { title, folderId: chosenFolderId } = await promptNoteName(autoTitle);
     // GUARD: prevent ghost notes — both title and content must be non-empty
     const _titleOk = title && title.trim();
     const _contentOk = storedNotesText && storedNotesText.trim();
@@ -30,10 +68,16 @@ async function autoSaveNote() {
     // doc knows which Storage object backs it. Cleared after save so the
     // path doesn't leak into the next unrelated note.
     const audioStoragePath = window.recorderLastAudioPath || null;
+    // U14: new notes save straight into the chosen folder (with a sortOrder,
+    // same as the moveSavedNote path, so it doesn't get stuck at Infinity
+    // vs manually-ordered notes already in that folder). Existing notes keep
+    // whatever folder they're already in — this modal doesn't move them.
+    const isNewNote = !currentNoteId;
     const record = await saveNoteFS({
       id:                   currentNoteId || undefined,
       title,
-      folderId:             currentNoteId ? (await getNoteFS(currentNoteId))?.folderId ?? null : null,
+      folderId:             isNewNote ? chosenFolderId : (await getNoteFS(currentNoteId))?.folderId ?? null,
+      ...(isNewNote ? { sortOrder: await getNextSortOrder(chosenFolderId) } : {}),
       notesText:            storedNotesText,
       notesHtml,
       pptText:              storedPptText,

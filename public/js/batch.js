@@ -1,5 +1,13 @@
 // Batch mode: batchBuddy drag IIFE, batch session/queue management, result cards.
-// Depends on: constants.js, markdown.js (renderMarkdown, escHtml), ui.js (agentLog, showToast, showSuccessToast, triggerDownload, dateStamp, setProgress), viewers.js (openPdfPopup), pipeline.js (runAgentPipeline), pptx_parser.js (extractPresentationText, separateSpeakers, extractPptxImages, extractPdfPageImages), firestore_sync.js (saveNoteFS), api.js.
+// Depends on: constants.js, markdown.js (renderMarkdown, escHtml), ui.js (agentLog, showToast, showSuccessToast, triggerDownload, dateStamp, setProgress), viewers.js (openPdfPopup), pipeline.js (runAgentPipeline), pptx_parser.js (extractPresentationText, separateSpeakers, extractPptxImages, extractPdfPageImages), firestore_sync.js (saveNoteFS, getAllFoldersFS), folders.js (buildFolderSelectOptions), api.js.
+
+// U14: folder list cache for the batch staging select + per-queue-item
+// selects. renderBatchQueue() runs synchronously and often (item add/remove,
+// status changes), so it reads from this cache instead of re-fetching each
+// time. Refreshed whenever multi-mode is entered (see setMode below).
+// ponytail: doesn't live-refresh if a folder is created/renamed while
+// already in multi mode — re-enter multi mode (or reload) to pick it up.
+let _batchFoldersCache = [];
 
 /* ── Batch buddy: drag + interaction ──────────────────────────────────── */
 (function () {
@@ -105,7 +113,19 @@ function setMode(mode) {
   document.getElementById('singleNoteCard').style.display  = isBatchMode ? 'none' : '';
   document.getElementById('batchResultsList').style.display = isBatchMode ? '' : 'none';
   if (isBatchMode && batchSessionStaging.length === 0) addBatchSession();
+  if (isBatchMode) refreshBatchFolderSelect();
   checkReady();
+}
+
+// U14: (re)loads the folder list into the staging select + shared cache
+// (used by renderBatchQueue's per-item selects).
+async function refreshBatchFolderSelect() {
+  const sel = document.getElementById('batchFolderSelect');
+  if (!sel) return;
+  const folders = await getAllFoldersFS().catch(() => []);
+  _batchFoldersCache = folders;
+  const prevValue = sel.value;
+  sel.innerHTML = buildFolderSelectOptions(folders, prevValue);
 }
 
 function addBatchSession() {
@@ -178,6 +198,10 @@ function renderBatchQueue() {
       ${canRemove ? `<div class="batch-item-name-row">
         <span class="batch-item-name-label">노트 이름</span>
         <input type="text" class="batch-item-name-input" data-item-id="${item.id}" value="${escHtml(notesName)}" placeholder="노트 제목 입력…" />
+      </div>
+      <div class="batch-item-name-row">
+        <span class="batch-item-name-label">저장 폴더</span>
+        <select class="batch-item-folder-select folder-save-select" data-item-id="${item.id}">${buildFolderSelectOptions(_batchFoldersCache, item.folderId)}</select>
       </div>` : ''}
     </div>`;
   }).join('');

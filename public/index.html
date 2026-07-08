@@ -4265,7 +4265,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=u13multi"></script>
+<script defer src="/js/markdown.js?v=u14folder"></script>
 </head>
 <body>
 
@@ -4645,6 +4645,11 @@
         <div id="batchSessionList" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
         <button id="addSessionBtn" class="action-btn" style="font-size:0.8rem; margin-top:0.5rem; width:100%;">＋ 교시 추가</button>
       </div>
+      <!-- U14: 저장 폴더 선택 -->
+      <div class="batch-staging-section">
+        <div class="batch-staging-label"><i data-lucide="folder" class="icon-sm"></i> 저장 폴더</div>
+        <select id="batchFolderSelect" class="batch-prof-select folder-save-select" style="width:100%;"></select>
+      </div>
       <!-- 쌍 추가 -->
       <div class="batch-staging-footer">
         <button id="addPairBtn" class="analyze-btn" disabled style="width:100%; padding:0.6rem; font-size:0.88rem;">③ ＋ 목록에 추가</button>
@@ -4921,41 +4926,41 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=u13multi"></script>
-<script defer src="/js/error_autoreport.js?v=u13multi"></script>
-<script defer src="/js/icons.js?v=u13multi"></script>
-<script defer src="/js/storage.js?v=u13multi"></script>
-<script defer src="/js/firestore_sync.js?v=u13multi"></script>
+<script defer src="/js/constants.js?v=u14folder"></script>
+<script defer src="/js/error_autoreport.js?v=u14folder"></script>
+<script defer src="/js/icons.js?v=u14folder"></script>
+<script defer src="/js/storage.js?v=u14folder"></script>
+<script defer src="/js/firestore_sync.js?v=u14folder"></script>
 <script defer src="/js/transcripts_store.js?v=u7bworker"></script>
-<script defer src="/js/api.js?v=u13multi"></script>
-<script defer src="/js/pptx_parser.js?v=u13multi"></script>
-<script defer src="/js/quiz.js?v=u13multi"></script>
-<script defer src="/js/ui.js?v=u13multi"></script>
-<script defer src="/js/viewers.js?v=u13multi"></script>
-<script defer src="/js/image_gallery.js?v=u13multi"></script>
-<script defer src="/js/pipeline.js?v=u13multi"></script>
-<script defer src="/js/batch.js?v=u13multi"></script>
-<script defer src="/js/note_creation.js?v=u13multi"></script>
-<script defer src="/js/notes_crud.js?v=u13multi"></script>
-<script defer src="/js/notion_viewer.js?v=u13multi"></script>
-<script defer src="/js/notion_clipboard.js?v=u13multi"></script>
-<script defer src="/js/folders.js?v=u13multi"></script>
-<script defer src="/js/exam_plan.js?v=u13multi"></script>
-<script defer src="/js/srs.js?v=u13multi"></script>
-<script defer src="/js/timetable.js?v=u13multi"></script>
-<script defer src="/js/srs_review.js?v=u13multi"></script>
-<script defer src="/js/home_view.js?v=u13multi"></script>
+<script defer src="/js/api.js?v=u14folder"></script>
+<script defer src="/js/pptx_parser.js?v=u14folder"></script>
+<script defer src="/js/quiz.js?v=u14folder"></script>
+<script defer src="/js/ui.js?v=u14folder"></script>
+<script defer src="/js/viewers.js?v=u14folder"></script>
+<script defer src="/js/image_gallery.js?v=u14folder"></script>
+<script defer src="/js/pipeline.js?v=u14folder"></script>
+<script defer src="/js/batch.js?v=u14folder"></script>
+<script defer src="/js/note_creation.js?v=u14folder"></script>
+<script defer src="/js/notes_crud.js?v=u14folder"></script>
+<script defer src="/js/notion_viewer.js?v=u14folder"></script>
+<script defer src="/js/notion_clipboard.js?v=u14folder"></script>
+<script defer src="/js/folders.js?v=u14folder"></script>
+<script defer src="/js/exam_plan.js?v=u14folder"></script>
+<script defer src="/js/srs.js?v=u14folder"></script>
+<script defer src="/js/timetable.js?v=u14folder"></script>
+<script defer src="/js/srs_review.js?v=u14folder"></script>
+<script defer src="/js/home_view.js?v=u14folder"></script>
 <script defer src="/js/transcripts_view.js?v=u7bworker"></script>
-<script defer src="/js/bulk.js?v=u13multi"></script>
-<script defer src="/js/firebase_auth.js?v=u13multi"></script>
-<script defer src="/js/payment.js?v=u13multi"></script>
+<script defer src="/js/bulk.js?v=u14folder"></script>
+<script defer src="/js/firebase_auth.js?v=u14folder"></script>
+<script defer src="/js/payment.js?v=u14folder"></script>
 <script defer src="/js/recorder.js?v=u7bworker"></script>
-<script defer src="/js/groups.js?v=u13multi"></script>
-<script defer src="/js/study_rooms.js?v=u13multi"></script>
-<script defer src="/js/bug_report.js?v=u13multi"></script>
-<script defer src="/js/onboarding_tour.js?v=u13multi"></script>
-<script defer src="/js/main.js?v=u13multi"></script>
-<script defer src="/js/main_inline.js?v=u13multi"></script>
+<script defer src="/js/groups.js?v=u14folder"></script>
+<script defer src="/js/study_rooms.js?v=u14folder"></script>
+<script defer src="/js/bug_report.js?v=u14folder"></script>
+<script defer src="/js/onboarding_tour.js?v=u14folder"></script>
+<script defer src="/js/main.js?v=u14folder"></script>
+<script defer src="/js/main_inline.js?v=u14folder"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

@@ -560,6 +560,16 @@ document.getElementById('batchQueue').addEventListener('input', e => {
   updateBatchItemName(id, e.target.value);
 });
 
+// U14: per-card folder select — lets the user change a queued item's save
+// destination while it's still 대기 중 (the select is only rendered for
+// waiting items; see renderBatchQueue).
+document.getElementById('batchQueue').addEventListener('change', e => {
+  if (!e.target.classList.contains('batch-item-folder-select')) return;
+  const id = parseInt(e.target.dataset.itemId, 10);
+  const item = batchQueue.find(i => i.id === id);
+  if (item) item.folderId = e.target.value || null;
+});
+
 document.getElementById('addPairBtn').addEventListener('click', () => {
   if (!batchPptStaging && !batchSessionStaging.some(s => s.txtFile)) {
     showToast('발표 자료 또는 녹취록 중 하나 이상 업로드하세요.');
@@ -573,7 +583,8 @@ document.getElementById('addPairBtn').addEventListener('click', () => {
     pptFile: batchPptStaging,
     notesName: defaultName,
     sessions: batchSessionStaging.filter(s => s.txtFile).map(s => ({ txtFile: s.txtFile, professorNum: s.professorNum })),
-    status: 'waiting'
+    status: 'waiting',
+    folderId: document.getElementById('batchFolderSelect')?.value || null, // U14
   });
 
   // reset staging
@@ -730,8 +741,14 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         if (!_t || !_c) {
           console.warn('[batch] skipped empty note save for item', item?.notesName || '(no name)');
         } else {
+          // U14: save straight into the folder chosen for this queue item
+          // (staging default or per-card override), with a sortOrder so it
+          // doesn't sit at Infinity vs manually-ordered notes in that folder.
+          const itemFolderId = item.folderId || null;
           await saveNoteFS({
             title: itemName,
+            folderId: itemFolderId,
+            sortOrder: await getNextSortOrder(itemFolderId),
             notesText: storedNotesText,
             notesHtml: batchBodyHtml,
             pptText: storedPptText,

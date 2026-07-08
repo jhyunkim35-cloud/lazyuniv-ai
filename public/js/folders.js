@@ -1,6 +1,24 @@
 // Folder manager: create, rename, delete folders; modal UI.
 // Depends on: constants.js (FOLDER_COLORS, _activeFolderId), firestore_sync.js (getAllFoldersFS, saveFolderFS, renameFolderFS, deleteFolderFS), ui.js (showToast), markdown.js (escHtml), notes_crud.js (fmtDate), home_view.js (renderHomeView).
 
+/* ═══════════════════════════════════════════════
+   U14: shared folder-select builder
+   ────────────────────────────────────────────────
+   Note-creation flows (single-mode promptNoteName modal, multi-mode batch
+   staging select + per-queue-item selects) all need the same "📂 미분류 +
+   one option per folder" list so a note can be filed into a folder right
+   when it's created instead of always landing in 미분류 and requiring a
+   later move. This returns <option> markup only — callers wrap their own
+   <select id/class/data-*> since each site needs different attributes.
+═══════════════════════════════════════════════ */
+function buildFolderSelectOptions(folders, selectedId) {
+  const sel = selectedId || '';
+  const opts = [{ id: '', name: '📂 미분류' }, ...(folders || [])];
+  return opts.map(f =>
+    `<option value="${escHtml(f.id || '')}"${(f.id || '') === sel ? ' selected' : ''}>${escHtml(f.name)}</option>`
+  ).join('');
+}
+
 async function showFolderManager() {
   const overlay = document.createElement('div');
   overlay.className = 'db-modal-overlay';
