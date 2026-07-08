@@ -1,23 +1,31 @@
-// Whisper (Groq) + pyannote.ai diarization STT proxy — replaces AssemblyAI as
-// the free-tier engine. Two endpoints, same client contract as assemblyai.js:
+// Whisper (Groq) + self-hosted pyannote diarization STT proxy — replaces
+// AssemblyAI as the free-tier engine. Two endpoints, same client contract as
+// assemblyai.js:
 //   POST ?action=transcribe — { audio_url } -> { transcript_id, status }
 //   GET  ?action=status&id  — poll status -> { status, text?, speaker_count?, audio_duration? }
+//   GET  ?action=labels&id  — late speaker-label upgrade once the worker finishes
 //
-// Two providers run in parallel on transcribe: pyannote.ai diarizes the audio
-// (async job) while Groq's Whisper transcribes it synchronously (fast enough
-// to finish inside the request). The Whisper result is stashed in Storage so
-// the status poll can merge it with the diarization once that job completes.
+// U7b: pyannote.ai's hosted API is gone. Diarization now runs on a local
+// Python worker (worker/diarize_worker.py) polling a Firestore job queue
+// (diarizationJobs/{jobId}). Groq's Whisper still transcribes synchronously
+// inside the request; the result is stashed in Storage so the status poll
+// (or the worker-backed `labels` action) can merge it with diarization turns
+// once the worker finishes.
 //
 // Auth: Firebase ID token in Authorization: Bearer <token>.
 // Rate-limit: same distributed per-uid Firestore counter as assemblyai.js.
 
 const fetch = globalThis.fetch || require('node-fetch');
+const crypto = require('crypto');
 const { getAdmin } = require('./_firebase-admin');
 const { recordUsage } = require('./_usage');
 const { mergeTranscript } = require('./_stt_merge');
 
-const PYANNOTE_BASE = 'https://api.pyannote.ai/v1';
 const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+// Grace window before a still-pending/running diarization job stops blocking
+// transcript delivery — the transcript itself is the product, labels are an
+// upgrade. See GRACE_MS usage in the status handler below.
+const GRACE_MS = 3 * 60 * 1000;
 const MAX_AUDIO_BYTES = 95 * 1024 * 1024; // Groq's file-size ceiling has some headroom below 100MB
 
 // Distributed rate limit — identical scheme to api/assemblyai.js.
@@ -101,6 +109,22 @@ function tmpPath(uid, jobId) {
   return `stt_tmp/${uid}/${jobId}.json`;
 }
 
+// Load the stashed (trimmed) Whisper verbose_json for a job. Throws on
+// missing file — callers map that to 404 (uid-scoped path doubles as the
+// cross-user access guard).
+async function loadStash(uid, jobId) {
+  const [buf] = await getBucket().file(tmpPath(uid, jobId)).download();
+  return JSON.parse(buf.toString('utf8'));
+}
+
+async function meterStt(uid, duration) {
+  try {
+    await recordUsage({ uid, kind: 'stt', increments: { sttSeconds: Math.round(duration || 0) } });
+  } catch (e) {
+    console.error('[usage] stt record failed:', e.message);
+  }
+}
+
 // Firebase download URLs keep the literal file extension before the query string.
 function extFromUrl(url) {
   const m = url.split('?')[0].match(/\.(\w{2,5})$/);
@@ -152,9 +176,8 @@ module.exports = async (req, res) => {
   }
 
   const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  const PYANNOTEAI_API_KEY = process.env.PYANNOTEAI_API_KEY;
-  if (!GROQ_API_KEY || !PYANNOTEAI_API_KEY) {
-    console.error('[whisper-stt] missing GROQ_API_KEY or PYANNOTEAI_API_KEY env');
+  if (!GROQ_API_KEY) {
+    console.error('[whisper-stt] missing GROQ_API_KEY env');
     return res.status(500).json({ error: 'stt_not_configured' });
   }
 
@@ -176,25 +199,15 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'audio_url_not_allowed' });
       }
 
-      // 1. Submit the (async) diarization job.
-      const diarRes = await fetch(`${PYANNOTE_BASE}/diarize`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${PYANNOTEAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: audio_url, model: 'community-1' }),
+      // 1. Enqueue the (async) diarization job for the local worker to pick up.
+      const jobId = crypto.randomUUID();
+      const admin = getAdmin();
+      await admin.firestore().collection('diarizationJobs').doc(jobId).set({
+        uid: user.uid,
+        audioUrl: audio_url,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      const diarJson = await safeJson(diarRes);
-      if (!diarRes.ok) {
-        console.error('[whisper-stt] pyannote diarize submit failed', diarRes.status, diarJson);
-        return res.status(502).json({ error: 'diarize_submit_failed', detail: diarJson });
-      }
-      const jobId = diarJson.jobId || diarJson.id;
-      if (!jobId) {
-        console.error('[whisper-stt] pyannote diarize submit: no jobId', diarJson);
-        return res.status(502).json({ error: 'diarize_submit_failed', detail: 'no jobId in response' });
-      }
 
       // 2. Transcribe synchronously with Groq Whisper.
       let buf;
@@ -252,40 +265,22 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'bad_id' });
       }
 
-      const jobRes = await fetch(`${PYANNOTE_BASE}/jobs/${encodeURIComponent(id)}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${PYANNOTEAI_API_KEY}` },
-      });
-      if (!jobRes.ok) {
-        const detail = await safeJson(jobRes);
-        console.error('[whisper-stt] pyannote job status failed', jobRes.status, detail);
-        return res.status(502).json({ error: 'status_failed', detail });
+      const admin = getAdmin();
+      const jobSnap = await admin.firestore().collection('diarizationJobs').doc(id).get();
+      if (!jobSnap.exists) {
+        return res.status(404).json({ error: 'not_found' });
       }
-      const jobJson = await safeJson(jobRes);
-      const jstatus = jobJson.status;
+      const job = jobSnap.data();
+      const jstatus = job.status;
 
-      if (jstatus === 'created' || jstatus === 'pending' || jstatus === 'running') {
-        return res.status(200).json({ status: 'processing' });
-      }
-
-      if (jstatus === 'failed' || jstatus === 'canceled') {
+      if (jstatus === 'failed') {
         // Diarization failed — the transcript is worth more than the speaker
         // labels, so never fail the whole job over it. Fall back to plain
         // unlabeled Whisper text.
         try {
-          const bucket = getBucket();
-          const [buf] = await bucket.file(tmpPath(user.uid, id)).download();
-          const whisper = JSON.parse(buf.toString('utf8'));
+          const whisper = await loadStash(user.uid, id);
           const { text } = mergeTranscript(whisper, null);
-          try {
-            await recordUsage({
-              uid: user.uid,
-              kind: 'stt',
-              increments: { sttSeconds: Math.round(whisper.duration || 0) },
-            });
-          } catch (e) {
-            console.error('[usage] stt record failed:', e.message);
-          }
+          await meterStt(user.uid, whisper.duration);
           return res.status(200).json({
             status: 'completed',
             text,
@@ -299,47 +294,99 @@ module.exports = async (req, res) => {
         }
       }
 
-      if (jstatus !== 'succeeded') {
-        // Unrecognized intermediate status — keep polling rather than erroring.
+      if (jstatus === 'succeeded') {
+        // Succeeded — merge diarization turns with the stashed Whisper result.
+        const turns = Array.isArray(job.turns) ? job.turns : [];
+        let whisper;
+        try {
+          whisper = await loadStash(user.uid, id);
+        } catch (e) {
+          // Missing tmp file — expired, or the job belongs to another uid
+          // (uid-scoped path). Either way: not found.
+          return res.status(404).json({ error: 'not_found' });
+        }
+
+        const { text, speakerCount } = mergeTranscript(whisper, turns);
+        const audio_duration = whisper.duration ?? null;
+        await meterStt(user.uid, audio_duration);
+
+        // Tmp file is intentionally NOT deleted here: if this response is lost
+        // in transit the client re-polls, and the merge must stay reproducible.
+        // Cleanup = Storage lifecycle rule on the stt_tmp/ prefix (console).
+
+        return res.status(200).json({
+          status: 'completed',
+          text,
+          speaker_count: speakerCount,
+          audio_duration,
+        });
+      }
+
+      // 'pending' / 'running' (and any other not-yet-terminal status): the
+      // worker hasn't finished diarizing yet. Keep the client polling inside
+      // the grace window; past it, the transcript is worth more than making
+      // the user wait on speaker labels, so deliver it unlabeled now — the
+      // worker keeps running and `action=labels` upgrades it later.
+      const createdAtMs = job.createdAt?.toMillis?.() ?? Date.now();
+      const age = Date.now() - createdAtMs;
+      if (age < GRACE_MS) {
         return res.status(200).json({ status: 'processing' });
       }
 
-      // Succeeded — merge diarization turns with the stashed Whisper result.
-      const turns = jobJson.output?.diarization || jobJson.output?.turns || [];
-      const bucket = getBucket();
-      const file = bucket.file(tmpPath(user.uid, id));
-      let whisper;
       try {
-        const [buf] = await file.download();
-        whisper = JSON.parse(buf.toString('utf8'));
+        const whisper = await loadStash(user.uid, id);
+        const { text } = mergeTranscript(whisper, null);
+        await meterStt(user.uid, whisper.duration);
+        return res.status(200).json({
+          status: 'completed',
+          text,
+          speaker_count: 0,
+          audio_duration: whisper.duration ?? null,
+          diarization_pending: true,
+          diarization_job: id,
+        });
       } catch (e) {
-        // Missing tmp file — either it belongs to another uid (never happens,
-        // path is uid-scoped) or it expired/was already consumed.
+        console.error('[whisper-stt] grace-expiry unlabeled delivery load failed', e.message);
+        return res.status(404).json({ error: 'not_found' });
+      }
+    }
+
+    if (action === 'labels' && req.method === 'GET') {
+      const id = (req.query?.id || '').toString();
+      if (!id || !/^[A-Za-z0-9_-]{8,128}$/.test(id)) {
+        return res.status(400).json({ error: 'bad_id' });
+      }
+
+      const admin = getAdmin();
+      const jobSnap = await admin.firestore().collection('diarizationJobs').doc(id).get();
+      if (!jobSnap.exists) {
+        return res.status(404).json({ error: 'not_found' });
+      }
+      const job = jobSnap.data();
+      if (job.uid !== user.uid) {
         return res.status(404).json({ error: 'not_found' });
       }
 
-      const { text, speakerCount } = mergeTranscript(whisper, turns);
-      const audio_duration = whisper.duration ?? null;
-
-      try {
-        await recordUsage({
-          uid: user.uid,
-          kind: 'stt',
-          increments: { sttSeconds: Math.round(audio_duration || 0) },
-        });
-      } catch (e) {
-        console.error('[usage] stt record failed:', e.message);
+      if (job.status !== 'succeeded') {
+        return res.status(200).json({ ready: false, status: job.status });
       }
 
-      // Tmp file is intentionally NOT deleted here: if this response is lost
-      // in transit the client re-polls, and the merge must stay reproducible.
-      // Cleanup = Storage lifecycle rule on the stt_tmp/ prefix (console).
+      const turns = Array.isArray(job.turns) ? job.turns : [];
+      let whisper;
+      try {
+        whisper = await loadStash(user.uid, id);
+      } catch (e) {
+        return res.status(404).json({ error: 'not_found' });
+      }
 
+      // Not metered here — the delivery poll (status action) already recorded
+      // usage; this is purely a label upgrade on already-billed audio.
+      const { text, speakerCount } = mergeTranscript(whisper, turns);
       return res.status(200).json({
-        status: 'completed',
+        ready: true,
         text,
         speaker_count: speakerCount,
-        audio_duration,
+        audio_duration: whisper.duration ?? null,
       });
     }
 

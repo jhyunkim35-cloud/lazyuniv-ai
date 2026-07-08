@@ -17,3 +17,8 @@ index_new.html
 
 .vercel
 .env*.local
+
+# U7b diarization worker — local venv + scratch audio, not product code
+worker/.venv/
+worker/*.wav
+worker/serviceAccount.json

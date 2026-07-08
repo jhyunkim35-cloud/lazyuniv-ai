@@ -1,29 +1,62 @@
 // Mocked end-to-end smoke of api/whisper-stt.js: exercises the full
 // transcribe → poll(processing) → poll(completed) contract, the
-// diarization-failed fallback, auth, URL allowlist, and re-poll idempotency —
-// with Groq/pyannote/Firebase all stubbed. Run: node smoke_whisper_stt.js
+// diarization-failed fallback, grace-expiry unlabeled delivery, the `labels`
+// late-upgrade action, auth, URL allowlist, and re-poll idempotency — with
+// Groq + Firestore (diarizationJobs queue, U7b) all stubbed.
+// Run: node scripts/test_whisper_stt_smoke.js
 'use strict';
 const path = require('path');
 const assert = require('assert');
 
 const REPO = path.join(__dirname, '..');
 process.env.GROQ_API_KEY = 'gk_test_fake';
-process.env.PYANNOTEAI_API_KEY = 'pa_test_fake';
 
 // ── In-memory Firebase admin stub ─────────────────────────────────────────
-const store = new Map();
+const store = new Map();          // Storage: path -> whisper JSON string
+const jobsStore = new Map();      // Firestore: diarizationJobs/{id} -> job data
 const usageCalls = [];
+
+function resolveTS(v) {
+  // Mimic admin.firestore.FieldValue.serverTimestamp() resolving to a
+  // Firestore Timestamp-like object with .toMillis() — real Firestore
+  // resolves this server-side; here it just resolves to "now".
+  return (v && v.__serverTimestamp) ? { toMillis: () => Date.now() } : v;
+}
+
+function diarizationJobsCollection() {
+  return {
+    doc: (id) => ({
+      set: async (data) => {
+        const resolved = {};
+        for (const k of Object.keys(data)) resolved[k] = resolveTS(data[k]);
+        jobsStore.set(id, resolved);
+      },
+      get: async () => {
+        const data = jobsStore.get(id);
+        return { exists: !!data, data: () => data };
+      },
+      update: async (patch) => {
+        const cur = jobsStore.get(id) || {};
+        const merged = { ...cur };
+        for (const k of Object.keys(patch)) merged[k] = resolveTS(patch[k]);
+        jobsStore.set(id, merged);
+      },
+    }),
+  };
+}
+
 const firestoreFn = () => ({
-  collection: () => ({ doc: () => ({}) }),
+  collection: (name) => (name === 'diarizationJobs' ? diarizationJobsCollection() : { doc: () => ({}) }),
   runTransaction: async (fn) => fn({ get: async () => ({ exists: false }), set: () => {} }),
 });
-firestoreFn.FieldValue = { increment: (n) => n };
+firestoreFn.FieldValue = { increment: (n) => n, serverTimestamp: () => ({ __serverTimestamp: true }) };
 firestoreFn.Timestamp = { fromMillis: (ms) => ms };
 const fakeAdmin = {
   auth: () => ({
     verifyIdToken: async (t) => {
-      if (t !== 'good-token') throw new Error('invalid token');
-      return { uid: 'u1', email: 'test@notyx.co.kr' };
+      if (t === 'good-token') return { uid: 'u1', email: 'test@notyx.co.kr' };
+      if (t === 'other-token') return { uid: 'u2', email: 'other@notyx.co.kr' };
+      throw new Error('invalid token');
     },
   }),
   firestore: firestoreFn,
@@ -67,8 +100,6 @@ const TURNS = [
   { start: 14, end: 22, speaker: 'SPEAKER_00' },
   { start: 22, end: 26, speaker: 'SPEAKER_02' },
 ];
-let jobPhase = 'running'; // mutated by the test script
-let diarizeSubmits = 0;
 
 function jsonRes(status, obj) {
   return {
@@ -81,19 +112,6 @@ function jsonRes(status, obj) {
 
 globalThis.fetch = async (url, opts = {}) => {
   const u = String(url);
-  if (u.includes('api.pyannote.ai/v1/diarize')) {
-    diarizeSubmits++;
-    const body = JSON.parse(opts.body);
-    assert.strictEqual(body.url, AUDIO_URL, 'pyannote gets the storage url');
-    assert.strictEqual(body.model, 'community-1', 'community-1 model selected');
-    assert.ok(opts.headers.Authorization.includes('pa_test_fake'));
-    return jsonRes(200, { jobId: 'job_smoke_00001', status: 'created' });
-  }
-  if (u.includes('api.pyannote.ai/v1/jobs/')) {
-    if (jobPhase === 'running') return jsonRes(200, { status: 'running' });
-    if (jobPhase === 'failed') return jsonRes(200, { status: 'failed' });
-    return jsonRes(200, { status: 'succeeded', output: { diarization: TURNS } });
-  }
   if (u.startsWith('https://firebasestorage.googleapis.com/')) {
     return { ok: true, status: 200, arrayBuffer: async () => new Uint8Array(2048).buffer, text: async () => '' };
   }
@@ -124,6 +142,14 @@ function makeRes() {
   return r;
 }
 
+async function transcribe() {
+  const res = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL } }), res);
+  assert.strictEqual(res._status, 200, JSON.stringify(res._json));
+  assert.strictEqual(res._json.status, 'queued');
+  return res._json.transcript_id;
+}
+
 (async () => {
   // 1. unauthorized
   let res = makeRes();
@@ -139,27 +165,29 @@ function makeRes() {
   console.log('[ok] 400 for non-Firebase audio_url');
 
   // 3. transcribe happy path
-  res = makeRes();
-  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL } }), res);
-  assert.strictEqual(res._status, 200, JSON.stringify(res._json));
-  assert.strictEqual(res._json.transcript_id, 'job_smoke_00001');
-  assert.strictEqual(res._json.status, 'queued');
-  const tmpKey = 'stt_tmp/u1/job_smoke_00001.json';
+  const jobId = await transcribe();
+  assert.ok(/^[A-Za-z0-9_-]{8,}$/.test(jobId), 'jobId looks like a crypto.randomUUID()');
+  const job = jobsStore.get(jobId);
+  assert.ok(job, 'diarizationJobs doc created');
+  assert.strictEqual(job.uid, 'u1');
+  assert.strictEqual(job.audioUrl, AUDIO_URL);
+  assert.strictEqual(job.status, 'pending');
+  const tmpKey = `stt_tmp/u1/${jobId}.json`;
   assert.ok(store.has(tmpKey), 'whisper JSON stashed in Storage');
   const stashed = JSON.parse(store.get(tmpKey));
   assert.ok(!('tokens' in (stashed.segments[0] || {})), 'verbose_json trimmed (tokens dropped)');
-  console.log('[ok] transcribe: pyannote job + Groq transcript + Storage stash');
+  console.log('[ok] transcribe: diarizationJobs doc enqueued + Groq transcript + Storage stash');
 
-  // 4. poll while diarization runs
+  // 4. poll while diarization runs (fresh job, within grace window)
   res = makeRes();
-  await handler(makeReq({ method: 'GET', query: { action: 'status', id: 'job_smoke_00001' } }), res);
+  await handler(makeReq({ method: 'GET', query: { action: 'status', id: jobId } }), res);
   assert.strictEqual(res._json.status, 'processing');
-  console.log('[ok] status: running → processing');
+  console.log('[ok] status: pending, within grace window → processing');
 
   // 5. poll after success → merged labeled transcript
-  jobPhase = 'succeeded';
+  jobsStore.set(jobId, { ...jobsStore.get(jobId), status: 'succeeded', turns: TURNS });
   res = makeRes();
-  await handler(makeReq({ method: 'GET', query: { action: 'status', id: 'job_smoke_00001' } }), res);
+  await handler(makeReq({ method: 'GET', query: { action: 'status', id: jobId } }), res);
   assert.strictEqual(res._json.status, 'completed');
   assert.strictEqual(res._json.speaker_count, 3);
   assert.strictEqual(res._json.audio_duration, 30);
@@ -171,7 +199,7 @@ function makeRes() {
 
   // 6. re-poll idempotency (lost-response recovery)
   res = makeRes();
-  await handler(makeReq({ method: 'GET', query: { action: 'status', id: 'job_smoke_00001' } }), res);
+  await handler(makeReq({ method: 'GET', query: { action: 'status', id: jobId } }), res);
   assert.strictEqual(res._json.status, 'completed');
   assert.strictEqual(res._json.speaker_count, 3);
   // Note: re-poll re-records usage (usageCalls now 2) — mirrors assemblyai.js,
@@ -180,10 +208,20 @@ function makeRes() {
   assert.strictEqual(usageCalls.length, 2);
   console.log('[ok] re-poll after completion → same result (tmp not deleted)');
 
-  // 7. diarization-failed fallback: plain text, usage still metered
-  jobPhase = 'failed';
+  // 7. labels action on the now-succeeded job → ready with the same merge
   res = makeRes();
-  await handler(makeReq({ method: 'GET', query: { action: 'status', id: 'job_smoke_00001' } }), res);
+  await handler(makeReq({ method: 'GET', query: { action: 'labels', id: jobId } }), res);
+  assert.strictEqual(res._status, 200);
+  assert.strictEqual(res._json.ready, true);
+  assert.strictEqual(res._json.speaker_count, 3);
+  assert.strictEqual(usageCalls.length, 2, 'labels action does not re-meter usage');
+  console.log('[ok] labels: ready → same merged transcript, no extra usage record');
+
+  // 8. diarization-failed fallback: plain text, usage still metered
+  const jobId2 = await transcribe();
+  jobsStore.set(jobId2, { ...jobsStore.get(jobId2), status: 'failed' });
+  res = makeRes();
+  await handler(makeReq({ method: 'GET', query: { action: 'status', id: jobId2 } }), res);
   assert.strictEqual(res._json.status, 'completed');
   assert.strictEqual(res._json.diarization_failed, true);
   assert.strictEqual(res._json.speaker_count, 0);
@@ -192,6 +230,40 @@ function makeRes() {
   assert.strictEqual(usageCalls.length, 3, 'usage recorded on fallback too');
   console.log('[ok] diarization failed → plain-text fallback, usage metered');
 
-  assert.strictEqual(diarizeSubmits, 1);
+  // 9. grace-expiry unlabeled delivery: job still pending, but createdAt is
+  // old enough that the client shouldn't be left waiting on speaker labels.
+  const jobId3 = await transcribe();
+  jobsStore.set(jobId3, {
+    ...jobsStore.get(jobId3),
+    createdAt: { toMillis: () => Date.now() - 4 * 60 * 1000 }, // > GRACE_MS (3min), still 'pending'
+  });
+  res = makeRes();
+  await handler(makeReq({ method: 'GET', query: { action: 'status', id: jobId3 } }), res);
+  assert.strictEqual(res._json.status, 'completed');
+  assert.strictEqual(res._json.diarization_pending, true);
+  assert.strictEqual(res._json.diarization_job, jobId3);
+  assert.strictEqual(res._json.speaker_count, 0);
+  assert.ok(!res._json.text.includes('발화자'), 'unlabeled delivery has no speaker prefixes');
+  assert.strictEqual(usageCalls.length, 4, 'usage metered on grace-expiry delivery too');
+  console.log('[ok] status: grace window expired while still pending → unlabeled delivery, worker keeps running');
+
+  // 10. labels: not ready (job from #9 is still 'pending' server-side)
+  res = makeRes();
+  await handler(makeReq({ method: 'GET', query: { action: 'labels', id: jobId3 } }), res);
+  assert.strictEqual(res._status, 200);
+  assert.strictEqual(res._json.ready, false);
+  assert.strictEqual(res._json.status, 'pending');
+  console.log('[ok] labels: not ready → {ready:false, status}');
+
+  // 11. labels: wrong-uid → 404 (job belongs to u1, request authenticated as u2)
+  res = makeRes();
+  await handler(makeReq({
+    method: 'GET',
+    headers: { authorization: 'Bearer other-token', origin: 'https://notyx.co.kr' },
+    query: { action: 'labels', id: jobId3 },
+  }), res);
+  assert.strictEqual(res._status, 404);
+  console.log('[ok] labels: wrong uid → 404 not_found');
+
   console.log('\nwhisper-stt.js mocked E2E smoke: ALL GREEN');
 })().catch((e) => { console.error('SMOKE FAILED:', e); process.exit(1); });

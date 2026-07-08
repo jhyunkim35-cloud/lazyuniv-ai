@@ -360,7 +360,6 @@
 
     const titleEl = document.getElementById('transcriptPreviewTitle');
     const metaEl  = document.getElementById('transcriptPreviewMeta');
-    const bodyEl  = document.getElementById('transcriptPreviewBody');
     titleEl.textContent       = t.title || '제목 없음';
     titleEl.dataset.transcriptId = t.id;
 
@@ -374,7 +373,20 @@
     // STT output without trying to interpret it as markdown. Speaker-label
     // prefixes ("[hh:mm:ss] 발화자 N:") get minimal emphasis so multi-speaker
     // transcripts scan by speaker.
-    const rawText = t.text || '';
+    renderTranscriptPreviewBody(t.text || '');
+
+    _previewEl.classList.remove('hidden');
+
+    // U7b: if this transcript was delivered before the local diarization
+    // worker finished, fire-and-forget a one-shot check for the label
+    // upgrade. Silent no-op if the worker still hasn't finished — the user
+    // never sees a spinner for this, it just quietly relabels when ready.
+    if (t.diarizationJobId) checkDiarizationLabels(t);
+  }
+
+  function renderTranscriptPreviewBody(rawText) {
+    const bodyEl = document.getElementById('transcriptPreviewBody');
+    if (!bodyEl) return;
     if (typeof escHtml === 'function') {
       bodyEl.innerHTML = escHtml(rawText).replace(
         /(^|\n)((?:\[[\d:]+\]\s*)?(?:발화자|참석자)\s*\d+\s*:)/g,
@@ -383,8 +395,34 @@
     } else {
       bodyEl.textContent = rawText;
     }
+  }
 
-    _previewEl.classList.remove('hidden');
+  async function checkDiarizationLabels(t) {
+    try {
+      if (!currentUser || typeof currentUser.getIdToken !== 'function') return;
+      const idToken = await currentUser.getIdToken();
+      const r = await fetch('/api/whisper-stt?action=labels&id=' + encodeURIComponent(t.diarizationJobId), {
+        headers: { 'authorization': 'Bearer ' + idToken },
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ready) return; // not ready yet — silent, no retry (next preview open re-checks)
+
+      await applyDiarizationLabelsFS(t.id, { text: j.text, charCount: j.text.length });
+
+      // Update the in-memory record so re-renders (or a second check) see the upgrade.
+      t.text = j.text;
+      t.charCount = j.text.length;
+      t.diarizationJobId = null;
+
+      // Re-render only if this transcript's preview is still the one open.
+      const titleEl = document.getElementById('transcriptPreviewTitle');
+      if (titleEl && titleEl.dataset.transcriptId === t.id) {
+        renderTranscriptPreviewBody(j.text);
+      }
+      window.showToast?.('화자 라벨이 적용되었습니다');
+    } catch (e) {
+      console.warn('[checkDiarizationLabels] failed:', e.message);
+    }
   }
 
   function hidePreviewModal() {

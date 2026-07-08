@@ -1322,7 +1322,7 @@
         if (stLabel)  stLabel.textContent = '② 텍스트 변환 중';
         if (pillLbl)  pillLbl.textContent = '변환 중…';
       } else if (j.status === 'completed') {
-        deliverTranscript(j.text || '', modalState.lastFilename);
+        deliverTranscript(j.text || '', modalState.lastFilename, j.diarization_job || null);
         return;
       } else if (j.status === 'error') {
         // Terminal: the job itself failed server-side — re-polling it is useless.
@@ -1382,7 +1382,7 @@
     return `${m}분 ${s}초`;
   }
 
-  async function deliverTranscript(text, sourceFilename) {
+  async function deliverTranscript(text, sourceFilename, diarizationJobId) {
     if (modalState.pollHandle) { clearTimeout(modalState.pollHandle); modalState.pollHandle = null; }
 
     const cleanText = (text || '').trim();
@@ -1407,6 +1407,7 @@
           text: cleanText,
           audioFilename: sourceFilename || '',
           durationSec: modalState.recordingDurationSec,
+          diarizationJobId: diarizationJobId || null,
         });
       } catch (err) {
         console.error('[recorder] saveTranscriptFS failed:', err);

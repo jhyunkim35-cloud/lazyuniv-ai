@@ -19,6 +19,9 @@
 //     createdAt:     ISO string
 //     updatedAt:     ISO string
 //     usedInNoteIds: string[]  (note ids this transcript was attached to)
+//     diarizationJobId: string | null  (U7b: set when delivered before the
+//                        local diarization worker finished — transcripts_view.js
+//                        polls ?action=labels once and clears this on upgrade)
 //   }
 //
 // Firestore single-doc 1MB limit: Korean text averages ~3 bytes/char in
@@ -46,7 +49,7 @@ function defaultTranscriptTitle(date = new Date()) {
 
 // Save a freshly-completed transcript. Returns the saved record.
 // Throws if not logged in — caller should toast and bail.
-async function saveTranscriptFS({ text, audioFilename, durationSec }) {
+async function saveTranscriptFS({ text, audioFilename, durationSec, diarizationJobId }) {
   const ref = userTranscriptsRef();
   if (!ref) throw new Error('not_logged_in');
 
@@ -75,6 +78,7 @@ async function saveTranscriptFS({ text, audioFilename, durationSec }) {
     createdAt: nowISO,
     updatedAt: nowISO,
     usedInNoteIds: [],
+    diarizationJobId: diarizationJobId || null,
   };
 
   await ref.doc(id).set(record);
@@ -121,6 +125,22 @@ async function renameTranscriptFS(id, newTitle) {
   return patch;
 }
 
+// U7b: apply the late speaker-label upgrade once the local diarization
+// worker finishes — swaps in the labeled text and clears diarizationJobId so
+// transcripts_view.js's fire-and-forget check stops polling this doc.
+async function applyDiarizationLabelsFS(id, { text, charCount }) {
+  const ref = userTranscriptsRef();
+  if (!ref || !id) return null;
+  const patch = {
+    text,
+    charCount: typeof charCount === 'number' ? charCount : (text || '').length,
+    diarizationJobId: null,
+    updatedAt: new Date().toISOString(),
+  };
+  await ref.doc(id).update(patch);
+  return patch;
+}
+
 // Attach a transcript to a note (for "used in" tracking). Best-effort.
 async function markTranscriptUsedInNote(transcriptId, noteId) {
   const ref = userTranscriptsRef();
@@ -141,5 +161,6 @@ window.getAllTranscriptsFS      = getAllTranscriptsFS;
 window.getTranscriptFS          = getTranscriptFS;
 window.deleteTranscriptFS       = deleteTranscriptFS;
 window.renameTranscriptFS       = renameTranscriptFS;
+window.applyDiarizationLabelsFS = applyDiarizationLabelsFS;
 window.markTranscriptUsedInNote = markTranscriptUsedInNote;
 window.defaultTranscriptTitle   = defaultTranscriptTitle;

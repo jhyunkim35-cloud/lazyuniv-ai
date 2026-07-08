@@ -165,10 +165,17 @@ function rankSpeakers(runs) {
   return { remap, speakerCount: sorted.length };
 }
 
-// Whisper Korean word tokens already carry their own leading spacing — just
-// concatenate and trim, no extra spaces inserted.
+// OpenAI-style word tokens carry their own leading space; Groq's Korean word
+// tokens don't (verified on real audio — bare eojeol like "안녕하세요").
+// Concatenate, inserting a space only when the boundary has none.
 function joinWords(words) {
-  return words.map(w => w.word || '').join('').trim();
+  let out = '';
+  for (const w of words) {
+    const t = w.word || '';
+    if (out && t && !/^\s/.test(t) && !/\s$/.test(out)) out += ' ';
+    out += t;
+  }
+  return out.trim();
 }
 
 // One paragraph per speaker run, further split on a >2s pause or once a
