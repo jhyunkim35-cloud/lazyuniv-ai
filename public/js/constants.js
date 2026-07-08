@@ -175,6 +175,9 @@ let storedFilteredText         = '';
 let storedNotesText            = '';
 let storedHighlightedTranscript = '';
 let currentSummaryLayers       = null;  // R4: { tldr, bullets, paragraph, chapters } from synthesizeSummary, or null
+let _draftSummary              = null;  // U10: { tldr, bullets } fast-draft summary — never persisted, cleared once currentSummaryLayers lands
+let _verifiedSummaryDone       = false; // U10: true once the verified synthesizeSummary attempt (success or fail) has completed for this analysis
+let _summarySynthNeeded        = false; // U11: set by agent1 paths; consumed by runAgentPipeline to run synth concurrently with critique∥highlight
 let currentStudyTools = null;  // R8+R9: { mindmap: string|null, memorize: array|null, concepts: array|null }
 
 let extractedImages    = [];   // [{slideNumber, imageBase64, mimeType, fileName}]

@@ -1585,6 +1585,12 @@
     }
     .summary-hero-regen:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
     .summary-hero-regen:disabled { opacity: 0.6; cursor: default; }
+    /* U10: fast-draft badge — shown only while the verified summary hasn't landed yet */
+    .summary-hero-draft-badge {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+    }
     .summary-hero-body {
       font-size: 1.02rem;
       line-height: 1.6;
@@ -4240,7 +4246,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=u9nogamif"></script>
+<script defer src="/js/markdown.js?v=u11summary"></script>
 </head>
 <body>
 
@@ -4657,6 +4663,7 @@
     <!-- R3: standalone 핵심 요약 hero (single mode) — surfaces 요약 without expanding the note -->
     <div class="result-card summary-hero-card" id="summaryHero" hidden>
       <div class="summary-hero-title">⚡ 핵심 요약<button type="button" class="summary-hero-regen" id="summaryRegenBtn">↻ 재생성</button></div>
+      <div class="summary-hero-draft-badge" id="summaryHeroDraftBadge" hidden>⚡ 빠른 요약 · 전체 검증 요약 생성 중…</div>
       <div class="summary-hero-chips" id="summaryHeroChips" hidden></div>
       <div class="summary-hero-body" id="summaryHeroBody"></div>
     </div>
@@ -4892,41 +4899,41 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=u9nogamif"></script>
-<script defer src="/js/error_autoreport.js?v=u9nogamif"></script>
-<script defer src="/js/icons.js?v=u9nogamif"></script>
-<script defer src="/js/storage.js?v=u9nogamif"></script>
-<script defer src="/js/firestore_sync.js?v=u9nogamif"></script>
-<script defer src="/js/transcripts_store.js?v=u9nogamif"></script>
-<script defer src="/js/api.js?v=u9nogamif"></script>
-<script defer src="/js/pptx_parser.js?v=u9nogamif"></script>
-<script defer src="/js/quiz.js?v=u9nogamif"></script>
-<script defer src="/js/ui.js?v=u9nogamif"></script>
-<script defer src="/js/viewers.js?v=u9nogamif"></script>
-<script defer src="/js/image_gallery.js?v=u9nogamif"></script>
-<script defer src="/js/pipeline.js?v=u9nogamif"></script>
-<script defer src="/js/batch.js?v=u9nogamif"></script>
-<script defer src="/js/note_creation.js?v=u9nogamif"></script>
-<script defer src="/js/notes_crud.js?v=u9nogamif"></script>
-<script defer src="/js/notion_viewer.js?v=u9nogamif"></script>
-<script defer src="/js/notion_clipboard.js?v=u9nogamif"></script>
-<script defer src="/js/folders.js?v=u9nogamif"></script>
-<script defer src="/js/exam_plan.js?v=u9nogamif"></script>
-<script defer src="/js/srs.js?v=u9nogamif"></script>
-<script defer src="/js/timetable.js?v=u9nogamif"></script>
-<script defer src="/js/srs_review.js?v=u9nogamif"></script>
-<script defer src="/js/home_view.js?v=u9nogamif"></script>
+<script defer src="/js/constants.js?v=u11summary"></script>
+<script defer src="/js/error_autoreport.js?v=u11summary"></script>
+<script defer src="/js/icons.js?v=u11summary"></script>
+<script defer src="/js/storage.js?v=u11summary"></script>
+<script defer src="/js/firestore_sync.js?v=u11summary"></script>
+<script defer src="/js/transcripts_store.js?v=u11summary"></script>
+<script defer src="/js/api.js?v=u11summary"></script>
+<script defer src="/js/pptx_parser.js?v=u11summary"></script>
+<script defer src="/js/quiz.js?v=u11summary"></script>
+<script defer src="/js/ui.js?v=u11summary"></script>
+<script defer src="/js/viewers.js?v=u11summary"></script>
+<script defer src="/js/image_gallery.js?v=u11summary"></script>
+<script defer src="/js/pipeline.js?v=u11summary"></script>
+<script defer src="/js/batch.js?v=u11summary"></script>
+<script defer src="/js/note_creation.js?v=u11summary"></script>
+<script defer src="/js/notes_crud.js?v=u11summary"></script>
+<script defer src="/js/notion_viewer.js?v=u11summary"></script>
+<script defer src="/js/notion_clipboard.js?v=u11summary"></script>
+<script defer src="/js/folders.js?v=u11summary"></script>
+<script defer src="/js/exam_plan.js?v=u11summary"></script>
+<script defer src="/js/srs.js?v=u11summary"></script>
+<script defer src="/js/timetable.js?v=u11summary"></script>
+<script defer src="/js/srs_review.js?v=u11summary"></script>
+<script defer src="/js/home_view.js?v=u11summary"></script>
 <script defer src="/js/transcripts_view.js?v=u7whisper"></script>
-<script defer src="/js/bulk.js?v=u9nogamif"></script>
-<script defer src="/js/firebase_auth.js?v=u9nogamif"></script>
-<script defer src="/js/payment.js?v=u9nogamif"></script>
+<script defer src="/js/bulk.js?v=u11summary"></script>
+<script defer src="/js/firebase_auth.js?v=u11summary"></script>
+<script defer src="/js/payment.js?v=u11summary"></script>
 <script defer src="/js/recorder.js?v=u7whisper"></script>
-<script defer src="/js/groups.js?v=u9nogamif"></script>
-<script defer src="/js/study_rooms.js?v=u9nogamif"></script>
-<script defer src="/js/bug_report.js?v=u9nogamif"></script>
-<script defer src="/js/onboarding_tour.js?v=u9nogamif"></script>
-<script defer src="/js/main.js?v=u9nogamif"></script>
-<script defer src="/js/main_inline.js?v=u9nogamif"></script>
+<script defer src="/js/groups.js?v=u11summary"></script>
+<script defer src="/js/study_rooms.js?v=u11summary"></script>
+<script defer src="/js/bug_report.js?v=u11summary"></script>
+<script defer src="/js/onboarding_tour.js?v=u11summary"></script>
+<script defer src="/js/main.js?v=u11summary"></script>
+<script defer src="/js/main_inline.js?v=u11summary"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

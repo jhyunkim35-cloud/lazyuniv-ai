@@ -8,7 +8,7 @@ assert_contains public/js/pipeline.js "Fix 2 (Q3): pass null cachePrefix" "Fix2:
 assert_contains public/js/pipeline.js "'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' });" "Fix2: agent2 critic 호출이 cachePrefix=null로 무캐시 전송"
 assert_contains public/js/pipeline.js "function buildPrevNotesDigest" "Fix3: prevNotes O(N) 다이제스트 함수 존재"
 assert_contains public/js/pipeline.js "이미 작성된 섹션·용어 (중복 금지)" "Fix3: 다이제스트가 청크 프롬프트에 사용됨"
-assert_contains public/js/pipeline.js "const [critiqued, highlighted] = await Promise.all([" "Fix4: agent2 critique + 하이라이트 병렬 실행"
+assert_contains public/js/pipeline.js "const [critiqued, highlighted, summaryRes] = await Promise.all([" "Fix4: agent2 critique + 하이라이트 병렬 실행"
 assert_contains public/js/pipeline.js "function buildToolsCachePrefix" "Fix5: 온디맨드 도구 공유 캐시 레이아웃 함수 존재"
 assert_contains public/js/pipeline.js "buildToolsCachePrefix(stripped)" "Fix5: 마인드맵/암기 도구가 공유 캐시 레이아웃 사용"
 assert_contains public/js/quiz.js "buildToolsCachePrefix(stripLeadingSummary(noteText))" "Fix5: 퀴즈 생성이 동일 공유 캐시 레이아웃 재사용"

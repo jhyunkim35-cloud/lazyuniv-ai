@@ -6,6 +6,9 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   const _heroEl = document.getElementById('summaryHero');  // R3: hide stale summary hero on new run
   if (_heroEl) _heroEl.hidden = true;
   currentSummaryLayers = null;  // R4: reset multilayer summary so a failed synth doesn't leak the previous note's layers
+  _draftSummary = null;  // U10: reset fast-draft summary alongside the verified one
+  _verifiedSummaryDone = false;  // U10: new analysis — draft is allowed to render again until verified lands
+  _summarySynthNeeded = false;   // U11: stale flag from an aborted run must not trigger a spurious synth
   currentStudyTools = null;  // R8+R9: reset study tools so a new analysis doesn't leak the previous note's mindmap/memorize/concepts
   _studyToolsRangeInput = '';  // U3: reset stale page-range text from the previous note
   const _stCard = document.getElementById('studyToolsCard');  // R8+R9: hide stale card too (same reason as hero above)
@@ -22,6 +25,12 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   // pipeline don't accidentally piggyback on it.
   _currentAnalysisId = uuidv4().replace(/-/g, '').slice(0, 32);
   debugLog('PIPE', 'analysisId=' + _currentAnalysisId);
+
+  // U10: fast draft summary (한줄+핵심 via Haiku) fired in parallel with Agent1 so the
+  // summary hero shows in ~5-10s instead of waiting for the full verified synthesizeSummary
+  // (~77s). Fire-and-forget — never awaited here, single-note view only (same scope as
+  // renderSummaryHero's other callers below; batch cards have no shared #summaryHero).
+  if (!targetBodyEl) generateQuickSummary(apiKey, storedPptText, storedFilteredText);
 
   const iterTimings = [];
   let notesText    = '';
@@ -63,12 +72,40 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
         // patches [CRITICAL] fixes, the highlighted transcript stays keyed off the
         // pre-patch notes — acceptable drift since patches are small string fixes
         // (same tradeoff already accepted for summary synthesis inside agent1_writeNotes).
-        const [critiqued, highlighted] = await Promise.all([
+        // U11: verified summary synthesis only needs iter1's notesText — run it
+        // concurrently with critique∥highlight instead of serially inside agent1.
+        // (요약은 패치 전 노트 기준 — 기존과 동일한 트레이드오프, 위 주석 참조.)
+        const summaryPromise = _summarySynthNeeded ? (async () => {
+          agentLog(1, '요약 전용 합성·검증 중… (검토와 병렬)');
+          try {
+            const stripped = stripLeadingSummary(notesText);
+            return { layers: await synthesizeSummary(apiKey, stripped), stripped };
+          } catch (e) {
+            debugLog('PIPE', `Summary synth failed: ${e.message} — keeping inline summary`);
+            return null;
+          }
+        })() : Promise.resolve(null);
+
+        const [critiqued, highlighted, summaryRes] = await Promise.all([
           agent2_critiqueNotes(apiKey, notesText, storedPptText, storedFilteredText, iter),
           storedFilteredText ? highlightTranscript(apiKey, storedFilteredText, notesText) : Promise.resolve(null),
+          summaryPromise,
         ]);
         critiqueText = critiqued;
         if (highlighted !== null) storedHighlightedTranscript = highlighted;
+        if (_summarySynthNeeded) {
+          if (summaryRes && summaryRes.layers) {
+            currentSummaryLayers = summaryRes.layers;
+            if (summaryRes.layers.paragraph) {
+              notesText = `**요약**: ${summaryRes.layers.paragraph}\n\n${summaryRes.stripped}`;
+              iterTargetEl.innerHTML = renderMarkdown(notesText);
+            }
+          }
+          storedNotesText = notesText;
+          _summarySynthNeeded = false;
+          _verifiedSummaryDone = true;  // U10: verified attempt finished (success or fail) — stop the quick-draft repaint
+          _draftSummary = null;
+        }
 
         // Guard: if Agent2 returned a meta-report instead of a real critique, keep Agent1 notes as-is
         const CRITIC_META_MARKERS = ['검토 보고서', '제출된 학습 노트', '요청사항', '수정 불가'];
@@ -503,11 +540,15 @@ async function synthesizeSummary(apiKey, fullNotes) {
     }
   }
 
-  /* critic: 요약이 노트 전체를 날조 없이·누락 없이 대표하는지 검증. Haiku, FAIL이면 1회 재생성. */
+  /* critic: 요약이 노트 전체를 날조 없이·누락 없이 대표하는지 검증. FAIL이면 1회 재생성.
+     U11: Haiku 정가로 노트 전문을 재전송하던 것을 → Sonnet + 공유 캐시 prefix로 교체.
+     캐시는 모델별이라 Haiku는 방금 합성이 써둔 Sonnet 캐시를 못 읽지만, Sonnet critic은
+     노트 전문을 0.1×로 읽는다(출력은 PASS/FAIL 16토큰이라 출력단가 차이 무의미).
+     system도 TOOLS_SYS로 바이트 동일해야 캐시가 매칭된다. */
   try {
     const verdict = (await callClaudeOnce(apiKey,
-      `아래 [요약]이 [학습 노트]를 정확히 대표하는지 검증하세요. 노트에 없는 내용을 지어냈거나(날조) 노트의 주요 주제 상당수를 누락했으면 FAIL, 정확하고 포괄적이면 PASS. 출력은 PASS 또는 FAIL 한 단어만.\n\n[요약]\n${raw}\n\n[학습 노트]\n${fullNotes}`,
-      '당신은 요약 검증자입니다.', 16, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' })).trim();
+      `위 [전체 학습 노트]를 아래 [요약]이 정확히 대표하는지 검증하세요. 노트에 없는 내용을 지어냈거나(날조) 노트의 주요 주제 상당수를 누락했으면 FAIL, 정확하고 포괄적이면 PASS. 출력은 PASS 또는 FAIL 한 단어만.\n\n[요약]\n${raw}`,
+      sys, 16, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' })).trim();
     debugLog('PIPE', `Summary critic verdict: ${verdict}`);
     if (/FAIL/i.test(verdict)) {
       const retryRaw = (await callClaudeOnce(apiKey, genPrompt(' 노트에 없는 내용은 절대 추가하지 말고, 노트 전체 범위를 빠짐없이 반영하세요.'), sys, 3072, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
@@ -552,14 +593,97 @@ function renderSummaryHeroLayer(bodyEl, layers, key) {
   }
 }
 
+/* ═══════════════════════════════════════════════
+   U10 — fast draft summary, in parallel with Agent1
+   Haiku pass over the raw source (no note text exists yet) producing only
+   [한줄]/[핵심] so the hero can show something in ~5-10s. Never touches
+   currentSummaryLayers (that's reserved for the verified synthesizeSummary
+   result, which is what autoSaveNote persists) — lives in _draftSummary and
+   gets discarded the moment the verified attempt finishes, success or fail.
+═══════════════════════════════════════════════ */
+async function generateQuickSummary(apiKey, pptText, recText) {
+  if (_verifiedSummaryDone) return;  // shouldn't fire this early, but cheap guard
+  const src = `${pptText || ''}\n${recText || ''}`.trim().slice(0, 30000);
+  if (!src) return;
+  try {
+    const raw = (await callClaudeOnce(apiKey,
+      `아래 강의 자료를 훑어보고 정확히 2개 마커로만 답하세요. 마커 외의 머리말·설명은 출력하지 마세요.
+
+[한줄]
+(강의 전체를 관통하는 TL;DR 1문장)
+[핵심]
+- (핵심 포인트 3~5개 불릿)
+
+[자료]
+${src}`,
+      TOOLS_SYS, 700, 'claude-sonnet-4-6', null, { feature: 'noteAnalysis', isFirstCall: false }) || '').trim();
+
+    if (_verifiedSummaryDone || !raw) return;  // verified landed while we waited, or empty response
+
+    const idxT = raw.indexOf('[한줄]');
+    const idxB = raw.indexOf('[핵심]');
+    if (idxT === -1 && idxB === -1) return;  // parse failure — verified summary lands later anyway
+    const tldr = idxT === -1 ? '' : raw.slice(idxT + 4, idxB === -1 ? raw.length : idxB).trim();
+    const bulletsRaw = idxB === -1 ? '' : raw.slice(idxB + 4).trim();
+    const bullets = bulletsRaw.split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean);
+    if (!tldr && !bullets.length) return;
+
+    _draftSummary = { tldr, bullets };
+    debugLog('PIPE', `Quick draft summary landed — tldr=${!!tldr}, bullets=${bullets.length}`);
+    renderSummaryHero(storedNotesText);  // repaint — no-op via the draft guard if verified already landed
+  } catch (e) {
+    debugLog('PIPE', `Quick draft summary failed: ${e.message}`);
+  }
+}
+
+// shared chip-row builder for both the verified layers and the U10 draft — tabs' click
+// handlers close over whichever `layers` object (currentSummaryLayers or _draftSummary) is passed.
+function renderSummaryHeroTabs(body, chips, layers, tabs) {
+  chips.innerHTML = '';
+  tabs.forEach((t, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'summary-hero-chip' + (i === 0 ? ' active' : '');
+    btn.textContent = t.label;
+    btn.addEventListener('click', () => {
+      chips.querySelectorAll('.summary-hero-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderSummaryHeroLayer(body, layers, t.key);
+    });
+    chips.appendChild(btn);
+  });
+  chips.hidden = false;
+  renderSummaryHeroLayer(body, layers, tabs[0].key);
+}
+
 /* R3: surface the 요약 as a standalone hero so it's scannable without expanding the note.
    R4: if currentSummaryLayers is populated, render as tab chips (한줄/핵심/문단/챕터).
+   U10: if the verified summary hasn't landed yet but a fast draft (한줄/핵심) has, render
+   that instead with a "생성 중" badge — never reads/writes currentSummaryLayers, so a
+   draft can never leak into autoSaveNote's saved summaryLayers.
    Falls back to the legacy single-line "**요약**:" extraction for old notes without layers. */
 function renderSummaryHero(notesText) {
   const hero = document.getElementById('summaryHero');
   const body = document.getElementById('summaryHeroBody');
   const chips = document.getElementById('summaryHeroChips');
+  const badge = document.getElementById('summaryHeroDraftBadge');
+  const regenBtn = document.getElementById('summaryRegenBtn');
   if (!hero || !body) return;
+
+  if (!currentSummaryLayers && _draftSummary && !_verifiedSummaryDone) {
+    const draftTabs = SUMMARY_HERO_TABS.filter(t => (t.key === 'tldr' || t.key === 'bullets') && (
+      Array.isArray(_draftSummary[t.key]) ? _draftSummary[t.key].length > 0 : !!_draftSummary[t.key]
+    ));
+    if (draftTabs.length > 0 && chips) {
+      if (badge) badge.hidden = false;
+      if (regenBtn) regenBtn.hidden = true;  // U10-6: no regen against an unverified draft
+      renderSummaryHeroTabs(body, chips, _draftSummary, draftTabs);
+      hero.hidden = false;
+      return;
+    }
+  }
+  if (badge) badge.hidden = true;
+  if (regenBtn) regenBtn.hidden = false;
 
   const layers = currentSummaryLayers;
   const available = layers ? SUMMARY_HERO_TABS.filter(t => {
@@ -568,21 +692,7 @@ function renderSummaryHero(notesText) {
   }) : [];
 
   if (available.length > 0 && chips) {
-    chips.innerHTML = '';
-    available.forEach((t, i) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'summary-hero-chip' + (i === 0 ? ' active' : '');
-      btn.textContent = t.label;
-      btn.addEventListener('click', () => {
-        chips.querySelectorAll('.summary-hero-chip').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderSummaryHeroLayer(body, layers, t.key);
-      });
-      chips.appendChild(btn);
-    });
-    chips.hidden = false;
-    renderSummaryHeroLayer(body, layers, available[0].key);
+    renderSummaryHeroTabs(body, chips, layers, available);
     hero.hidden = false;
     return;
   }
@@ -1348,17 +1458,11 @@ ${critiqueText}`;
         accumulatedNotes += chunkText + '\n';
       }
 
-      agentLog(1, `${numChunks}개 청크 완료 — 전체 노트 기반 요약 합성 중…`);
+      agentLog(1, `${numChunks}개 청크 완료`);
 
-      /* ── R1 map-reduce + R2 verify: synthesize 요약 from the FULL note (all chunks),
-         then a dedicated critic verifies coverage/accuracy. Chunk 0 writes no 요약,
-         so it would otherwise be missing. Failure → note survives without 요약. */
-      try {
-        currentSummaryLayers = await synthesizeSummary(apiKey, combinedNotes);  // R4: multilayer object
-        if (currentSummaryLayers.paragraph) combinedNotes = `**요약**: ${currentSummaryLayers.paragraph}\n\n${combinedNotes}`;
-      } catch (e) {
-        debugLog('PIPE', `Summary synth failed: ${e.message} — proceeding without 요약`);
-      }
+      /* ── R1 map-reduce + R2 verify: 요약 합성은 U11에서 runAgentPipeline로 이동 —
+         critique∥highlight와 병렬로 돈다(요약은 notesText만 필요). 여기선 플래그만. ── */
+      _summarySynthNeeded = true;
 
       notesText = combinedNotes;
       targetEl.innerHTML = renderMarkdown(notesText);
@@ -1390,20 +1494,8 @@ ${critiqueText}`;
   }
 
   /* ── R2: single-pass / PPT-only 경로도 요약을 전용 합성·검증으로 교체.
-     Agent1 곁다리 요약을 떼고 verified 요약 prepend. 실패 시 인라인 요약 유지. ── */
-  if (needsSummarySynth) {
-    agentLog(1, '요약 전용 합성·검증 중…');
-    try {
-      const stripped = stripLeadingSummary(notesText);
-      currentSummaryLayers = await synthesizeSummary(apiKey, stripped);  // R4: multilayer object
-      if (currentSummaryLayers.paragraph) {
-        notesText = `**요약**: ${currentSummaryLayers.paragraph}\n\n${stripped}`;
-        targetEl.innerHTML = renderMarkdown(notesText);
-      }
-    } catch (e) {
-      debugLog('PIPE', `Summary synth failed: ${e.message} — keeping inline summary`);
-    }
-  }
+     U11: 합성 자체는 runAgentPipeline에서 critique∥highlight와 병렬 실행 — 여기선 플래그만. ── */
+  if (needsSummarySynth) _summarySynthNeeded = true;
 
   storedNotesText = notesText;
 
