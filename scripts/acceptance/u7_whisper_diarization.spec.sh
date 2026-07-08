@@ -1,0 +1,34 @@
+# 회귀 가드 — U7 STT Whisper 이관 + 완전 화자분리 (2026-07-08)
+# Groq whisper-large-v3-turbo 전사 + pyannote.ai Community-1 화자분리(미지 N명)를
+# assemblyai.js와 동형 계약(transcribe→jobId, status 폴링→문자열)으로 잠금.
+# 머지 로직 행동 검증은 node scripts/test_stt_merge.js (8단언).
+
+assert_file api/whisper-stt.js "U7-1: whisper-stt 서버리스 함수 존재"
+assert_file api/_stt_merge.js "U7-1: 순수 머지 모듈 존재"
+assert_file scripts/test_stt_merge.js "U7-1: 머지 단위테스트 존재"
+
+assert_contains api/whisper-stt.js "whisper-large-v3-turbo" "U7-2: Groq turbo 모델 지정"
+assert_contains api/whisper-stt.js "model: 'community-1'" "U7-2: pyannote Community-1 모델(비용 케이스 — Precision-2는 비용 역전)"
+assert_contains api/whisper-stt.js "timestamp_granularities[]" "U7-2: 단어 타임스탬프 요청"
+assert_contains api/whisper-stt.js "language', 'ko'" "U7-2: 한국어 지정"
+
+assert_contains api/whisper-stt.js "transcript_id: jobId" "U7-3: assemblyai.js 동형 계약 (transcript_id 반환)"
+assert_contains api/whisper-stt.js "diarization_failed: true" "U7-3: 화자분리 실패 시 전사문 폴백 (잡 전체 실패 금지)"
+assert_contains api/whisper-stt.js "stt_tmp/" "U7-3: whisper 결과 uid 스코프 Storage 스태시"
+assert_absent api/whisper-stt.js "file.delete()" "U7-3: 완료 응답 유실 대비 tmp 미삭제 (재폴링 멱등성)"
+assert_contains api/whisper-stt.js "isAllowedAudioUrl" "U7-3: Storage URL 허용목록 가드"
+
+assert_contains api/_stt_merge.js "발화자" "U7-4: 기존 발화자 N: 문자열 포맷 출력 (separateSpeakers 무변경 호환)"
+assert_contains api/_stt_merge.js "dropHallucinatedSegments" "U7-4: 무음 환각 세그먼트 드롭 가드"
+assert_contains api/_stt_merge.js "smoothBoundaryBleed" "U7-4: 화자 경계 블리드 스무딩"
+assert_contains api/_stt_merge.js "rankSpeakers" "U7-4: 최다 발화자 → 발화자 1 리맵"
+
+assert_matches public/js/recorder.js "const USE_WHISPER = (true|false)" "U7-5: 롤백 플래그 존재 (값은 운영 토글 — 키 등록 전 false)"
+assert_contains public/js/recorder.js "/api/whisper-stt" "U7-5: 기본 엔진이 whisper-stt로 라우팅"
+assert_contains public/js/recorder.js "audioBitsPerSecond: 32000" "U7-5: 32kbps opus (90분≈22MB, Groq 한도 내)"
+
+assert_contains vercel.json "api/whisper-stt.js" "U7-6: maxDuration 등록"
+assert_contains public/js/transcripts_view.js "발화자|참석자" "U7-7: 프리뷰 발화자 라벨 강조 렌더"
+assert_matches public/index.html "transcripts_view\.js\?v=(u7whisper|u8)" "U7-7: transcripts_view 캐시버스트 갱신"
+
+assert_live /api/whisper-stt "unauthorized" "U7-8: 라이브 함수 응답 (미인증 401 바디)"
