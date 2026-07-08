@@ -1,11 +1,10 @@
 // SRS Review UI: flashcard review screen with SM-2 quality grading.
-// Depends on: constants.js (db, currentUser, _currentView), srs.js (getDueCards, gradeCard, getSrsCard, saveSrsCard, cardIdFor), gamification.js (onCardReviewed), firestore_sync.js (getNoteFS), markdown.js (renderMarkdown, escHtml), ui.js (switchView, showToast).
+// Depends on: constants.js (db, currentUser, _currentView), srs.js (getDueCards, gradeCard, getSrsCard, saveSrsCard, cardIdFor), firestore_sync.js (getNoteFS), markdown.js (renderMarkdown, escHtml), ui.js (switchView, showToast).
 
 (function () {
 
   let _queue   = [];
   let _current = 0;
-  let _sessionXP   = 0;
   let _sessionDone = 0;
   let _fromFolderId = null;
 
@@ -192,21 +191,6 @@
   font-size: 0.84rem;
 }
 .srs-next-review { color: var(--text-muted); }
-.srs-xp-badge { color: var(--primary); font-weight: 700; }
-.srs-xp-float {
-  position: fixed;
-  top: 45%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--primary);
-  pointer-events: none;
-  animation: srsXpFloat 0.9s ease-out forwards;
-  z-index: 99999;
-}
-@keyframes srsXpFloat {
-  0%   { transform: translate(-50%, -50%); opacity: 1; }
   100% { transform: translate(-50%, -180%); opacity: 0; }
 }
 .srs-summary {
@@ -343,7 +327,6 @@
   async function enterReviewMode(folderId) {
     _injectStyles();
     _fromFolderId = folderId;
-    _sessionXP    = 0;
     _sessionDone  = 0;
     _current      = 0;
 
@@ -463,14 +446,10 @@
     srsCard.querySelectorAll('.srs-grade-btn').forEach(b => { b.disabled = true; });
 
     let updatedCard = card;
-    let state = { streak: 0 };
     try {
       updatedCard = await gradeCard(card.id, quality);
-      state = await onCardReviewed(quality);
     } catch (e) {}
 
-    const xpGained = quality >= 3 ? 10 : 5;
-    _sessionXP   += xpGained;
     _sessionDone += 1;
 
     // Next-review days
@@ -482,41 +461,30 @@
 
     const feedback = document.createElement('div');
     feedback.className = 'srs-grade-feedback';
-    feedback.innerHTML = `<span class="srs-next-review">다음 복습: ${days}일 후</span>` +
-                         `<span class="srs-xp-badge">+${xpGained} XP</span>`;
+    feedback.innerHTML = `<span class="srs-next-review">다음 복습: ${days}일 후</span>`;
     srsCard.appendChild(feedback);
-
-    // XP float animation
-    const xpFloat = document.createElement('div');
-    xpFloat.className = 'srs-xp-float';
-    xpFloat.textContent = `+${xpGained} XP`;
-    document.body.appendChild(xpFloat);
-    setTimeout(() => xpFloat.remove(), 950);
 
     setTimeout(() => {
       _current++;
       if (_current < _queue.length) {
         renderReviewCard(_queue[_current]);
       } else {
-        _renderSummary(state);
+        _renderSummary();
       }
     }, 1200);
   }
 
   // ── Summary screen ────────────────────────────────────────────
 
-  function _renderSummary(state) {
+  function _renderSummary() {
     const rv = document.getElementById('reviewView');
     if (!rv) return;
-    const streak = (state && state.streak) ? state.streak : 0;
     rv.innerHTML = `
 <div class="srs-review-wrap">
   <div class="srs-summary">
     <div class="srs-summary-icon">🎉</div>
     <h2 class="srs-summary-title">오늘 ${_sessionDone}장 복습 완료!</h2>
     <div class="srs-summary-stats">
-      <div class="srs-stat"><span class="srs-stat-num">+${_sessionXP}</span><span class="srs-stat-label">XP 획득</span></div>
-      <div class="srs-stat"><span class="srs-stat-num">${streak}일</span><span class="srs-stat-label">연속 복습</span></div>
     </div>
     <button class="srs-done-btn" id="srsDoneBtn">확인</button>
   </div>

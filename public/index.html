@@ -76,9 +76,8 @@
          instead of the cyan we had before — keeps the palette unified. */
       --secondary: #8b5cf6;
       --secondary-dim: rgba(139, 92, 246, 0.12);
-      /* Accent: coral/orange — for game-y celebration moments (XP gain,
-         streak fire, achievement unlocks). Used sparingly so it stands
-         out against the indigo baseline. */
+      /* Accent: coral/orange — for warm highlight moments. Used sparingly
+         so it stands out against the indigo baseline. */
       --accent: #f97316;
       --accent-dim: rgba(249, 115, 22, 0.15);
       --accent-soft: #fb923c;
@@ -4228,9 +4227,7 @@
     #allNotesTitle,
     #landingView h1,
     #splitTopBar > span,
-    .notion-viewer-title,
-    #gamifDailyGoal > div:first-child > span:first-child,
-    #gamifAchievements > div > span:first-child {
+    .notion-viewer-title {
       font-family: 'Noto Serif KR', 'Pretendard', Georgia, serif;
       letter-spacing: -0.01em;
       line-height: 1.25;
@@ -4243,7 +4240,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=u8image"></script>
+<script defer src="/js/markdown.js?v=u9nogamif"></script>
 </head>
 <body>
 
@@ -4437,8 +4434,6 @@
 
   <!-- ═══ HOME VIEW ═══ -->
   <div id="homeView">
-    <!-- Gamification streak/XP badge — populated by renderHomeView, hidden in folder views -->
-    <div id="gamifStreakBadge" style="display:none; margin-bottom:1rem;"></div>
     <!-- Top: jump-into-recording card. Visible on the unfiltered home only
          (folder views hide it via JS) so it's the first thing a user sees
          when they land. Click → opens the recorder modal directly without
@@ -4897,43 +4892,41 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=u8image"></script>
-<script defer src="/js/error_autoreport.js?v=u8image"></script>
-<script defer src="/js/icons.js?v=u8image"></script>
-<script defer src="/js/storage.js?v=u8image"></script>
-<script defer src="/js/firestore_sync.js?v=u8image"></script>
-<script defer src="/js/transcripts_store.js?v=u8image"></script>
-<script defer src="/js/api.js?v=u8image"></script>
-<script defer src="/js/pptx_parser.js?v=u8image"></script>
-<script defer src="/js/quiz.js?v=u8image"></script>
-<script defer src="/js/ui.js?v=u8image"></script>
-<script defer src="/js/viewers.js?v=u8image"></script>
-<script defer src="/js/image_gallery.js?v=u8image"></script>
-<script defer src="/js/pipeline.js?v=u8image"></script>
-<script defer src="/js/batch.js?v=u8image"></script>
-<script defer src="/js/note_creation.js?v=u8image"></script>
-<script defer src="/js/notes_crud.js?v=u8image"></script>
-<script defer src="/js/notion_viewer.js?v=u8image"></script>
-<script defer src="/js/notion_clipboard.js?v=u8image"></script>
-<script defer src="/js/folders.js?v=u8image"></script>
-<script defer src="/js/exam_plan.js?v=u8image"></script>
-<script defer src="/js/srs.js?v=u8image"></script>
-<script defer src="/js/timetable.js?v=u8image"></script>
-<script defer src="/js/gamification.js?v=u8image"></script>
-<script defer src="/js/achievements.js?v=u8image"></script>
-<script defer src="/js/srs_review.js?v=u8image"></script>
-<script defer src="/js/home_view.js?v=u8image"></script>
+<script defer src="/js/constants.js?v=u9nogamif"></script>
+<script defer src="/js/error_autoreport.js?v=u9nogamif"></script>
+<script defer src="/js/icons.js?v=u9nogamif"></script>
+<script defer src="/js/storage.js?v=u9nogamif"></script>
+<script defer src="/js/firestore_sync.js?v=u9nogamif"></script>
+<script defer src="/js/transcripts_store.js?v=u9nogamif"></script>
+<script defer src="/js/api.js?v=u9nogamif"></script>
+<script defer src="/js/pptx_parser.js?v=u9nogamif"></script>
+<script defer src="/js/quiz.js?v=u9nogamif"></script>
+<script defer src="/js/ui.js?v=u9nogamif"></script>
+<script defer src="/js/viewers.js?v=u9nogamif"></script>
+<script defer src="/js/image_gallery.js?v=u9nogamif"></script>
+<script defer src="/js/pipeline.js?v=u9nogamif"></script>
+<script defer src="/js/batch.js?v=u9nogamif"></script>
+<script defer src="/js/note_creation.js?v=u9nogamif"></script>
+<script defer src="/js/notes_crud.js?v=u9nogamif"></script>
+<script defer src="/js/notion_viewer.js?v=u9nogamif"></script>
+<script defer src="/js/notion_clipboard.js?v=u9nogamif"></script>
+<script defer src="/js/folders.js?v=u9nogamif"></script>
+<script defer src="/js/exam_plan.js?v=u9nogamif"></script>
+<script defer src="/js/srs.js?v=u9nogamif"></script>
+<script defer src="/js/timetable.js?v=u9nogamif"></script>
+<script defer src="/js/srs_review.js?v=u9nogamif"></script>
+<script defer src="/js/home_view.js?v=u9nogamif"></script>
 <script defer src="/js/transcripts_view.js?v=u7whisper"></script>
-<script defer src="/js/bulk.js?v=u8image"></script>
-<script defer src="/js/firebase_auth.js?v=u8image"></script>
-<script defer src="/js/payment.js?v=u8image"></script>
+<script defer src="/js/bulk.js?v=u9nogamif"></script>
+<script defer src="/js/firebase_auth.js?v=u9nogamif"></script>
+<script defer src="/js/payment.js?v=u9nogamif"></script>
 <script defer src="/js/recorder.js?v=u7whisper"></script>
-<script defer src="/js/groups.js?v=u8image"></script>
-<script defer src="/js/study_rooms.js?v=u8image"></script>
-<script defer src="/js/bug_report.js?v=u8image"></script>
-<script defer src="/js/onboarding_tour.js?v=u8image"></script>
-<script defer src="/js/main.js?v=u8image"></script>
-<script defer src="/js/main_inline.js?v=u8image"></script>
+<script defer src="/js/groups.js?v=u9nogamif"></script>
+<script defer src="/js/study_rooms.js?v=u9nogamif"></script>
+<script defer src="/js/bug_report.js?v=u9nogamif"></script>
+<script defer src="/js/onboarding_tour.js?v=u9nogamif"></script>
+<script defer src="/js/main.js?v=u9nogamif"></script>
+<script defer src="/js/main_inline.js?v=u9nogamif"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

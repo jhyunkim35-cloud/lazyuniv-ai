@@ -47,7 +47,7 @@ assert_contains public/js/pptx_parser.js "Single-note only; see note_creation.js
 assert_contains public/index.html 'id="batchPptInput" accept=".pptx,.pdf,.docx"' "U8-9b: batchPptInput은 변경 없음 (이미지 미지원 유지)"
 
 # ── 캐시버스트 ──
-assert_contains public/index.html "/js/pptx_parser.js?v=u8image" "U8-10a: pptx_parser.js 캐시버스트 갱신"
-assert_contains public/index.html "/js/note_creation.js?v=u8image" "U8-10b: note_creation.js 캐시버스트 갱신"
-assert_contains public/index.html "/js/constants.js?v=u8image" "U8-10c: constants.js 캐시버스트 갱신"
-assert_contains public/index.html "/js/main_inline.js?v=u8image" "U8-10d: main_inline.js 캐시버스트 갱신"
+assert_matches public/index.html "pptx_parser\.js\?v=" "U8-10a: pptx_parser.js 버전 마커 존재"
+assert_matches public/index.html "note_creation\.js\?v=" "U8-10b: note_creation.js 버전 마커 존재"
+assert_matches public/index.html "constants\.js\?v=" "U8-10c: constants.js 버전 마커 존재"
+assert_matches public/index.html "main_inline\.js\?v=" "U8-10d: main_inline.js 버전 마커 존재"
