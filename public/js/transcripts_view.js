@@ -371,8 +371,18 @@
     metaEl.textContent = [date, dur, `${chars}자${truncatedNote}`].filter(Boolean).join(' · ');
 
     // Render as preformatted text — preserves paragraph breaks from the
-    // STT output without trying to interpret it as markdown.
-    bodyEl.textContent = t.text || '';
+    // STT output without trying to interpret it as markdown. Speaker-label
+    // prefixes ("[hh:mm:ss] 발화자 N:") get minimal emphasis so multi-speaker
+    // transcripts scan by speaker.
+    const rawText = t.text || '';
+    if (typeof escHtml === 'function') {
+      bodyEl.innerHTML = escHtml(rawText).replace(
+        /(^|\n)((?:\[[\d:]+\]\s*)?(?:발화자|참석자)\s*\d+\s*:)/g,
+        (m, br, label) => `${br}<span style="color:var(--primary,#7c4dff);font-weight:600">${label}</span>`
+      );
+    } else {
+      bodyEl.textContent = rawText;
+    }
 
     _previewEl.classList.remove('hidden');
   }

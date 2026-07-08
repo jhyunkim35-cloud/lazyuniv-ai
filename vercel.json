@@ -5,6 +5,7 @@
   "functions": {
     "api/claude.js":       { "maxDuration": 300 },
     "api/assemblyai.js":   { "maxDuration": 60 },
+    "api/whisper-stt.js":  { "maxDuration": 300 },
     "api/google-stt.js":   { "maxDuration": 60 },
     "api/admin.js":        { "maxDuration": 30 },
     "api/toss.js":         { "maxDuration": 30 },

@@ -17,6 +17,8 @@
 //             but transcripts won't be persisted to the user's transcript store.
 
 (function () {
+  const USE_WHISPER = true; // rollback: false → AssemblyAI
+
   // ── Audio MIME detection (browser quirks) ───────────────
   function pickMimeType() {
     const candidates = [
@@ -485,7 +487,7 @@
               <label class="rec-engine-option rec-engine-option--selected" id="recEngineOptAAI">
                 <input type="radio" name="sttEngine" value="assemblyai" id="recEngineAssemblyAI" checked>
                 <div>
-                  <div class="rec-engine-option-title">기본 (AssemblyAI)</div>
+                  <div class="rec-engine-option-title">기본 엔진 (무료)</div>
                   <div class="rec-engine-option-desc">무료 · 빠름 · 정확도 보통</div>
                 </div>
               </label>
@@ -900,7 +902,10 @@
 
     modalState.mime = pickMimeType();
     try {
-      modalState.rec = new MediaRecorder(modalState.stream, modalState.mime ? { mimeType: modalState.mime } : undefined);
+      // audioBitsPerSecond: 32000 keeps a 90-min opus recording ~22MB — well
+      // inside Groq's file-size limit — with no audible speech-quality loss.
+      const recOpts = modalState.mime ? { mimeType: modalState.mime, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 };
+      modalState.rec = new MediaRecorder(modalState.stream, recOpts);
     } catch (err) {
       console.error('[recorder] MediaRecorder init failed', err);
       releaseStream();
@@ -1171,7 +1176,7 @@
         '파일이 너무 큽니다 (최대 500MB). 더 작은 파일을 사용해주세요.';
       return;
     }
-    modalState.sttEngine = 'assemblyai'; // file uploads always use free AssemblyAI path
+    modalState.sttEngine = 'assemblyai'; // file uploads always use the free engine (routed via USE_WHISPER below)
     handleAudioBlob(file, file.name);
   }
 
@@ -1224,7 +1229,8 @@
     document.getElementById('recSttStatus').textContent = '텍스트 변환 시작 중…';
 
     // Determine STT endpoint based on selected engine
-    const sttApi = modalState.sttEngine === 'google' ? '/api/google-stt' : '/api/assemblyai';
+    const sttApi = modalState.sttEngine === 'google' ? '/api/google-stt'
+      : (USE_WHISPER ? '/api/whisper-stt' : '/api/assemblyai');
 
     modalState.sttApi = sttApi;
 
