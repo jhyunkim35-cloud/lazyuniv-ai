@@ -7,6 +7,7 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   if (_heroEl) _heroEl.hidden = true;
   currentSummaryLayers = null;  // R4: reset multilayer summary so a failed synth doesn't leak the previous note's layers
   currentStudyTools = null;  // R8+R9: reset study tools so a new analysis doesn't leak the previous note's mindmap/memorize/concepts
+  _studyToolsRangeInput = '';  // U3: reset stale page-range text from the previous note
   const _stCard = document.getElementById('studyToolsCard');  // R8+R9: hide stale card too (same reason as hero above)
   if (_stCard) _stCard.hidden = true;
   iterChipData = [];
@@ -656,6 +657,26 @@ async function regenerateSummary() {
 ═══════════════════════════════════════════════ */
 let currentStudyToolsTab = 'mindmap';  // UI-only, not persisted
 let _studyToolsBusy = false;  // reentry guard — a DOM-button guard alone breaks when a tab switch re-renders a fresh enabled button mid-generation
+// U3: raw text typed into the optional 암기/개념 page-range control. Kept in a module
+// var (not just the DOM) because clicking 생성/재생성 synchronously re-renders the body
+// (disabled ⏳ button) before the async call returns, which would otherwise wipe the input.
+let _studyToolsRangeInput = '';
+
+// U3: page-range filtering only makes sense when the note actually has page cites
+// (PPT/PDF-sourced notes) — docx/transcript-only notes never have "p.N" so hide the control.
+function notesHasPageCites() {
+  return /(^|[^\w])p\.\d+/.test(storedNotesText || '');
+}
+
+function buildPageRangeControl() {
+  const wrap = document.createElement('div');
+  wrap.className = 'study-tools-range';
+  wrap.innerHTML = `<label for="studyToolsRangeInput">📄 p.</label><input type="text" id="studyToolsRangeInput" class="study-tools-range-input" placeholder="전체 (예: 3-10)">`;
+  const input = wrap.querySelector('input');
+  input.value = _studyToolsRangeInput;
+  input.addEventListener('input', () => { _studyToolsRangeInput = input.value; });
+  return wrap;
+}
 
 // 카드 자체의 표시 여부 — storedNotesText가 있을 때(싱글노트 뷰)만 보인다.
 function renderStudyTools() {
@@ -676,16 +697,19 @@ function renderStudyToolsBody() {
   const hasData = Array.isArray(data) ? data.length > 0 : !!data;
   body.innerHTML = '';
 
+  const showRange = tool !== 'mindmap' && notesHasPageCites();  // U3: 마인드맵은 범위 선택 대상 밖
+
   if (!hasData) {
     const wrap = document.createElement('div');
     wrap.className = 'study-tools-empty';
+    if (showRange) wrap.appendChild(buildPageRangeControl());
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'studyToolsGenBtn';
     btn.className = 'study-tools-gen-btn';
     btn.textContent = _studyToolsBusy ? '⏳ 생성 중…' : (tool === 'mindmap' ? '✨ 마인드맵 생성' : '✨ 암기·개념 생성');
     btn.disabled = _studyToolsBusy;
-    btn.addEventListener('click', () => (tool === 'mindmap' ? generateMindmap() : generateStudyAids()));
+    btn.addEventListener('click', () => (tool === 'mindmap' ? generateMindmap() : generateStudyAids(_studyToolsRangeInput)));
     wrap.appendChild(btn);
     body.appendChild(wrap);
     return;
@@ -693,13 +717,14 @@ function renderStudyToolsBody() {
 
   const regenRow = document.createElement('div');
   regenRow.className = 'study-tools-regen-row';
+  if (showRange) regenRow.appendChild(buildPageRangeControl());
   const regenBtn = document.createElement('button');
   regenBtn.type = 'button';
   regenBtn.id = 'studyToolsRegenBtn';
   regenBtn.className = 'study-tools-regen-btn';
   regenBtn.textContent = _studyToolsBusy ? '⏳ 생성 중…' : '↻ 재생성';
   regenBtn.disabled = _studyToolsBusy;
-  regenBtn.addEventListener('click', () => (tool === 'mindmap' ? generateMindmap() : generateStudyAids()));
+  regenBtn.addEventListener('click', () => (tool === 'mindmap' ? generateMindmap() : generateStudyAids(_studyToolsRangeInput)));
   regenRow.appendChild(regenBtn);
   body.appendChild(regenRow);
 
@@ -786,7 +811,8 @@ function renderMindmap(container, outline) {
   const expandBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 펼치기' });
   const collapseBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 접기' });
   const copyBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '📋 복사' });
-  controls.append(expandBtn, collapseBtn, copyBtn);
+  const pngBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '🖼 이미지 저장' });  // U4
+  controls.append(expandBtn, collapseBtn, copyBtn, pngBtn);
   container.appendChild(controls);
 
   const tree = document.createElement('div');
@@ -823,23 +849,143 @@ function renderMindmap(container, outline) {
   copyBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(outline).then(() => showSuccessToast('📋 복사 완료'));
   });
+  pngBtn.addEventListener('click', () => downloadMindmapPng(root, root.text));  // U4: reuse the already-parsed tree, no re-parse
 }
 
-/* ── R9: 암기(cloze) + 개념(용어집) — 한 번의 호출로 둘 다 생성 ── */
-async function generateStudyAids() {
+// U4: truncate a label to fit maxWidth in the current ctx font, appending … when trimmed.
+function truncateCanvasText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + '…').width > maxWidth) t = t.slice(0, -1);
+  return t + '…';
+}
+
+/* U4: render the mindmap tree to an offscreen canvas and download as PNG.
+   Horizontal layout — root at left, children stacked vertically to the right,
+   straight connector lines. Reuses the tree renderMindmap already parsed. */
+function downloadMindmapPng(tree, title) {
+  const NODE_W = 200, NODE_H = 34, ROW_H = 44, COL_GAP = 50, PAD = 24;
+  let maxDepth = 0;
+  function layout(node, depth) {
+    maxDepth = Math.max(maxDepth, depth);
+    node._depth = depth;
+    if (!node.children.length) { node._slots = 1; return 1; }
+    let slots = 0;
+    node.children.forEach(c => { slots += layout(c, depth + 1); });
+    node._slots = slots;
+    return slots;
+  }
+  function assignRow(node, rowStart) {
+    if (!node.children.length) { node._row = rowStart; return; }
+    let r = rowStart;
+    node.children.forEach(c => { assignRow(c, r); r += c._slots; });
+    node._row = (node.children[0]._row + node.children[node.children.length - 1]._row) / 2;
+  }
+  const totalSlots = layout(tree, 0);
+  assignRow(tree, 0);
+
+  const width = PAD * 2 + NODE_W + maxDepth * (NODE_W + COL_GAP);
+  const height = PAD * 2 + totalSlots * ROW_H;
+
+  const isLight = document.documentElement.classList.contains('light');
+  const palette = isLight
+    ? { bg: '#ffffff', node: '#eef2ff', text: '#1e293b', line: '#94a3b8' }
+    : { bg: '#1a1a24', node: '#2a2a3a', text: '#e8e8f0', line: '#4a4a5a' };
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width * 2;
+  canvas.height = height * 2;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);  // retina
+  ctx.fillStyle = palette.bg;
+  ctx.fillRect(0, 0, width, height);
+
+  const box = node => {
+    const x = PAD + node._depth * (NODE_W + COL_GAP);
+    const y = PAD + node._row * ROW_H + (ROW_H - NODE_H) / 2;
+    return { x, y, cx: x + NODE_W / 2, cy: y + NODE_H / 2, left: x, right: x + NODE_W };
+  };
+
+  ctx.strokeStyle = palette.line;
+  ctx.lineWidth = 1.5;
+  (function drawLines(node) {
+    const b = box(node);
+    node.children.forEach(c => {
+      const cb = box(c);
+      const midX = (b.right + cb.left) / 2;
+      ctx.beginPath();
+      ctx.moveTo(b.right, b.cy);
+      ctx.lineTo(midX, b.cy);
+      ctx.lineTo(midX, cb.cy);
+      ctx.lineTo(cb.left, cb.cy);
+      ctx.stroke();
+      drawLines(c);
+    });
+  })(tree);
+
+  ctx.textBaseline = 'middle';
+  (function drawNodes(node) {
+    const b = box(node);
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.y, NODE_W, NODE_H, 6);
+    ctx.fillStyle = palette.node;
+    ctx.fill();
+    ctx.font = node === tree ? 'bold 14px sans-serif' : '13px sans-serif';
+    ctx.fillStyle = palette.text;
+    ctx.fillText(truncateCanvasText(ctx, node.text, NODE_W - 16), b.x + 8, b.cy);
+    node.children.forEach(drawNodes);
+  })(tree);
+
+  canvas.toBlob(blob => {
+    if (!blob) { showToast('❌ 이미지 생성 실패'); return; }
+    const safeTitle = (title || '마인드맵').replace(/[\\/:*?"<>|]/g, '').trim() || '마인드맵';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `마인드맵-${safeTitle}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+}
+
+/* ── R9: 암기(cloze) + 개념(용어집) — 한 번의 호출로 둘 다 생성 ──
+   U3: rangeText는 studyToolsRangeInput의 raw 텍스트("N-M" 또는 빈 문자열=전체).
+   유효하면 캐시 prefix가 아니라 UNCACHED 프롬프트 뒤쪽에만 이어붙인다 — cachePrefix는
+   summary/mindmap/quiz와 바이트 단위로 동일해야 캐시가 공유되므로 절대 건드리지 않는다. */
+async function generateStudyAids(rangeText = '') {
   if (!storedNotesText || _studyToolsBusy) return;  // no note loaded, or already running
+
+  let pageRange = null;
+  const rt = (rangeText || '').trim();
+  if (rt) {
+    // "N-M" 또는 단일 페이지 "N" (N = N-N) 허용
+    const m = rt.match(/^(\d+)\s*(?:-\s*(\d+))?$/);
+    const start = m ? parseInt(m[1], 10) : NaN;
+    const end = m ? parseInt(m[2] ?? m[1], 10) : NaN;
+    if (!m || !(start >= 1) || !(end >= 1) || start > end) {
+      showToast('❌ 페이지 범위 형식이 올바르지 않습니다 (예: 3-10 또는 5)');
+      return;
+    }
+    pageRange = { start, end };
+  }
+
   _studyToolsBusy = true;
   renderStudyToolsBody();  // repaint current tab with disabled ⏳ button
   try {
     const sys = TOOLS_SYS;  // shared with summary/마인드맵 so the note cache actually matches cross-tool
     const stripped = stripLeadingSummary(storedNotesText);
     const cachePrefix = buildToolsCachePrefix(stripped);  // Fix 5 (Q3): shared with summary/mindmap/quiz on the same note
+    const rangeClause = pageRange
+      ? `\n\n페이지 인용이 p.${pageRange.start} ~ p.${pageRange.end} 범위에 속하는 내용만 다루세요. 다른 페이지 내용은 제외하세요.`
+      : '';  // U3: uncached — kept out of cachePrefix so the shared cache block stays byte-identical
     const prompt = `아래 2개 섹션을 정확한 마커로 작성하세요. 마커 외의 머리말·설명은 출력하지 마세요.
 
 [암기]
 - (외울 핵심 문장. 핵심 단어·수치를 {{이렇게}} 이중 중괄호로 감싸고, 필요하면 문장 끝에 (p.N) 표시. 8~15개)
 [개념]
-- (용어 :: 한두 문장 정의. 필요하면 (p.N) 표시. 8~15개)`;
+- (용어 :: 한두 문장 정의. 필요하면 (p.N) 표시. 8~15개)${rangeClause}`;
     const raw = (await callClaudeOnce('server-proxied', prompt, sys, 2048, 'claude-sonnet-4-6', cachePrefix, { feature: 'noteAnalysis' }) || '').trim();
 
     const MARKERS = ['[암기]', '[개념]'];
@@ -866,6 +1012,7 @@ async function generateStudyAids() {
     currentStudyTools = Object.assign({ mindmap: null, memorize: null, concepts: null }, currentStudyTools, {
       memorize: memorize.length ? memorize : null,
       concepts: concepts.length ? concepts : null,
+      pageRange: pageRange,  // U3: range this generation used (null = 전체) — overwritten each regen, restored on reopen via notes_crud.js
     });
     await saveStudyToolsQuiet();
     showSuccessToast('📌 암기·개념 생성 완료');
@@ -877,8 +1024,19 @@ async function generateStudyAids() {
   }
 }
 
+// U3: small "📄 p.N–M" badge showing the page range this generation used, if any.
+function renderPageRangeBadge(container) {
+  const range = currentStudyTools && currentStudyTools.pageRange;
+  if (!range) return;
+  const badge = document.createElement('div');
+  badge.className = 'study-tools-range-badge';
+  badge.textContent = `📄 p.${range.start}–${range.end}`;
+  container.appendChild(badge);
+}
+
 function renderMemorize(container, items) {
   container.innerHTML = '';
+  renderPageRangeBadge(container);
   const controls = document.createElement('div');
   controls.className = 'study-aids-controls';
   const showBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'mindmap-ctrl-btn', textContent: '모두 보기' });
@@ -932,6 +1090,7 @@ function renderMemorize(container, items) {
 
 function renderConcepts(container, items) {
   container.innerHTML = '';
+  renderPageRangeBadge(container);
   const list = document.createElement('div');
   list.className = 'concepts-list';
   items.forEach(({ term, def }) => {

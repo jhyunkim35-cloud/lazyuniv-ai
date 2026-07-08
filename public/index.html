@@ -1639,7 +1639,30 @@
     .study-tools-chip:hover:not(.active) { color: var(--text); }
     .study-tools-chip.active { border-color: var(--primary); color: var(--primary); background: var(--primary-dim); }
     .study-tools-body { padding: 0 1.5rem 1.5rem; min-height: 70px; }
-    .study-tools-empty { display: flex; align-items: center; justify-content: center; padding: 2rem 0; }
+    .study-tools-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem; padding: 2rem 0; }
+    /* U3: 암기/개념 생성 전용 선택 페이지 범위 컨트롤 — p.인용이 있는 노트에서만 렌더 */
+    .study-tools-range { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted); }
+    .study-tools-range-input {
+      width: 6.5em;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.8rem;
+    }
+    .study-tools-regen-row .study-tools-range { margin-right: auto; }
+    .study-tools-range-badge {
+      display: inline-block;
+      margin-bottom: 0.6rem;
+      padding: 0.15rem 0.6rem;
+      border-radius: 99px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
     .study-tools-gen-btn, .study-tools-regen-btn {
       padding: 0.55rem 1.4rem;
       border-radius: 99px;
@@ -4220,7 +4243,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=u2quiz"></script>
+<script defer src="/js/markdown.js?v=u34tools"></script>
 </head>
 <body>
 
@@ -4874,43 +4897,43 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=u2quiz"></script>
-<script defer src="/js/error_autoreport.js?v=u2quiz"></script>
-<script defer src="/js/icons.js?v=u2quiz"></script>
-<script defer src="/js/storage.js?v=u2quiz"></script>
-<script defer src="/js/firestore_sync.js?v=u2quiz"></script>
-<script defer src="/js/transcripts_store.js?v=u2quiz"></script>
-<script defer src="/js/api.js?v=u2quiz"></script>
-<script defer src="/js/pptx_parser.js?v=u2quiz"></script>
-<script defer src="/js/quiz.js?v=u2quiz"></script>
-<script defer src="/js/ui.js?v=u2quiz"></script>
-<script defer src="/js/viewers.js?v=u2quiz"></script>
-<script defer src="/js/image_gallery.js?v=u2quiz"></script>
-<script defer src="/js/pipeline.js?v=u2quiz"></script>
-<script defer src="/js/batch.js?v=u2quiz"></script>
-<script defer src="/js/note_creation.js?v=u2quiz"></script>
-<script defer src="/js/notes_crud.js?v=u2quiz"></script>
-<script defer src="/js/notion_viewer.js?v=u2quiz"></script>
-<script defer src="/js/notion_clipboard.js?v=u2quiz"></script>
-<script defer src="/js/folders.js?v=u2quiz"></script>
-<script defer src="/js/exam_plan.js?v=u2quiz"></script>
-<script defer src="/js/srs.js?v=u2quiz"></script>
-<script defer src="/js/timetable.js?v=u2quiz"></script>
-<script defer src="/js/gamification.js?v=u2quiz"></script>
-<script defer src="/js/achievements.js?v=u2quiz"></script>
-<script defer src="/js/srs_review.js?v=u2quiz"></script>
-<script defer src="/js/home_view.js?v=u2quiz"></script>
-<script defer src="/js/transcripts_view.js?v=u2quiz"></script>
-<script defer src="/js/bulk.js?v=u2quiz"></script>
-<script defer src="/js/firebase_auth.js?v=u2quiz"></script>
-<script defer src="/js/payment.js?v=u2quiz"></script>
-<script defer src="/js/recorder.js?v=u2quiz"></script>
-<script defer src="/js/groups.js?v=u2quiz"></script>
-<script defer src="/js/study_rooms.js?v=u2quiz"></script>
-<script defer src="/js/bug_report.js?v=u2quiz"></script>
-<script defer src="/js/onboarding_tour.js?v=u2quiz"></script>
-<script defer src="/js/main.js?v=u2quiz"></script>
-<script defer src="/js/main_inline.js?v=u2quiz"></script>
+<script defer src="/js/constants.js?v=u34tools"></script>
+<script defer src="/js/error_autoreport.js?v=u34tools"></script>
+<script defer src="/js/icons.js?v=u34tools"></script>
+<script defer src="/js/storage.js?v=u34tools"></script>
+<script defer src="/js/firestore_sync.js?v=u34tools"></script>
+<script defer src="/js/transcripts_store.js?v=u34tools"></script>
+<script defer src="/js/api.js?v=u34tools"></script>
+<script defer src="/js/pptx_parser.js?v=u34tools"></script>
+<script defer src="/js/quiz.js?v=u34tools"></script>
+<script defer src="/js/ui.js?v=u34tools"></script>
+<script defer src="/js/viewers.js?v=u34tools"></script>
+<script defer src="/js/image_gallery.js?v=u34tools"></script>
+<script defer src="/js/pipeline.js?v=u34tools"></script>
+<script defer src="/js/batch.js?v=u34tools"></script>
+<script defer src="/js/note_creation.js?v=u34tools"></script>
+<script defer src="/js/notes_crud.js?v=u34tools"></script>
+<script defer src="/js/notion_viewer.js?v=u34tools"></script>
+<script defer src="/js/notion_clipboard.js?v=u34tools"></script>
+<script defer src="/js/folders.js?v=u34tools"></script>
+<script defer src="/js/exam_plan.js?v=u34tools"></script>
+<script defer src="/js/srs.js?v=u34tools"></script>
+<script defer src="/js/timetable.js?v=u34tools"></script>
+<script defer src="/js/gamification.js?v=u34tools"></script>
+<script defer src="/js/achievements.js?v=u34tools"></script>
+<script defer src="/js/srs_review.js?v=u34tools"></script>
+<script defer src="/js/home_view.js?v=u34tools"></script>
+<script defer src="/js/transcripts_view.js?v=u34tools"></script>
+<script defer src="/js/bulk.js?v=u34tools"></script>
+<script defer src="/js/firebase_auth.js?v=u34tools"></script>
+<script defer src="/js/payment.js?v=u34tools"></script>
+<script defer src="/js/recorder.js?v=u34tools"></script>
+<script defer src="/js/groups.js?v=u34tools"></script>
+<script defer src="/js/study_rooms.js?v=u34tools"></script>
+<script defer src="/js/bug_report.js?v=u34tools"></script>
+<script defer src="/js/onboarding_tour.js?v=u34tools"></script>
+<script defer src="/js/main.js?v=u34tools"></script>
+<script defer src="/js/main_inline.js?v=u34tools"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">
