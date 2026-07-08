@@ -17,7 +17,9 @@
 //             but transcripts won't be persisted to the user's transcript store.
 
 (function () {
-  const USE_WHISPER = true; // rollback: false → AssemblyAI
+  // U7 dark-deploy: whisper path needs GROQ_API_KEY + PYANNOTE_API_KEY in Vercel.
+  // 준현: 키 등록 후 true로 켜고 실오디오 검증 (2026-07-08 U7 타임라인 참조).
+  const USE_WHISPER = false; // rollback: false → AssemblyAI
 
   // ── Audio MIME detection (browser quirks) ───────────────
   function pickMimeType() {
