@@ -27,21 +27,40 @@ function citeChip(s) {
 function renderMarkdown(raw) {
   const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+  // Q4/Fix3: dropped the single-`*` italic rule — the note prompt only ever
+  // emits **bold**, and single `*` was mangling STEM notation (x*y*z).
   function inlineFormat(s) {
     return citeChip(s)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g,     '<em>$1</em>')
       .replace(/`(.+?)`/g,       '<code>$1</code>');
   }
 
   const lines  = raw.split('\n');
   const output = [];
-  let inUl = false;
   let inTable = false;
   let inBlockquote = false;
 
+  // Q4/Fix2: nested-list stack — one entry per open <ul>/<li> depth level,
+  // so 4-space (or 2-space) indented sub-bullets render as real <ul> nesting
+  // instead of falling through to the flat-paragraph branch.
+  const listStack = []; // ascending depths of currently-open <li> levels
+
   function closeLists() {
-    if (inUl) { output.push('</ul>'); inUl = false; }
+    while (listStack.length) { output.push('</li></ul>'); listStack.pop(); }
+  }
+
+  // depth-aware list item push — see listStack comment above for the algorithm
+  function pushListItem(depth, html) {
+    while (listStack.length && listStack[listStack.length - 1] > depth) {
+      output.push('</li></ul>');
+      listStack.pop();
+    }
+    if (listStack.length && listStack[listStack.length - 1] === depth) {
+      output.push(`</li><li>${html}`);
+    } else {
+      output.push(`<ul><li>${html}`);
+      listStack.push(depth);
+    }
   }
 
   function closeTable() {
@@ -93,11 +112,14 @@ function renderMarkdown(raw) {
     } else if (/^# (.+)$/.test(line)) {
       closeLists();
       output.push(`<h1>${inlineFormat(line.replace(/^# /, ''))}</h1>`);
-    } else if (/^[-*•] (.+)$/.test(line)) {
-      if (!inUl) { output.push('<ul>'); inUl = true; }
-      output.push(`<li>${inlineFormat(line.replace(/^[-*•] /, ''))}</li>`);
+    } else if (/^(\s*)[-*•]\s+(.+)$/.test(line)) {
+      const m = line.match(/^(\s*)[-*•]\s+(.+)$/);
+      const indent = m[1].length;
+      let depth = indent >= 4 ? Math.floor(indent / 4) : (indent >= 2 ? 1 : 0);
+      if (depth > 3) depth = 3;
+      pushListItem(depth, inlineFormat(m[2]));
     } else if (/^(\d+)\. (.+)$/.test(line)) {
-      if (inUl) { output.push('</ul>'); inUl = false; }
+      closeLists();
       const m = line.match(/^(\d+)\. (.+)$/);
       output.push(`<p class="md-ol-item"><span class="md-ol-num">${m[1]}.</span> ${inlineFormat(m[2])}</p>`);
     } else if (/^---+$/.test(line.trim())) {

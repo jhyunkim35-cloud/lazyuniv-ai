@@ -115,6 +115,14 @@
       --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.20);
       --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.32);
       --danger: #ef4444;
+
+      /* Q4: note-content inline emphasis colors — swapped in :root.light below.
+         Kept as vars (not literals) so light theme gets accessible contrast
+         instead of the dark-palette hex values bleeding into a white bg. */
+      --md-heading: #a5b4fc;
+      --md-strong: #d4c0ff;
+      --md-em: #a0d8ef;
+      --md-highlight: #fbbf24;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -729,16 +737,16 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Markdown output */
-    .md-content h1 { font-size: 1.25rem; font-weight: 700; color: #a5b4fc; margin: 1.2rem 0 0.5rem; }
-    .md-content h2 { font-size: 1.08rem; font-weight: 700; color: #a5b4fc; margin: 1rem 0 0.4rem; }
+    .md-content h1 { font-size: 1.25rem; font-weight: 700; color: var(--md-heading); margin: 1.2rem 0 0.5rem; }
+    .md-content h2 { font-size: 1.08rem; font-weight: 700; color: var(--md-heading); margin: 1rem 0 0.4rem; }
     .md-content h3 { font-size: 0.98rem; font-weight: 600; color: var(--secondary); margin: 0.8rem 0 0.3rem; }
     .md-content p { margin: 0.4rem 0; }
     .md-content ul, .md-content ol { padding-left: 1.4rem; margin: 0.4rem 0; }
     .md-content li { margin: 0.25rem 0; }
     .md-ol-item { display:flex; gap:0.4rem; margin:0.3rem 0; }
     .md-ol-num { font-weight:700; flex-shrink:0; min-width:1.5em; }
-    .md-content strong { color: #d4c0ff; font-weight: 600; }
-    .md-content em { color: #a0d8ef; font-style: italic; }
+    .md-content strong { color: var(--md-strong); font-weight: 600; }
+    .md-content em { color: var(--md-em); font-style: italic; }
     .md-content code {
       background: var(--surface3);
       border: 1px solid var(--border);
@@ -1668,15 +1676,23 @@
     .mindmap-leaf { padding: 0.15rem 0; color: var(--text-muted); }
     .mindmap-children { border-left: 1px solid var(--border); margin-left: 0.5rem; padding-left: 0.75rem; }
 
-    /* R9: 암기(cloze) + 개념 목록 */
+    /* R9/Q4: 암기(cloze) + 개념 목록 — answer text lives only in
+       data-answer (never in the DOM as text) until revealed, so it can't
+       leak via select/copy/Ctrl+F. Blank state is a fixed-width box, not a
+       color:transparent trick. */
     .cloze {
+      display: inline-block;
+      min-width: 3.5em;
       cursor: pointer;
       border-radius: 4px;
       padding: 0 0.2em;
       background: var(--border);
-      color: transparent;
     }
-    .cloze[data-revealed="1"] { background: transparent; color: inherit; }
+    .cloze[data-revealed="1"] { background: transparent; min-width: 0; }
+    .cloze:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
+    }
     .memorize-list, .concepts-list { display: flex; flex-direction: column; gap: 0.5rem; }
     .memorize-row, .concept-row {
       padding: 0.5rem 0.75rem;
@@ -1721,7 +1737,7 @@
       background: rgba(251, 191, 36, 0.18);
       border-radius: 4px;
       padding: 0.1em 0.35em;
-      color: #fbbf24 !important;
+      color: var(--md-highlight) !important;
       border: 1px solid rgba(251, 191, 36, 0.28);
     }
 
@@ -3919,6 +3935,13 @@
       --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
       --shadow-md: 0 2px 8px rgba(15, 23, 42, 0.08);
       --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
+
+      /* Q4: light-theme note-content emphasis — same hue family as dark
+         (indigo/violet/blue), darkened for ≥4.5:1 contrast on white. */
+      --md-heading: #4338ca;
+      --md-strong: #6d28d9;
+      --md-em: #0369a1;
+      --md-highlight: #92400e;
     }
     :root.light body { background-image: none; }
 
@@ -4190,7 +4213,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=q3fast"></script>
+<script defer src="/js/markdown.js?v=q4render"></script>
 </head>
 <body>
 
@@ -4843,43 +4866,43 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=q3fast"></script>
-<script defer src="/js/error_autoreport.js?v=q3fast"></script>
-<script defer src="/js/icons.js?v=q3fast"></script>
-<script defer src="/js/storage.js?v=q3fast"></script>
-<script defer src="/js/firestore_sync.js?v=q3fast"></script>
-<script defer src="/js/transcripts_store.js?v=q3fast"></script>
-<script defer src="/js/api.js?v=q3fast"></script>
-<script defer src="/js/pptx_parser.js?v=q3fast"></script>
-<script defer src="/js/quiz.js?v=q3fast"></script>
-<script defer src="/js/ui.js?v=q3fast"></script>
-<script defer src="/js/viewers.js?v=q3fast"></script>
-<script defer src="/js/image_gallery.js?v=q3fast"></script>
-<script defer src="/js/pipeline.js?v=q3fast"></script>
-<script defer src="/js/batch.js?v=q3fast"></script>
-<script defer src="/js/note_creation.js?v=q3fast"></script>
-<script defer src="/js/notes_crud.js?v=q3fast"></script>
-<script defer src="/js/notion_viewer.js?v=q3fast"></script>
-<script defer src="/js/notion_clipboard.js?v=q3fast"></script>
-<script defer src="/js/folders.js?v=q3fast"></script>
-<script defer src="/js/exam_plan.js?v=q3fast"></script>
-<script defer src="/js/srs.js?v=q3fast"></script>
-<script defer src="/js/timetable.js?v=q3fast"></script>
-<script defer src="/js/gamification.js?v=q3fast"></script>
-<script defer src="/js/achievements.js?v=q3fast"></script>
-<script defer src="/js/srs_review.js?v=q3fast"></script>
-<script defer src="/js/home_view.js?v=q3fast"></script>
-<script defer src="/js/transcripts_view.js?v=q3fast"></script>
-<script defer src="/js/bulk.js?v=q3fast"></script>
-<script defer src="/js/firebase_auth.js?v=q3fast"></script>
-<script defer src="/js/payment.js?v=q3fast"></script>
-<script defer src="/js/recorder.js?v=q3fast"></script>
-<script defer src="/js/groups.js?v=q3fast"></script>
-<script defer src="/js/study_rooms.js?v=q3fast"></script>
-<script defer src="/js/bug_report.js?v=q3fast"></script>
-<script defer src="/js/onboarding_tour.js?v=q3fast"></script>
-<script defer src="/js/main.js?v=q3fast"></script>
-<script defer src="/js/main_inline.js?v=q3fast"></script>
+<script defer src="/js/constants.js?v=q4render"></script>
+<script defer src="/js/error_autoreport.js?v=q4render"></script>
+<script defer src="/js/icons.js?v=q4render"></script>
+<script defer src="/js/storage.js?v=q4render"></script>
+<script defer src="/js/firestore_sync.js?v=q4render"></script>
+<script defer src="/js/transcripts_store.js?v=q4render"></script>
+<script defer src="/js/api.js?v=q4render"></script>
+<script defer src="/js/pptx_parser.js?v=q4render"></script>
+<script defer src="/js/quiz.js?v=q4render"></script>
+<script defer src="/js/ui.js?v=q4render"></script>
+<script defer src="/js/viewers.js?v=q4render"></script>
+<script defer src="/js/image_gallery.js?v=q4render"></script>
+<script defer src="/js/pipeline.js?v=q4render"></script>
+<script defer src="/js/batch.js?v=q4render"></script>
+<script defer src="/js/note_creation.js?v=q4render"></script>
+<script defer src="/js/notes_crud.js?v=q4render"></script>
+<script defer src="/js/notion_viewer.js?v=q4render"></script>
+<script defer src="/js/notion_clipboard.js?v=q4render"></script>
+<script defer src="/js/folders.js?v=q4render"></script>
+<script defer src="/js/exam_plan.js?v=q4render"></script>
+<script defer src="/js/srs.js?v=q4render"></script>
+<script defer src="/js/timetable.js?v=q4render"></script>
+<script defer src="/js/gamification.js?v=q4render"></script>
+<script defer src="/js/achievements.js?v=q4render"></script>
+<script defer src="/js/srs_review.js?v=q4render"></script>
+<script defer src="/js/home_view.js?v=q4render"></script>
+<script defer src="/js/transcripts_view.js?v=q4render"></script>
+<script defer src="/js/bulk.js?v=q4render"></script>
+<script defer src="/js/firebase_auth.js?v=q4render"></script>
+<script defer src="/js/payment.js?v=q4render"></script>
+<script defer src="/js/recorder.js?v=q4render"></script>
+<script defer src="/js/groups.js?v=q4render"></script>
+<script defer src="/js/study_rooms.js?v=q4render"></script>
+<script defer src="/js/bug_report.js?v=q4render"></script>
+<script defer src="/js/onboarding_tour.js?v=q4render"></script>
+<script defer src="/js/main.js?v=q4render"></script>
+<script defer src="/js/main_inline.js?v=q4render"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

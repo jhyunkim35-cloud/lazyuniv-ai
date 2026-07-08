@@ -891,21 +891,43 @@ function renderMemorize(container, items) {
   items.forEach(text => {
     const row = document.createElement('div');
     row.className = 'memorize-row';
-    // escHtml FIRST, then wrap {{cloze}} spans, then citeChip — same layering order as renderMarkdown.
-    const withCloze = escHtml(text).replace(/\{\{(.+?)\}\}/g, '<span class="cloze" data-revealed="0">$1</span>');
-    row.innerHTML = citeChip(withCloze);
+    // Q4: escHtml FIRST, then split on {{cloze}} markers so citeChip only
+    // ever touches the surrounding text — the answer goes ONLY into
+    // data-answer (never rendered as text until revealed), so it can't be
+    // selected/copied/Ctrl+F'd, and it never gets re-parsed as HTML (no
+    // leaked <button> chip markup inside the attribute).
+    const parts = escHtml(text).split(/\{\{(.+?)\}\}/);
+    row.innerHTML = parts.map((part, i) => {
+      if (i % 2 === 1) {
+        return `<span class="cloze" role="button" tabindex="0" aria-label="정답 보기" data-answer="${part}" data-revealed="0"></span>`;
+      }
+      return citeChip(part);
+    }).join('');
     list.appendChild(row);
   });
   container.appendChild(list);
 
+  function toggleCloze(span) {
+    const revealed = span.dataset.revealed === '1';
+    span.dataset.revealed = revealed ? '0' : '1';
+    span.textContent = revealed ? '' : (span.dataset.answer || '');
+  }
+
   // one delegated listener on the list, not one per span
   list.addEventListener('click', e => {
     const span = e.target.closest('.cloze');
-    if (!span) return;
-    span.dataset.revealed = span.dataset.revealed === '1' ? '0' : '1';
+    if (span) toggleCloze(span);
   });
-  showBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '1'; }));
-  hideBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '0'; }));
+  // Q4: keyboard access — Enter/Space toggle reveal (tabindex=0 + role=button above)
+  list.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const span = e.target.closest('.cloze');
+    if (!span) return;
+    e.preventDefault();
+    toggleCloze(span);
+  });
+  showBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '1'; s.textContent = s.dataset.answer || ''; }));
+  hideBtn.addEventListener('click', () => list.querySelectorAll('.cloze').forEach(s => { s.dataset.revealed = '0'; s.textContent = ''; }));
 }
 
 function renderConcepts(container, items) {
