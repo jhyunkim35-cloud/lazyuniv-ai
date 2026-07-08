@@ -64,6 +64,40 @@ document.getElementById('recordBtn').addEventListener('click', () => {
   if (typeof window.openRecorderModal === 'function') window.openRecorderModal();
 });
 
+/* U1: paste-text memo — smallest modal, reuses .db-modal-overlay/.db-modal CSS
+   (same classes as appConfirm/appPrompt in ui.js) with a textarea swapped in for
+   the single-line input. Confirm wraps the text as a .txt File and feeds it
+   through the exact same setRecSlotFile/addRecSlot path the file picker uses. */
+document.getElementById('pasteMemoBtn').addEventListener('click', () => {
+  const overlay = document.createElement('div');
+  overlay.className = 'db-modal-overlay';
+  overlay.innerHTML = `
+    <div class="db-modal" style="max-width:480px;">
+      <h3>📝 텍스트 붙여넣기</h3>
+      <textarea id="memoPasteInput" rows="10" placeholder="강의 내용을 붙여넣거나 직접 입력하세요" style="width:100%; box-sizing:border-box; padding:0.6rem 0.7rem; border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text); font-size:0.88rem; font-family:inherit; resize:vertical;"></textarea>
+      <div class="db-modal-footer" style="justify-content:flex-end;">
+        <button id="memoPasteCancel" style="background:var(--surface3); color:var(--text); border:1px solid var(--border);">취소</button>
+        <button id="memoPasteOk">추가</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const ta = overlay.querySelector('#memoPasteInput');
+  const close = () => overlay.remove();
+  overlay.querySelector('#memoPasteCancel').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('#memoPasteOk').addEventListener('click', () => {
+    const text = ta.value.trim();
+    if (!text) { showToast('⚠️ 붙여넣을 텍스트를 입력하세요.'); return; }
+    const file = new File([text], '메모.txt', { type: 'text/plain' });
+    const emptySlot = txtFiles.find(s => s.file === null);
+    if (emptySlot) setRecSlotFile(emptySlot.id, file);
+    else addRecSlot(file);
+    close();
+    showToast('📝 메모가 녹취록으로 추가되었습니다.');
+  });
+  setTimeout(() => ta.focus(), 50);
+});
+
 // Screen Wake Lock is auto-released when the tab is hidden, so re-acquire it
 // when the user returns mid-generation. Also flag that a background trip
 // happened during generation so we can warn that a mobile browser may have
@@ -456,8 +490,8 @@ document.getElementById('batchPptInput').addEventListener('change', async e => {
   const f = e.target.files[0];
   if (!f) return;
   const n = f.name.toLowerCase();
-  if (!n.endsWith('.pptx') && !n.endsWith('.pdf')) {
-    showToast('⚠️ .pptx 또는 .pdf 파일만 업로드할 수 있습니다.');
+  if (!n.endsWith('.pptx') && !n.endsWith('.pdf') && !n.endsWith('.docx')) {
+    showToast('⚠️ .pptx, .pdf 또는 .docx 파일만 업로드할 수 있습니다.');
     return;
   }
   if (f.size > MAX_FILE_SIZE_BYTES) {

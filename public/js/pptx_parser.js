@@ -23,8 +23,8 @@ async function getPdfjsLib() {
 async function onPptChange(file) {
   if (!file) return;
   const name = file.name.toLowerCase();
-  if (!name.endsWith('.pptx') && !name.endsWith('.pdf')) {
-    showToast('⚠️ .pptx 또는 .pdf 파일만 업로드할 수 있습니다.');
+  if (!name.endsWith('.pptx') && !name.endsWith('.pdf') && !name.endsWith('.docx')) {
+    showToast('⚠️ .pptx, .pdf 또는 .docx 파일만 업로드할 수 있습니다.');
     return;
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -35,9 +35,9 @@ async function onPptChange(file) {
     if (!await appConfirm(`파일 크기가 ${(file.size / 1024 / 1024).toFixed(0)}MB입니다. 처리 시간이 길어질 수 있습니다. 계속하시겠습니까?`)) return;
   }
   pptFile = file;
-  document.getElementById('pptIcon').innerHTML = name.endsWith('.pdf')
-    ? '<i data-lucide="file-text"></i>'
-    : '<i data-lucide="presentation"></i>';
+  document.getElementById('pptIcon').innerHTML = name.endsWith('.pptx')
+    ? '<i data-lucide="presentation"></i>'
+    : '<i data-lucide="file-text"></i>';
   document.getElementById('pptTagName').textContent = file.name;
   document.getElementById('pptTag').style.display = 'inline-flex';
   document.getElementById('pptZone').classList.add('has-file');
@@ -288,9 +288,10 @@ function checkReady() {
   if (isBatchMode) {
     checkBatchReady();
   } else {
-    analyzeBtn.disabled = isRunning || !pptFile;
-    const notice = document.getElementById('pptOnlyNotice');
     const hasRecordings = txtFiles.some(s => s.file !== null);
+    // U1: transcript-only analysis is now allowed — enable when either input exists.
+    analyzeBtn.disabled = isRunning || (!pptFile && !hasRecordings);
+    const notice = document.getElementById('pptOnlyNotice');
     if (pptFile && !hasRecordings) notice.classList.add('visible');
     else notice.classList.remove('visible');
 
@@ -311,7 +312,7 @@ function checkReady() {
         'text-align:center',
         'line-height:1.5',
       ].join(';');
-      recOnlyHint.textContent = '💡 PPT/PDF를 함께 업로드하면 더 정확한 노트가 생성됩니다.';
+      recOnlyHint.textContent = '💡 녹취록만으로도 분석할 수 있어요 — PPT/PDF를 함께 올리면 더 정확해집니다.';
       notice.parentNode.insertBefore(recOnlyHint, notice.nextSibling);
     }
     if (recOnlyHint) {
@@ -324,10 +325,40 @@ function checkReady() {
    Presentation text extraction — dispatches by type
 ═══════════════════════════════════════════════ */
 async function extractPresentationText(file) {
-  if (file.name.toLowerCase().endsWith('.pdf')) {
-    return extractPdfText(file);
-  }
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.pdf'))  return extractPdfText(file);
+  if (name.endsWith('.docx')) return extractDocxText(file);
   return extractPptxText(file);
+}
+
+/* ── DOCX via JSZip + XML (no page markers — Word docs have no pages) ── */
+function decodeXmlEntities(s) {
+  // &amp; must decode LAST — decoding it first double-decodes e.g. &amp;lt; into <
+  return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+async function extractDocxText(file) {
+  const zip = await JSZip.loadAsync(file);
+  const docFile = zip.files['word/document.xml'];
+  // Throw (not a sentinel string) — a returned string would flow into the
+  // pipeline as the document text and generate a note from garbage.
+  if (!docFile) throw new Error('Word 문서에서 텍스트를 추출할 수 없습니다.');
+
+  const xml = await docFile.async('text');
+  const paraXmls = xml.split(/<w:p[ >]/).slice(1); // first chunk is pre-first-paragraph content
+
+  const paragraphs = [];
+  for (const paraXml of paraXmls) {
+    const texts = [...paraXml.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g)].map(m => decodeXmlEntities(m[1]));
+    const para  = texts.join('').trim();
+    if (para) paragraphs.push(para);
+  }
+
+  const result = paragraphs.join('\n\n').trim();
+  if (!result) throw new Error('Word 문서에서 텍스트를 추출할 수 없습니다.');
+  debugLog('DOCX', `Extracted ${paragraphs.length} paragraphs, ${result.length} chars`);
+  return result;
 }
 
 /* ── PPTX via JSZip + XML ─────────────────────── */

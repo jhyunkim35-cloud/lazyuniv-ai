@@ -971,7 +971,10 @@ async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', ta
 
   const { formatSection, rulesSection } = getNoteFormatBlocks();
   const hasTxt   = recText && recText.trim().length > 0;
-  const srcLabel = hasTxt ? 'PPT 내용과 강의 녹취록을' : 'PPT 내용을';
+  const hasPpt   = pptText && pptText.trim().length > 0;
+  const srcLabel = hasTxt && hasPpt ? 'PPT 내용과 강의 녹취록을'
+                 : hasPpt           ? 'PPT 내용을'
+                 :                    '강의 녹취록을';
 
   const targetEl = targetBodyEl || document.getElementById('finalNotesBody');
   const dot      = makeAgentDot(1);
@@ -990,12 +993,17 @@ async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', ta
 ${formatSection}
 
 [규칙]
-${rulesSection}
+${rulesSection}`;
+  // U1: transcript-only mode has no PPT at all — omit the PPT structure clause
+  // and reference block entirely rather than send an empty [PPT 참고 자료].
+  if (hasPpt) {
+    cachePrefix += `
 
 ${PPT_STRUCTURE_CLAUSE}
 
 [PPT 참고 자료]
 ${pptText}`;
+  }
   // Fix 1 (Q3) sanity: fold the full transcript into the shared cache block too
   // (not just the PPT) whenever this call has one — single-pass mode sends the
   // whole recText uncached today; chunked mode reuses this same cachePrefix as its
@@ -1019,7 +1027,8 @@ ${critiqueText}`;
     // cachePrefix already contains formatSection, rulesSection, PPT_STRUCTURE_CLAUSE, pptText,
     // and (Fix 1, Q3) the full recText when hasTxt — repeat only the revision-specific
     // instruction here to avoid resending the transcript a second time uncached.
-    const userPrompt = `위 형식·규칙·PPT 자료를 참고하여 학습 노트를 수정하세요.${revisionClause}`;
+    const refLabel = hasPpt ? 'PPT 자료' : '녹취록 자료';
+    const userPrompt = `위 형식·규칙·${refLabel}를 참고하여 학습 노트를 수정하세요.${revisionClause}`;
 
     agentLog(1, 'Claude AI 응답 스트리밍 수신 중…');
     const revisionMeta = { isFirstCall: false, feature: 'noteAnalysis' };
@@ -1139,12 +1148,22 @@ ${critiqueText}`;
 
     } else {
       /* ── Single-pass mode ── */
+      // ponytail: transcript-only long lectures also land here (slideMatches=0
+      // since there's no [슬라이드 N]/[페이지 N] pptText to match against, so
+      // totalSlides=0 never exceeds the chunk threshold above) — no transcript
+      // chunking exists, continueIfTruncated() below handles output truncation
+      // instead. Add real transcript chunking if long recording-only notes
+      // start getting cut off in practice.
       needsSummarySynth = true;  // R2: replace Agent1 inline 요약 with verified summary
-      agentLog(1, `PPT + 녹취록 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`);
+      agentLog(1, hasPpt
+        ? `PPT + 녹취록 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`
+        : `녹취록 전용 단일 패스 — Sonnet으로 학습 가이드 작성 시작… (녹취록 ${recText.length.toLocaleString()}자)`);
 
       // Fix 1 (Q3): recText already lives in cachePrefix (see `if (hasTxt)` above) —
       // don't resend it uncached here too.
-      const userPrompt = `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.`;
+      const userPrompt = hasPpt
+        ? `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.`
+        : `위 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. PPT 자료가 없으므로 녹취록 내용만으로 핵심 개념을 충실히 정리하세요.`;
 
       agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
       debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
@@ -1317,6 +1336,7 @@ async function agent2_critiqueNotes(apiKey, notesText, pptText, recText, iter) {
   agentLog(2, `${iter}차 노트를 원본 자료와 비교 검토 중…`);
 
   const systemPrompt = '당신은 엄격한 학문적 검토자입니다. 모든 출력은 한국어로 작성하세요.';
+  const hasPpt2 = pptText && pptText.trim().length > 0;  // U1: transcript-only mode has no PPT block
   // Fix 2 (Q3): agent2 runs exactly once per analysis (no re-critique loop), so a
   // cache_control block here pays the 1.25x write premium and is never read back —
   // pure surcharge on ~57k Haiku tokens. It also can't be shared with agent1's cache
@@ -1354,12 +1374,14 @@ Agent 1에게: [CRITICAL] 항목만 수정하고, [NORMAL]·[MINOR]는 공간이
 
 모든 항목이 정확하다면 다음 문장만 정확히 출력하세요 (다른 내용 추가 금지):
   검토 완료 — 수정 필요 없음
-
+` + (hasPpt2 ? `
 [원본 PPT]
 ${pptText}
 
 [원본 녹취록]
-${recText}`;
+${recText}` : `
+[원본 녹취록]
+${recText}`);
   const userPrompt = `[검토 대상 학습 노트]
 ${notesText}`;
 

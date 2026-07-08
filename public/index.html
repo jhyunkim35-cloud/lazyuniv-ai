@@ -4213,7 +4213,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=q4render"></script>
+<script defer src="/js/markdown.js?v=u1input"></script>
 </head>
 <body>
 
@@ -4518,10 +4518,10 @@
   <div class="upload-grid" id="uploadGrid">
     <!-- PPTX / PDF -->
     <div class="upload-zone ppt-zone" id="pptZone">
-      <input type="file" id="pptInput" accept=".pptx,.pdf" />
+      <input type="file" id="pptInput" accept=".pptx,.pdf,.docx" />
       <div class="upload-icon-wrap" id="pptIcon"><i data-lucide="presentation"></i></div>
       <h3>발표 자료 파일</h3>
-      <p>.pptx 또는 .pdf</p>
+      <p>.pptx, .pdf 또는 .docx</p>
       <div class="file-tag" id="pptTag" style="display:none">
         <span><i data-lucide="check" class="icon-xs"></i></span><span id="pptTagName"></span>
       </div>
@@ -4540,6 +4540,7 @@
       <button class="add-rec-btn" id="sortRecBtn" type="button" style="display:none;"><i data-lucide="list-ordered" class="icon-sm"></i> 파일명 순 정렬</button>
       <button class="add-rec-btn" id="addRecBtn">+ 녹취록 추가</button>
       <button class="add-rec-btn add-rec-btn-mic" id="recordBtn" type="button"><i data-lucide="mic" class="icon-sm"></i> 녹음 / 오디오 업로드</button>
+      <button class="add-rec-btn" id="pasteMemoBtn" type="button">📝 텍스트 붙여넣기</button>
     </div>
   </div>
 
@@ -4581,9 +4582,9 @@
       <div class="batch-staging-section">
         <div class="batch-staging-label"><i data-lucide="presentation" class="icon-sm"></i> 발표 자료 선택</div>
         <label class="batch-file-btn" id="batchPptBtn" style="width:100%;">
-          <input type="file" id="batchPptInput" accept=".pptx,.pdf" />
+          <input type="file" id="batchPptInput" accept=".pptx,.pdf,.docx" />
           <span class="batch-file-btn-icon"><i data-lucide="presentation" class="icon-sm"></i></span>
-          <span class="batch-file-btn-label">PPT / PDF 파일 선택</span>
+          <span class="batch-file-btn-label">PPT / PDF / Word 파일 선택</span>
         </label>
       </div>
       <!-- 교시별 녹취록 -->
@@ -4866,43 +4867,43 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=q4render"></script>
-<script defer src="/js/error_autoreport.js?v=q4render"></script>
-<script defer src="/js/icons.js?v=q4render"></script>
-<script defer src="/js/storage.js?v=q4render"></script>
-<script defer src="/js/firestore_sync.js?v=q4render"></script>
-<script defer src="/js/transcripts_store.js?v=q4render"></script>
-<script defer src="/js/api.js?v=q4render"></script>
-<script defer src="/js/pptx_parser.js?v=q4render"></script>
-<script defer src="/js/quiz.js?v=q4render"></script>
-<script defer src="/js/ui.js?v=q4render"></script>
-<script defer src="/js/viewers.js?v=q4render"></script>
-<script defer src="/js/image_gallery.js?v=q4render"></script>
-<script defer src="/js/pipeline.js?v=q4render"></script>
-<script defer src="/js/batch.js?v=q4render"></script>
-<script defer src="/js/note_creation.js?v=q4render"></script>
-<script defer src="/js/notes_crud.js?v=q4render"></script>
-<script defer src="/js/notion_viewer.js?v=q4render"></script>
-<script defer src="/js/notion_clipboard.js?v=q4render"></script>
-<script defer src="/js/folders.js?v=q4render"></script>
-<script defer src="/js/exam_plan.js?v=q4render"></script>
-<script defer src="/js/srs.js?v=q4render"></script>
-<script defer src="/js/timetable.js?v=q4render"></script>
-<script defer src="/js/gamification.js?v=q4render"></script>
-<script defer src="/js/achievements.js?v=q4render"></script>
-<script defer src="/js/srs_review.js?v=q4render"></script>
-<script defer src="/js/home_view.js?v=q4render"></script>
-<script defer src="/js/transcripts_view.js?v=q4render"></script>
-<script defer src="/js/bulk.js?v=q4render"></script>
-<script defer src="/js/firebase_auth.js?v=q4render"></script>
-<script defer src="/js/payment.js?v=q4render"></script>
-<script defer src="/js/recorder.js?v=q4render"></script>
-<script defer src="/js/groups.js?v=q4render"></script>
-<script defer src="/js/study_rooms.js?v=q4render"></script>
-<script defer src="/js/bug_report.js?v=q4render"></script>
-<script defer src="/js/onboarding_tour.js?v=q4render"></script>
-<script defer src="/js/main.js?v=q4render"></script>
-<script defer src="/js/main_inline.js?v=q4render"></script>
+<script defer src="/js/constants.js?v=u1input"></script>
+<script defer src="/js/error_autoreport.js?v=u1input"></script>
+<script defer src="/js/icons.js?v=u1input"></script>
+<script defer src="/js/storage.js?v=u1input"></script>
+<script defer src="/js/firestore_sync.js?v=u1input"></script>
+<script defer src="/js/transcripts_store.js?v=u1input"></script>
+<script defer src="/js/api.js?v=u1input"></script>
+<script defer src="/js/pptx_parser.js?v=u1input"></script>
+<script defer src="/js/quiz.js?v=u1input"></script>
+<script defer src="/js/ui.js?v=u1input"></script>
+<script defer src="/js/viewers.js?v=u1input"></script>
+<script defer src="/js/image_gallery.js?v=u1input"></script>
+<script defer src="/js/pipeline.js?v=u1input"></script>
+<script defer src="/js/batch.js?v=u1input"></script>
+<script defer src="/js/note_creation.js?v=u1input"></script>
+<script defer src="/js/notes_crud.js?v=u1input"></script>
+<script defer src="/js/notion_viewer.js?v=u1input"></script>
+<script defer src="/js/notion_clipboard.js?v=u1input"></script>
+<script defer src="/js/folders.js?v=u1input"></script>
+<script defer src="/js/exam_plan.js?v=u1input"></script>
+<script defer src="/js/srs.js?v=u1input"></script>
+<script defer src="/js/timetable.js?v=u1input"></script>
+<script defer src="/js/gamification.js?v=u1input"></script>
+<script defer src="/js/achievements.js?v=u1input"></script>
+<script defer src="/js/srs_review.js?v=u1input"></script>
+<script defer src="/js/home_view.js?v=u1input"></script>
+<script defer src="/js/transcripts_view.js?v=u1input"></script>
+<script defer src="/js/bulk.js?v=u1input"></script>
+<script defer src="/js/firebase_auth.js?v=u1input"></script>
+<script defer src="/js/payment.js?v=u1input"></script>
+<script defer src="/js/recorder.js?v=u1input"></script>
+<script defer src="/js/groups.js?v=u1input"></script>
+<script defer src="/js/study_rooms.js?v=u1input"></script>
+<script defer src="/js/bug_report.js?v=u1input"></script>
+<script defer src="/js/onboarding_tour.js?v=u1input"></script>
+<script defer src="/js/main.js?v=u1input"></script>
+<script defer src="/js/main_inline.js?v=u1input"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

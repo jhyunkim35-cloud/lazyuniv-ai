@@ -10,7 +10,9 @@ async function runSingleNoteAnalysis() {
   }
   if (isRunning) return;  // double-click guard
   const apiKey = 'server-proxied';
-  if (!pptFile) return;
+  // U1: allow transcript-only analysis — PPT/PDF is now optional as long as
+  // at least one transcript slot is filled.
+  if (!pptFile && !txtFiles.some(s => s.file !== null)) return;
 
   // A new single-mode analysis always produces a NEW note. Clear currentNoteId
   // so autoSaveNote generates a fresh id instead of reusing the id of whatever
@@ -68,21 +70,28 @@ async function runSingleNoteAnalysis() {
   renderImageGallery([]);
 
   try {
-    setProgress(5, '파일 읽는 중…');
-    const pptText = await extractPresentationText(pptFile);
-    storedPptText = pptText;
+    if (pptFile) {
+      setProgress(5, '파일 읽는 중…');
+      const pptText = await extractPresentationText(pptFile);
+      storedPptText = pptText;
 
-    // Extract images from PPTX or PDF and render gallery
-    if (pptFile.name.toLowerCase().endsWith('.pptx')) {
-      setProgress(8, '슬라이드 이미지 추출 중…');
-      const imgs = await extractPptxImages(pptFile);
-      renderImageGallery(imgs);
-      if (imgs.length) agentLog(0, `슬라이드 이미지 ${imgs.length}개 발견`);
-    } else if (pptFile.name.toLowerCase().endsWith('.pdf')) {
-      setProgress(8, 'PDF 페이지 이미지 렌더링 중…');
-      const imgs = await extractPdfPageImages(pptFile);
-      renderImageGallery(imgs);
-      if (imgs.length) agentLog(0, `PDF 페이지 이미지 ${imgs.length}개 렌더링`);
+      // Extract images from PPTX or PDF and render gallery
+      if (pptFile.name.toLowerCase().endsWith('.pptx')) {
+        setProgress(8, '슬라이드 이미지 추출 중…');
+        const imgs = await extractPptxImages(pptFile);
+        renderImageGallery(imgs);
+        if (imgs.length) agentLog(0, `슬라이드 이미지 ${imgs.length}개 발견`);
+      } else if (pptFile.name.toLowerCase().endsWith('.pdf')) {
+        setProgress(8, 'PDF 페이지 이미지 렌더링 중…');
+        const imgs = await extractPdfPageImages(pptFile);
+        renderImageGallery(imgs);
+        if (imgs.length) agentLog(0, `PDF 페이지 이미지 ${imgs.length}개 렌더링`);
+      }
+      // .docx has no images to extract — falls through here with none, which is fine.
+    } else {
+      // U1: transcript-only — no PPT/PDF to parse, no images to extract.
+      storedPptText = '';
+      setProgress(5, '녹취록 전용 모드 — PPT 없음');
     }
 
     const recFiles = txtFiles.filter(s => s.file !== null);
