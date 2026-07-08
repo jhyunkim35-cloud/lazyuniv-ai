@@ -116,7 +116,7 @@ async function runSingleNoteAnalysis() {
       storedFilteredText = '';
     }
 
-    analyzeBtn.textContent = '⏳ AI 에이전트 실행 중… (Sonnet 작성 → Sonnet 비평 → Haiku 수정)';
+    analyzeBtn.textContent = '⏳ AI 에이전트 실행 중… (Sonnet 작성 → Haiku 비평 → Haiku 수정)';
     setProgress(20, 'AI 노트 작성·검토 시작…');
     await runAgentPipeline(apiKey);
 

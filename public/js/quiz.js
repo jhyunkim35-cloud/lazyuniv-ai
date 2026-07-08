@@ -66,7 +66,7 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
   const formatSchemas = {
     mc: {
       desc: `five-choice multiple choice`,
-      schema: `{"q":"question","choices":["A","B","C","D","E"],"answer":0,"explanation":"why correct + why key wrong answers are wrong","section":"h2 section title"}`,
+      schema: `{"q":"question","choices":["A","B","C","D","E"],"answer":0,"explanation":"why correct + why key wrong answers are wrong","hint":"정답을 직접 언급하지 않는 단서 한 문장","section":"h2 section title"}`,
       validate(q, i) {
         if (!q.q || !Array.isArray(q.choices) || q.choices.length !== 5 ||
             typeof q.answer !== 'number' || q.answer < 0 || q.answer > 4 || !q.explanation)
@@ -75,7 +75,7 @@ async function generateQuizStream(noteText, settings = {}, prevQuestions = [], o
     },
     short: {
       desc: `short-answer`,
-      schema: `{"q":"question","type":"short","keywords":["key answer 1","key answer 2"],"fullAnswer":"1-2 sentence model answer","explanation":"brief explanation","section":"h2 section title"}`,
+      schema: `{"q":"question","type":"short","keywords":["key answer 1","key answer 2"],"fullAnswer":"1-2 sentence model answer","explanation":"brief explanation","hint":"정답을 직접 언급하지 않는 단서 한 문장","section":"h2 section title"}`,
       validate(q, i) {
         if (!q.q || !Array.isArray(q.keywords) || q.keywords.length < 1 || !q.fullAnswer)
           throw new Error(`문제 ${i+1} 형식 오류 (단답형)`);
@@ -587,14 +587,41 @@ function _quizRenderCurrentCard(ctx, idx) {
       </div>`;
   }
 
+  // U2 Task 1: MCQ/단답형 get an optional hint reveal button (essay excluded).
+  // Old saved/streamed questions simply lack q.hint, so the button just doesn't render.
+  const hintHtml = (type !== 'essay' && q.hint)
+    ? `<div class="qi-hint-row"><button type="button" class="qi-hint-btn">💡 힌트</button><div class="qi-hint-text" style="display:none;"></div></div>`
+    : '';
+
   area.innerHTML = `<div class="quiz-card quiz-card-enter visible" data-qi="${idx}" data-type="${type}">
-      <div class="quiz-card-num">문제 ${idx + 1} / ${ctx.questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
+      <div class="quiz-card-header">
+        <div class="quiz-card-num">문제 ${idx + 1} / ${ctx.questions.length}${q.section ? ' · ' + escHtml(q.section) : ''}${typeLabel}</div>
+        <button type="button" class="qi-flag-btn${ctx.flagged[idx] ? ' qi-flagged' : ''}" aria-label="나중에 복습 표시">🚩</button>
+      </div>
       <div class="quiz-card-q">${escHtml(q.q)}</div>
+      ${hintHtml}
       ${inputHtml}
       <div class="qi-explanation"></div>
     </div>`;
 
   const cardEl = area.querySelector('.quiz-card');
+
+  const hintBtn = cardEl.querySelector('.qi-hint-btn');
+  if (hintBtn) {
+    hintBtn.addEventListener('click', () => {
+      const hintText = cardEl.querySelector('.qi-hint-text');
+      hintText.textContent = q.hint;
+      hintText.style.display = 'block';
+      hintBtn.style.display = 'none';
+    });
+  }
+
+  // U2 Task 2: in-session flag toggle, available on every question type.
+  const flagBtn = cardEl.querySelector('.qi-flag-btn');
+  flagBtn.addEventListener('click', () => {
+    ctx.flagged[idx] = !ctx.flagged[idx];
+    flagBtn.classList.toggle('qi-flagged', !!ctx.flagged[idx]);
+  });
 
   if (type === 'mc') {
     cardEl.querySelectorAll('.qi-choice').forEach(btn => {
@@ -897,6 +924,24 @@ async function _quizRunGrading(ctx) {
         }
       }).join('');
 
+  // U2 Task 2: 🚩 표시한 문항 리뷰 — 정답 여부와 무관하게 flagged된 문항만 모아 보여줌
+  const flaggedList = questions.reduce((acc, q, i) => {
+    if (ctx.flagged[i]) acc.push({ q, i, type: q.type || 'mc' });
+    return acc;
+  }, []);
+  const flaggedHtml = flaggedList.map(({ q, i, type }) => {
+    const ansLine = type === 'mc'
+      ? `✅ 정답: ${QUIZ_CHOICES_PREFIX[q.answer]} ${escHtml(q.choices[q.answer])}`
+      : type === 'short'
+        ? `✅ 키워드: ${escHtml((q.keywords || []).join(', '))}`
+        : `✅ 모범 답안: ${escHtml(q.modelAnswer || '')}`;
+    return `<div class="quiz-wrong-item">
+        <div class="qwi-q">Q${i+1}. ${escHtml(q.q)}</div>
+        <div class="qwi-ans">${ansLine}</div>
+        <div class="qwi-exp">${escHtml(q.explanation || '')}</div>
+      </div>`;
+  }).join('');
+
   const banner = document.createElement('div');
   banner.className = 'quiz-results-banner';
   banner.innerHTML = `
@@ -905,6 +950,8 @@ async function _quizRunGrading(ctx) {
       <div id="quizWeaknessInline"></div>
       ${wrongs.length > 0 ? '<div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-top:0.25rem;">오답 목록</div>' : ''}
       <div class="quiz-wrong-list">${wrongHtml}</div>
+      ${flaggedList.length > 0 ? '<div style="font-size:0.82rem;font-weight:600;color:var(--text-muted);margin-top:0.25rem;">🚩 표시한 문항</div>' : ''}
+      ${flaggedList.length > 0 ? `<div class="quiz-wrong-list">${flaggedHtml}</div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding-top:0.4rem;">
         <button id="quizHistInlineBtn" style="display:none;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text-muted);font-size:0.85rem;cursor:pointer;"><i data-lucide="presentation" class="icon-sm"></i> 퀴즈 이력</button>
         <div style="display:flex;gap:0.5rem;margin-left:auto;">
@@ -943,7 +990,7 @@ async function _quizRunGrading(ctx) {
         if (type === 'mc')    correct = answers[i] === q.answer;
         if (type === 'short') correct = matchesKeywords(answers[i], q.keywords);
         if (type === 'essay') correct = (essayGradeResults[i]?.score || 0) >= 60;
-        return { section: q.section || '', correct, questionText: q.q || '' };
+        return { section: q.section || '', correct, questionText: q.q || '', flagged: !!ctx.flagged[i] };
       }),
     };
     await saveQuizResult(record).catch(e => console.warn('quiz save failed:', e));
@@ -1029,7 +1076,7 @@ async function _quizSavePartial(ctx) {
       if (type === 'short') correct = matchesKeywords(ctx.answers[i], q.keywords);
       if (type === 'essay') correct = (ctx.essayGradeResults[i]?.score || 0) >= 60;
       if (correct) correctCount++;
-      savedQuestions.push({ section: q.section || '', correct, questionText: q.q || '' });
+      savedQuestions.push({ section: q.section || '', correct, questionText: q.q || '', flagged: !!ctx.flagged[i] });
     });
 
     const record = {
@@ -1059,6 +1106,7 @@ function runInlineQuiz(questions, container, noteId, noteTitle, noteText, settin
     currentIndex:      0,
     skipWarningShown:  [],
     submitted:         [],
+    flagged:           [], // U2 Task 2: in-session flag-for-review per question index
     streamingDone:     false,
     waitingForStream:  false,
     _savedAlready:     false,
