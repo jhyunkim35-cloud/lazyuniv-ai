@@ -588,6 +588,12 @@ document.getElementById('addPairBtn').addEventListener('click', () => {
   checkAddPairReady();
   renderBatchQueue();
   checkBatchReady();
+
+  // Flash the queue so the user sees where the item landed
+  const queueEl = document.getElementById('batchQueue');
+  queueEl.classList.remove('flash-highlight');
+  void queueEl.offsetWidth; // restart animation
+  queueEl.classList.add('flash-highlight');
 });
 
 // renderBatchQueue + batch result card functions moved to /js/batch.js
@@ -596,7 +602,7 @@ document.getElementById('addPairBtn').addEventListener('click', () => {
 document.getElementById('batchCancelBtn').addEventListener('click', () => {
   if (abortController) {
     abortController.abort();
-    agentLog(0, '사용자가 배치 처리를 취소했습니다.');
+    agentLog(0, '사용자가 다중 노트를 취소했습니다.');
     stopElapsedTimer();
   }
 });
@@ -653,7 +659,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
         errorCard(item, '이용 한도 초과');
         failCount++;
         renderBatchQueue();
-        showToast('이용 한도를 초과하여 배치 처리를 중단합니다.');
+        showToast('이용 한도를 초과하여 다중 노트를 중단합니다.');
         break;
       }
 
@@ -798,7 +804,7 @@ document.getElementById('batchStartBtn').addEventListener('click', async () => {
       batchQueue.filter(it => it.status === 'processing').forEach(it => { it.status = 'waiting'; });
       renderBatchQueue();
       checkBatchReady();
-      showToast('배치 처리가 취소되었습니다.');
+      showToast('다중 노트가 취소되었습니다.');
       setProgress(null);
     } else {
       console.error(err);

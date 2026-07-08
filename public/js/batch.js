@@ -147,7 +147,7 @@ function checkAddPairReady() {
 function renderBatchQueue() {
   const container = document.getElementById('batchQueue');
   if (batchQueue.length === 0) {
-    container.innerHTML = '<div class="batch-queue-empty">아직 추가된 쌍이 없습니다. 위에서 파일을 선택하고 "쌍 추가" 버튼을 클릭하세요.</div>';
+    container.innerHTML = '<div class="batch-queue-empty">여러 강의 자료를 한 번에 노트로 만들어요. 위에서 자료를 고르고 "목록에 추가"를 누르면 여기에 쌓입니다.</div>';
     return;
   }
   const statusMap = {
@@ -184,8 +184,12 @@ function renderBatchQueue() {
 }
 
 function checkBatchReady() {
-  document.getElementById('batchStartBtn').disabled =
-    isRunning || !batchQueue.some(i => i.status === 'waiting');
+  const btn = document.getElementById('batchStartBtn');
+  const waiting = batchQueue.filter(i => i.status === 'waiting').length;
+  btn.textContent = waiting > 0
+    ? `🚀 노트 ${waiting}개 한번에 만들기`
+    : '🚀 한번에 만들기';
+  btn.disabled = isRunning || !batchQueue.some(i => i.status === 'waiting');
 }
 
 function removeBatchItem(id) {
@@ -256,7 +260,7 @@ function finalizeBatchProgress(total, failed) {
 
   // If user navigated to home while batch ran, show toast and refresh home grid
   if (_currentView === 'home') {
-    showToast(`✅ 배치 완료! ${total - failed}개 노트 생성됨`);
+    showToast(`✅ 다중 노트 완료 — ${total - failed}개 노트 생성됨`);
     renderHomeView();
   }
 }

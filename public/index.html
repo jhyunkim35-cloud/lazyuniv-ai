@@ -1805,6 +1805,25 @@
     }
 
     /* ── Batch Section ───────────────────────────── */
+    .batch-section-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: -0.4rem;
+    }
+    .batch-queue-header {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: -0.5rem;
+    }
+    @keyframes batch-queue-flash {
+      0%   { background: rgba(124, 77, 255, 0);    box-shadow: 0 0 0 0   rgba(124, 77, 255, 0); }
+      25%  { background: rgba(124, 77, 255, 0.14); box-shadow: 0 0 0 4px rgba(124, 77, 255, 0.35); }
+      100% { background: rgba(124, 77, 255, 0);    box-shadow: 0 0 0 0   rgba(124, 77, 255, 0); }
+    }
+    .batch-queue.flash-highlight { animation: batch-queue-flash 1.2s ease-out; border-radius: var(--radius); }
     .batch-section {
       display: none;
       flex-direction: column;
@@ -4246,7 +4265,7 @@
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script defer src="https://js.tosspayments.com/v2/standard"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-<script defer src="/js/markdown.js?v=u10bgate"></script>
+<script defer src="/js/markdown.js?v=u13multi"></script>
 </head>
 <body>
 
@@ -4601,17 +4620,19 @@
 
   <!-- Mode Toggle -->
   <div class="mode-toggle">
-    <button class="mode-btn active" id="modeSingle"><i data-lucide="target" class="icon-sm"></i> 단일 모드</button>
-    <button class="mode-btn" id="modeBatch"><i data-lucide="package" class="icon-sm"></i> 배치 모드</button>
+    <button class="mode-btn active" id="modeSingle"><i data-lucide="target" class="icon-sm"></i> 노트 1개</button>
+    <button class="mode-btn" id="modeBatch"><i data-lucide="layers" class="icon-sm"></i> 다중 노트</button>
   </div>
 
   <!-- Batch Section -->
   <div class="batch-section" id="batchSection">
 
+    <div class="batch-section-subtitle">📚 다중 노트 — 여러 자료를 한 번에 노트로</div>
+
     <div class="batch-staging" id="batchStaging">
       <!-- PPT 선택 -->
       <div class="batch-staging-section">
-        <div class="batch-staging-label"><i data-lucide="presentation" class="icon-sm"></i> 발표 자료 선택</div>
+        <div class="batch-staging-label"><i data-lucide="presentation" class="icon-sm"></i> ① 강의 자료</div>
         <label class="batch-file-btn" id="batchPptBtn" style="width:100%;">
           <input type="file" id="batchPptInput" accept=".pptx,.pdf,.docx" />
           <span class="batch-file-btn-icon"><i data-lucide="presentation" class="icon-sm"></i></span>
@@ -4620,19 +4641,20 @@
       </div>
       <!-- 교시별 녹취록 -->
       <div class="batch-staging-section">
-        <div class="batch-staging-label"><i data-lucide="mic" class="icon-sm"></i> 교시별 녹취록</div>
+        <div class="batch-staging-label"><i data-lucide="mic" class="icon-sm"></i> ② 녹취록 (선택사항)</div>
         <div id="batchSessionList" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
         <button id="addSessionBtn" class="action-btn" style="font-size:0.8rem; margin-top:0.5rem; width:100%;">＋ 교시 추가</button>
       </div>
       <!-- 쌍 추가 -->
       <div class="batch-staging-footer">
-        <button id="addPairBtn" class="analyze-btn" disabled style="width:100%; padding:0.6rem; font-size:0.88rem;">＋ 쌍 추가하기</button>
+        <button id="addPairBtn" class="analyze-btn" disabled style="width:100%; padding:0.6rem; font-size:0.88rem;">③ ＋ 목록에 추가</button>
       </div>
     </div>
 
     <!-- Queue -->
+    <div class="batch-queue-header">만들 노트 목록</div>
     <div class="batch-queue" id="batchQueue">
-      <div class="batch-queue-empty">아직 추가된 쌍이 없습니다. 위에서 파일을 선택하고 "쌍 추가" 버튼을 클릭하세요.</div>
+      <div class="batch-queue-empty">여러 강의 자료를 한 번에 노트로 만들어요. 위에서 자료를 고르고 "목록에 추가"를 누르면 여기에 쌓입니다.</div>
     </div>
 
     <!-- Overall batch progress -->
@@ -4640,8 +4662,8 @@
 
     <!-- Batch start + cancel -->
     <div class="analyze-row">
-      <button class="analyze-btn" id="batchStartBtn" disabled>🚀 배치 처리 시작</button>
-      <button class="cancel-btn" id="batchCancelBtn"><i data-lucide="x" class="icon-xs"></i> 배치 취소</button>
+      <button class="analyze-btn" id="batchStartBtn" disabled>🚀 한번에 만들기</button>
+      <button class="cancel-btn" id="batchCancelBtn"><i data-lucide="x" class="icon-xs"></i> 취소</button>
     </div>
 
     <!-- Go-home button — shown while batch runs so user can navigate away -->
@@ -4899,41 +4921,41 @@
   </div>
 </div>
 
-<script defer src="/js/constants.js?v=u10bgate"></script>
-<script defer src="/js/error_autoreport.js?v=u10bgate"></script>
-<script defer src="/js/icons.js?v=u10bgate"></script>
-<script defer src="/js/storage.js?v=u10bgate"></script>
-<script defer src="/js/firestore_sync.js?v=u10bgate"></script>
+<script defer src="/js/constants.js?v=u13multi"></script>
+<script defer src="/js/error_autoreport.js?v=u13multi"></script>
+<script defer src="/js/icons.js?v=u13multi"></script>
+<script defer src="/js/storage.js?v=u13multi"></script>
+<script defer src="/js/firestore_sync.js?v=u13multi"></script>
 <script defer src="/js/transcripts_store.js?v=u7bworker"></script>
-<script defer src="/js/api.js?v=u10bgate"></script>
-<script defer src="/js/pptx_parser.js?v=u10bgate"></script>
-<script defer src="/js/quiz.js?v=u10bgate"></script>
-<script defer src="/js/ui.js?v=u10bgate"></script>
-<script defer src="/js/viewers.js?v=u10bgate"></script>
-<script defer src="/js/image_gallery.js?v=u10bgate"></script>
-<script defer src="/js/pipeline.js?v=u10bgate"></script>
-<script defer src="/js/batch.js?v=u10bgate"></script>
-<script defer src="/js/note_creation.js?v=u10bgate"></script>
-<script defer src="/js/notes_crud.js?v=u10bgate"></script>
-<script defer src="/js/notion_viewer.js?v=u10bgate"></script>
-<script defer src="/js/notion_clipboard.js?v=u10bgate"></script>
-<script defer src="/js/folders.js?v=u10bgate"></script>
-<script defer src="/js/exam_plan.js?v=u10bgate"></script>
-<script defer src="/js/srs.js?v=u10bgate"></script>
-<script defer src="/js/timetable.js?v=u10bgate"></script>
-<script defer src="/js/srs_review.js?v=u10bgate"></script>
-<script defer src="/js/home_view.js?v=u10bgate"></script>
+<script defer src="/js/api.js?v=u13multi"></script>
+<script defer src="/js/pptx_parser.js?v=u13multi"></script>
+<script defer src="/js/quiz.js?v=u13multi"></script>
+<script defer src="/js/ui.js?v=u13multi"></script>
+<script defer src="/js/viewers.js?v=u13multi"></script>
+<script defer src="/js/image_gallery.js?v=u13multi"></script>
+<script defer src="/js/pipeline.js?v=u13multi"></script>
+<script defer src="/js/batch.js?v=u13multi"></script>
+<script defer src="/js/note_creation.js?v=u13multi"></script>
+<script defer src="/js/notes_crud.js?v=u13multi"></script>
+<script defer src="/js/notion_viewer.js?v=u13multi"></script>
+<script defer src="/js/notion_clipboard.js?v=u13multi"></script>
+<script defer src="/js/folders.js?v=u13multi"></script>
+<script defer src="/js/exam_plan.js?v=u13multi"></script>
+<script defer src="/js/srs.js?v=u13multi"></script>
+<script defer src="/js/timetable.js?v=u13multi"></script>
+<script defer src="/js/srs_review.js?v=u13multi"></script>
+<script defer src="/js/home_view.js?v=u13multi"></script>
 <script defer src="/js/transcripts_view.js?v=u7bworker"></script>
-<script defer src="/js/bulk.js?v=u10bgate"></script>
-<script defer src="/js/firebase_auth.js?v=u10bgate"></script>
-<script defer src="/js/payment.js?v=u10bgate"></script>
+<script defer src="/js/bulk.js?v=u13multi"></script>
+<script defer src="/js/firebase_auth.js?v=u13multi"></script>
+<script defer src="/js/payment.js?v=u13multi"></script>
 <script defer src="/js/recorder.js?v=u7bworker"></script>
-<script defer src="/js/groups.js?v=u10bgate"></script>
-<script defer src="/js/study_rooms.js?v=u10bgate"></script>
-<script defer src="/js/bug_report.js?v=u10bgate"></script>
-<script defer src="/js/onboarding_tour.js?v=u10bgate"></script>
-<script defer src="/js/main.js?v=u10bgate"></script>
-<script defer src="/js/main_inline.js?v=u10bgate"></script>
+<script defer src="/js/groups.js?v=u13multi"></script>
+<script defer src="/js/study_rooms.js?v=u13multi"></script>
+<script defer src="/js/bug_report.js?v=u13multi"></script>
+<script defer src="/js/onboarding_tour.js?v=u13multi"></script>
+<script defer src="/js/main.js?v=u13multi"></script>
+<script defer src="/js/main_inline.js?v=u13multi"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">
