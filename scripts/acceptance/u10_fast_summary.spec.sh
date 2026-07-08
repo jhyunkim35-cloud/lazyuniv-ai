@@ -56,3 +56,5 @@ assert_contains public/js/pipeline.js "if (badge) badge.hidden = true;" "U10-9d:
 # ── 캐시버스트 (버전 문자열 무관 — 존재만 확인) ──
 assert_matches public/index.html "pipeline\.js\?v=" "U10-10a: pipeline.js 버전 마커 존재"
 assert_matches public/index.html "constants\.js\?v=" "U10-10b: constants.js 버전 마커 존재"
+
+assert_contains public/js/pipeline.js "if (full.length < 15000) return;" "U10b: 드래프트는 긴 소스(청크급)에서만 발동 — 짧은 노트는 스트리밍+검증요약으로 충분"

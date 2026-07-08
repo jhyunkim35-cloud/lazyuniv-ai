@@ -603,7 +603,12 @@ function renderSummaryHeroLayer(bodyEl, layers, key) {
 ═══════════════════════════════════════════════ */
 async function generateQuickSummary(apiKey, pptText, recText) {
   if (_verifiedSummaryDone) return;  // shouldn't fire this early, but cheap guard
-  const src = `${pptText || ''}\n${recText || ''}`.trim().slice(0, 30000);
+  const full = `${pptText || ''}\n${recText || ''}`.trim();
+  // U10b(준현): 노트 본문은 어차피 ~3초부터 실시간 스트리밍되므로, 드래프트 요약은
+  // 완성까지 수 분 걸리는 긴 소스(청크 모드급)에서만 가치가 있다. 짧은 노트는
+  // 검증 요약이 금방 도착 — 드래프트 콜(₩20~40) 생략.
+  if (full.length < 15000) return;
+  const src = full.slice(0, 30000);
   if (!src) return;
   try {
     const raw = (await callClaudeOnce(apiKey,
