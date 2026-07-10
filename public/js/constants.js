@@ -189,6 +189,7 @@ let imageDescriptions  = {};       // slideNumber → description (Mode 2 only)
 let isRunning      = false;      // double-click guard
 let abortController = null;      // cancel support
 let currentNoteId  = null;       // id of the note currently loaded
+let _noteSaveInFlight = false;   // Q5: true while draftSaveNote()'s write is in flight — beforeunload guard
 let _accordionOpenLabels = new Set();
 let _noteDrag      = null;       // active pointer-drag state object
 let _lastGenerationError = '';   // last pipeline error message for debug report

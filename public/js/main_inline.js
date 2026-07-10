@@ -1082,7 +1082,10 @@ document.addEventListener('keydown', e => {
 window.addEventListener('beforeunload', e => {
   // Q2: also warn while a recording/upload/STT job is in flight — recorder.js
   // keeps that state module-scoped, so we go through its exposed getter.
-  if (isRunning || window.recorderIsActive?.()) { e.preventDefault(); e.returnValue = ''; }
+  // Q5: also warn while the post-generation silent draft save is still writing —
+  // by then isRunning is already false, so without this the tab could still
+  // close in the narrow window between "pipeline done" and "draft saved".
+  if (isRunning || window.recorderIsActive?.() || _noteSaveInFlight) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // toggleBulkSelectMode, _updateBulkBar, toggleBulkSelectAll, bulkExportPdf, bulkDeleteSelected moved to /js/bulk.js

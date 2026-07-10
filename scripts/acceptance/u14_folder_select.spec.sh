@@ -13,11 +13,14 @@ assert_contains public/js/batch.js "buildFolderSelectOptions(_batchFoldersCache,
 assert_contains public/js/notes_crud.js "async function promptNoteName(defaultTitle)" "U14-2a: promptNoteName 시그니처 유지"
 assert_contains public/js/notes_crud.js "저장 폴더" "U14-2b: 모달에 '저장 폴더' 라벨"
 assert_contains public/js/notes_crud.js "resolve({ title, folderId: folderSelect.value || null })" "U14-2c: {title, folderId} 반환"
-assert_contains public/js/notes_crud.js "const { title, folderId: chosenFolderId } = await promptNoteName(autoTitle);" "U14-2d: autoSaveNote가 새 반환 형태를 구조분해"
+assert_contains public/js/notes_crud.js "const { title, folderId: chosenFolderId } = await promptNoteName(computeAutoNoteTitle());" "U14-2d: autoSaveNote가 새 반환 형태를 구조분해"
 
 # ── autoSaveNote: 신규 노트는 선택한 폴더로, 기존 노트는 기존 폴더 유지 ──
-assert_contains public/js/notes_crud.js "const isNewNote = !currentNoteId;" "U14-3a: 신규/기존 노트 분기"
-assert_contains public/js/notes_crud.js "folderId:             isNewNote ? chosenFolderId : (await getNoteFS(currentNoteId))?.folderId ?? null," "U14-3b: 신규=선택폴더, 기존=기존폴더 유지"
+# Q5 (2026-07-10): isNewNote now also covers "just finalizing my own silent
+# draft" (isDraftFinalize) — see q5_save_guard.spec.sh — but the underlying
+# new=chosenFolderId / existing=keep-folder rule this guards is unchanged.
+assert_contains public/js/notes_crud.js "const isNewNote = !currentNoteId || isDraftFinalize;" "U14-3a: 신규/기존 노트 분기"
+assert_contains public/js/notes_crud.js "folderId: isNewNote ? chosenFolderId : (await getNoteFS(currentNoteId))?.folderId ?? null," "U14-3b: 신규=선택폴더, 기존=기존폴더 유지"
 assert_contains public/js/notes_crud.js "sortOrder: await getNextSortOrder(chosenFolderId)" "U14-3c: 신규 노트 sortOrder 부여 (moveSavedNote와 동일 방식)"
 
 # ── 다중 모드: 스테이징 폴더 select ──

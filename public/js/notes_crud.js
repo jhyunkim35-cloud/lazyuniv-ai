@@ -1,5 +1,6 @@
 // Notes CRUD: auto-save, list rendering, open/load, Notion file import, delete, move, rename, detect splits.
-// Depends on: constants.js (currentNoteId, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, currentStudyTools, pptFile), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero, renderStudyTools), folders.js (buildFolderSelectOptions).
+// Depends on: constants.js (currentNoteId, _noteSaveInFlight, storedNotesText, storedPptText, storedFilteredText, storedHighlightedTranscript, extractedImages, currentSummaryLayers, currentStudyTools, pptFile, currentUser), storage.js, firestore_sync.js (saveNoteFS, getNoteFS, getAllNotesFS, deleteNoteFS, searchNotesFS, getAllFoldersFS, getStorageSize, getNextSortOrder, saveFolderFS), ui.js (showToast, showSuccessToast), markdown.js (escHtml, renderMarkdown), quiz.js (clearQuizInlineArea), pipeline.js (renderSummaryHero, renderStudyTools), folders.js (buildFolderSelectOptions).
+// Q5: draftSaveNote()/autoSaveNote() are called from note_creation.js right after a single-note pipeline finishes — draftSaveNote() writes a silent draft BEFORE the name/folder modal, autoSaveNote() finalizes it.
 
 /* ═══════════════════════════════════════════════
    Auto-save after pipeline
@@ -47,15 +48,80 @@ async function promptNoteName(defaultTitle) {
   });
 }
 
+// Q5: id of the note draftSaveNote() silently created for the note currently
+// being finalized — lets autoSaveNote() tell "this currentNoteId is my own
+// unconfirmed draft from this same flow" apart from "this is a genuinely
+// pre-existing note the caller opened". Single-use: cleared once consumed.
+let _draftSaveNoteId = null;
+
+function computeAutoNoteTitle() {
+  const slide1Section = storedPptText.match(/\[슬라이드 1\]([\s\S]*?)(?=\[슬라이드 \d+\]|$)/);
+  const slide1Title   = slide1Section?.[1].match(/^제목: (.+)/m)?.[1].trim();
+  const headingMatch  = storedNotesText.match(/^#\s+(.+)/m);
+  const headingTitle  = headingMatch?.[1].replace(/\*\*/g, '').trim();
+  const fileTitle     = pptFile?.name?.replace(/\.[^.]+$/, '') || document.getElementById('pptTagName')?.textContent || '새 노트';
+  return slide1Title || headingTitle || fileTitle;
+}
+
+// Q5: shared field-set for both draftSaveNote() and autoSaveNote() so the two
+// saves (silent draft, then user-confirmed finalize) can't drift out of sync
+// when a field gets added to notes later.
+function buildNoteSaveFields({ title, folderId }) {
+  const notesHtml = document.getElementById('finalNotesBody')?.innerHTML || '';
+  // Phase 3B-4: pick up the most-recent recorder audio path so the note
+  // doc knows which Storage object backs it. Cleared by the caller after a
+  // successful save so the path doesn't leak into the next unrelated note.
+  const audioStoragePath = window.recorderLastAudioPath || null;
+  return {
+    title,
+    folderId,
+    notesText:            storedNotesText,
+    notesHtml,
+    pptText:              storedPptText,
+    filteredText:         storedFilteredText,
+    highlightedTranscript: storedHighlightedTranscript,
+    extractedImages:      extractedImages,
+    audioStoragePath:     audioStoragePath,
+    summaryLayers:        currentSummaryLayers || null,  // R4: multilayer summary (한줄/핵심/문단/챕터)
+    studyTools:           currentStudyTools || null,     // R8+R9: 마인드맵/암기/개념
+  };
+}
+
+// Q5: silent draft save — called right after the pipeline finishes, BEFORE
+// the name/folder modal shows. Writes the note under its auto-generated
+// title into 미분류 so a tab close/crash between "generation done" and "user
+// confirmed the modal" can't lose the note outright — worst case it survives
+// under the auto title. autoSaveNote() finalizes this same note id right
+// after (title/folder from the modal), or the auto title stands forever if
+// the user never confirms.
+async function draftSaveNote() {
+  if (!storedNotesText || !storedNotesText.trim()) return; // ghost-note guard — same rule as autoSaveNote
+  _noteSaveInFlight = true;
+  let record;
+  try {
+    const fields = buildNoteSaveFields({ title: computeAutoNoteTitle(), folderId: null });
+    record = await saveNoteFS(Object.assign(fields, { sortOrder: await getNextSortOrder(null) }));
+  } catch (e) {
+    console.error('[draftSaveNote] failed:', e);
+    return;
+  } finally {
+    _noteSaveInFlight = false;
+  }
+  currentNoteId    = record.id;
+  _draftSaveNoteId = record.id;
+  // ponytail: best-effort — rehydrate extractedImages to the already-uploaded
+  // URL shape so the autoSaveNote() finalize save right after this doesn't
+  // re-upload the same slide images to Storage a second time. A failure here
+  // just costs one harmless re-upload on finalize, not data loss.
+  if (currentUser && extractedImages && extractedImages.length) {
+    const hydrated = await getNoteFS(record.id).catch(() => null);
+    if (hydrated?.extractedImages) extractedImages = hydrated.extractedImages;
+  }
+}
+
 async function autoSaveNote() {
   try {
-    const slide1Section    = storedPptText.match(/\[슬라이드 1\]([\s\S]*?)(?=\[슬라이드 \d+\]|$)/);
-    const slide1Title      = slide1Section?.[1].match(/^제목: (.+)/m)?.[1].trim();
-    const headingMatch     = storedNotesText.match(/^#\s+(.+)/m);
-    const headingTitle     = headingMatch?.[1].replace(/\*\*/g, '').trim();
-    const fileTitle        = pptFile?.name?.replace(/\.[^.]+$/, '') || document.getElementById('pptTagName')?.textContent || '새 노트';
-    const autoTitle        = slide1Title || headingTitle || fileTitle;
-    const { title, folderId: chosenFolderId } = await promptNoteName(autoTitle);
+    const { title, folderId: chosenFolderId } = await promptNoteName(computeAutoNoteTitle());
     // GUARD: prevent ghost notes — both title and content must be non-empty
     const _titleOk = title && title.trim();
     const _contentOk = storedNotesText && storedNotesText.trim();
@@ -63,33 +129,30 @@ async function autoSaveNote() {
       console.warn('[autoSaveNote] skipped empty note save', { titleOk: !!_titleOk, contentOk: !!_contentOk });
       return;
     }
-    const notesHtml = document.getElementById('finalNotesBody')?.innerHTML || '';
-    // Phase 3B-4: pick up the most-recent recorder audio path so the note
-    // doc knows which Storage object backs it. Cleared after save so the
-    // path doesn't leak into the next unrelated note.
-    const audioStoragePath = window.recorderLastAudioPath || null;
-    // U14: new notes save straight into the chosen folder (with a sortOrder,
-    // same as the moveSavedNote path, so it doesn't get stuck at Infinity
-    // vs manually-ordered notes already in that folder). Existing notes keep
-    // whatever folder they're already in — this modal doesn't move them.
-    const isNewNote = !currentNoteId;
-    const record = await saveNoteFS({
-      id:                   currentNoteId || undefined,
+    // Q5: draftSaveNote() (called just before this, right after the pipeline
+    // finished) may have already silently saved this exact note under its
+    // auto title. If so, finalize IN PLACE — same id, folderId now follows
+    // the user's modal choice — instead of the "existing note keeps its
+    // folder" rule below, which is for genuinely pre-existing notes that
+    // this modal doesn't move.
+    const isDraftFinalize = !!currentNoteId && currentNoteId === _draftSaveNoteId;
+    // U14: new notes (including a just-finalized draft) save straight into
+    // the chosen folder (with a sortOrder, same as the moveSavedNote path,
+    // so it doesn't get stuck at Infinity vs manually-ordered notes already
+    // in that folder). Genuinely existing notes keep whatever folder
+    // they're already in — this modal doesn't move them.
+    const isNewNote = !currentNoteId || isDraftFinalize;
+    const fields = buildNoteSaveFields({
       title,
-      folderId:             isNewNote ? chosenFolderId : (await getNoteFS(currentNoteId))?.folderId ?? null,
-      ...(isNewNote ? { sortOrder: await getNextSortOrder(chosenFolderId) } : {}),
-      notesText:            storedNotesText,
-      notesHtml,
-      pptText:              storedPptText,
-      filteredText:         storedFilteredText,
-      highlightedTranscript: storedHighlightedTranscript,
-      extractedImages:      extractedImages,
-      audioStoragePath:     audioStoragePath,
-      summaryLayers:        currentSummaryLayers || null,  // R4: multilayer summary (한줄/핵심/문단/챕터)
-      studyTools:           currentStudyTools || null,     // R8+R9: 마인드맵/암기/개념
+      folderId: isNewNote ? chosenFolderId : (await getNoteFS(currentNoteId))?.folderId ?? null,
     });
-    if (audioStoragePath) window.recorderLastAudioPath = null;
-    currentNoteId = record.id;
+    const record = await saveNoteFS(Object.assign(fields, {
+      id: currentNoteId || undefined,
+      ...(isNewNote ? { sortOrder: await getNextSortOrder(chosenFolderId) } : {}),
+    }));
+    if (fields.audioStoragePath) window.recorderLastAudioPath = null;
+    currentNoteId    = record.id;
+    _draftSaveNoteId = null;
     showSuccessToast('💾 저장 완료');
     renderHomeView();
   } catch (e) {

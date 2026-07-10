@@ -1,5 +1,5 @@
 // Single-note analysis flow — analyzeBtn handler body.
-// Depends on: constants.js (pptFile, imageFiles, txtFiles, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, extractedImages, currentUser, isRunning, abortController, _batchRunning, _batchProgress, _batchBuddyVisible, _currentView, _notesCollapsed, resultsEl, analyzeBtn, quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn, REC_ORDINALS, _lastGenerationError, debugLog), pptx_parser.js (extractImagesText, U8), image_gallery.js (renderImageGallery), ui.js, pipeline.js (runAgentPipeline), firestore_sync.js (autoSaveNote), payment.js (canAnalyze, showPaymentModal).
+// Depends on: constants.js (pptFile, imageFiles, txtFiles, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, extractedImages, currentUser, isRunning, abortController, _batchRunning, _batchProgress, _batchBuddyVisible, _currentView, _notesCollapsed, resultsEl, analyzeBtn, quizBtn, classifyBtn, notionCopyBtn, dlNotionFileBtn, copyNotesBtn, dlTxtBtn, dlMdBtn, dlPdfBtn, splitViewBtn, REC_ORDINALS, _lastGenerationError, debugLog), pptx_parser.js (extractImagesText, U8), image_gallery.js (renderImageGallery), ui.js, pipeline.js (runAgentPipeline), notes_crud.js (draftSaveNote, autoSaveNote), payment.js (canAnalyze, showPaymentModal).
 
 async function runSingleNoteAnalysis() {
   if (!currentUser) { showToast('🔑 로그인 후 이용할 수 있습니다.'); return; }
@@ -148,7 +148,13 @@ async function runSingleNoteAnalysis() {
       updateBatchBuddy();
     }
 
-    // Auto-save to IndexedDB
+    // Q5: silent draft save FIRST — before the name/folder modal — so a tab
+    // close between "generation done" and "user confirmed the modal" can't
+    // lose the note (worst case: it survives under the auto title in
+    // 미분류). autoSaveNote() then finalizes the SAME note id with the
+    // user's chosen title/folder (or keeps the auto title on cancel —
+    // unchanged prior behavior).
+    await draftSaveNote().catch(e => console.error('draftSaveNote:', e));
     autoSaveNote().catch(e => { console.error('autoSaveNote:', e); showToast(`❌ 자동 저장 실패: ${e.message}`); });
     // Usage is now incremented server-side by /api/claude on first call.
 
