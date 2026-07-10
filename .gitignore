@@ -23,3 +23,8 @@ worker/.venv/
 worker/*.wav
 worker/serviceAccount.json
 __pycache__/
+
+# U7b diarization eval set — synthesized audio + raw downloads are
+# reproducible from build_evalset.py; keep only the .py/.rttm/.json.
+worker/evalset/*.wav
+worker/evalset/raw/

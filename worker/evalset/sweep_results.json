@@ -1,0 +1,2702 @@
+[
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1567,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1575,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv1",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1581,
+  "speakers": 2
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1844,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1843,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1832,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1844,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1843,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1832,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1844,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1843,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1832,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1844,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1843,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1832,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1844,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.181,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1843,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1809,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1832,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv2",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.1798,
+  "speakers": 3
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1995,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1975,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1995,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1975,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1995,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1975,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1995,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1975,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1995,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.204,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2042,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.1975,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv3",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2017,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2208,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2201,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2185,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3795,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.5,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3795,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2208,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2201,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2185,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3795,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.55,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3795,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2208,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2201,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3818,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2185,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.3795,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.6,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.3795,
+  "speakers": 5
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2208,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2214,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2214,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2201,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2206,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2206,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2185,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2188,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.65,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2188,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2208,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2214,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.0
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2214,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2201,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2206,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.1
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2206,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.04,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2185,
+  "speakers": 3
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.07,
+    "Fb": 0.8
+   }
+  },
+  "der": 0.2188,
+  "speakers": 4
+ },
+ {
+  "conv": "conv4",
+  "params": {
+   "segmentation": {
+    "min_duration_off": 0.2
+   },
+   "clustering": {
+    "threshold": 0.7,
+    "Fa": 0.1,
+    "Fb": 1.1
+   }
+  },
+  "der": 0.2188,
+  "speakers": 4
+ }
+]

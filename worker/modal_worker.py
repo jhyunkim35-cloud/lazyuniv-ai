@@ -43,6 +43,13 @@ MERGE_GAP_S = 0.5
 MAX_TURNS = 5000
 RECLAIM_HOURS = 3
 
+# Keep in sync with diarize_worker.TUNED_PARAMS — see that comment for the
+# sweep evidence (U7d, 2026-07-11).
+TUNED_PARAMS = {
+    'segmentation': {'min_duration_off': 0.0},
+    'clustering': {'threshold': 0.65, 'Fa': 0.07, 'Fb': 0.8},
+}
+
 
 def _db():
     import firebase_admin
@@ -143,6 +150,7 @@ def diarize_job(job_id: str):
         pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-community-1',
                                             token=os.environ['HF_TOKEN'])
         pipeline.to(torch.device('cuda'))
+        pipeline.instantiate(TUNED_PARAMS)
         output = pipeline({'waveform': waveform, 'sample_rate': 16000})
         hf_cache.commit()
 

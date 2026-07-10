@@ -80,6 +80,17 @@ def _load_hf_token():
 
 HF_TOKEN = _load_hf_token()
 
+# U7d sweep (worker/evalset, 2026-07-11): clustering.threshold 0.6→0.65 cut
+# mean DER 23.1%→19.1% on the synthetic Korean dev set — the entire gain is
+# on the overlap-heavy conversation (38.2%→22.1%, over-split 5→4 speakers) —
+# and holds speaker counts on real audio (매불쇼 3, 세바시 1). Other knobs
+# (Fa 0.04, min_duration_off) looked good on synthetic but ATE a real speaker
+# → rejected. Re-derive with evalset/modal_sweep.py before changing.
+TUNED_PARAMS = {
+    'segmentation': {'min_duration_off': 0.0},
+    'clustering': {'threshold': 0.65, 'Fa': 0.07, 'Fb': 0.8},
+}
+
 
 def init_firebase():
     if not firebase_admin._apps:
@@ -101,7 +112,8 @@ def get_pipeline():
         from pyannote.audio import Pipeline
         print('[worker] loading pyannote/speaker-diarization-community-1 ...')
         _pipeline = Pipeline.from_pretrained('pyannote/speaker-diarization-community-1', token=HF_TOKEN)
-        print('[worker] pipeline loaded')
+        _pipeline.instantiate(TUNED_PARAMS)
+        print('[worker] pipeline loaded (tuned)')
     return _pipeline
 
 
