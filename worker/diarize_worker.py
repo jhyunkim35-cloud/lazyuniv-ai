@@ -31,6 +31,19 @@ from firebase_admin import credentials, firestore
 # it's not a TTY, which hid job-completion lines during the loopback test.
 print = functools.partial(print, flush=True)
 
+
+# Block idle-sleep while a job is diarizing (a 65-min lecture froze for 3+
+# hours overnight when the laptop slept mid-job). Only holds during active
+# processing — idle polling lets the machine sleep normally. Windows only;
+# doesn't stop lid-close sleep, just idle timeout.
+def keep_awake(on):
+    if os.name != 'nt':
+        return
+    import ctypes
+    ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+    ctypes.windll.kernel32.SetThreadExecutionState(
+        ES_CONTINUOUS | (ES_SYSTEM_REQUIRED if on else 0))
+
 # ── Config ───────────────────────────────────────────────────────────────
 HERE = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_JSON = os.environ.get('SERVICE_ACCOUNT_JSON', os.path.join(HERE, 'serviceAccount.json'))
@@ -217,6 +230,7 @@ def postprocess_turns(turns):
 def process_job(db, job_id, job):
     t0 = time.time()
     tmp_dir = tempfile.mkdtemp(prefix='notyx_diar_')
+    keep_awake(True)
     try:
         src = download_audio(job['audioUrl'], tmp_dir)
         t_dl = time.time()
@@ -251,6 +265,7 @@ def process_job(db, job_id, job):
         except Exception as e2:
             print('[worker] {} could not write failure status: {}'.format(job_id, e2))
     finally:
+        keep_awake(False)
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
