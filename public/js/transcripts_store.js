@@ -22,6 +22,9 @@
 //     diarizationJobId: string | null  (U7b: set when delivered before the
 //                        local diarization worker finished — transcripts_view.js
 //                        polls ?action=labels once and clears this on upgrade)
+//     speakerNames:  { [speakerNum: string]: string }  (U15: display-only
+//                        rename map, e.g. {"1":"교수님"} — stored text keeps
+//                        "발화자 N:" untouched)
 //   }
 //
 // Firestore single-doc 1MB limit: Korean text averages ~3 bytes/char in
@@ -141,6 +144,17 @@ async function applyDiarizationLabelsFS(id, { text, charCount }) {
   return patch;
 }
 
+// U15: display-time speaker-name mapping (e.g. {"1":"교수님"}) — does NOT
+// touch the stored transcript text (labels stay "발화자 N:" in storage).
+// Consumers apply the mapping at render/consume time (transcripts_view.js).
+async function saveSpeakerNamesFS(id, speakerNames) {
+  const ref = userTranscriptsRef();
+  if (!ref || !id) return null;
+  const patch = { speakerNames: speakerNames || {}, updatedAt: new Date().toISOString() };
+  await ref.doc(id).update(patch);
+  return patch;
+}
+
 // Attach a transcript to a note (for "used in" tracking). Best-effort.
 async function markTranscriptUsedInNote(transcriptId, noteId) {
   const ref = userTranscriptsRef();
@@ -162,5 +176,6 @@ window.getTranscriptFS          = getTranscriptFS;
 window.deleteTranscriptFS       = deleteTranscriptFS;
 window.renameTranscriptFS       = renameTranscriptFS;
 window.applyDiarizationLabelsFS = applyDiarizationLabelsFS;
+window.saveSpeakerNamesFS       = saveSpeakerNamesFS;
 window.markTranscriptUsedInNote = markTranscriptUsedInNote;
 window.defaultTranscriptTitle   = defaultTranscriptTitle;

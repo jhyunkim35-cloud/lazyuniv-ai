@@ -20,7 +20,7 @@ async function getPdfjsLib() {
 /* ═══════════════════════════════════════════════
    File handling
 ═══════════════════════════════════════════════ */
-const IMAGE_UPLOAD_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+const IMAGE_UPLOAD_EXTS = ['.jpg', '.jpeg', '.png', '.webp', '.heic'];
 function isImageUploadFile(file) {
   const name = file.name.toLowerCase();
   return IMAGE_UPLOAD_EXTS.some(ext => name.endsWith(ext));
@@ -45,7 +45,7 @@ async function onPptChange(files) {
   if (list.length > 1) {
     // Multiple files selected → document slot only supports this for images.
     if (!list.every(isImageUploadFile)) {
-      showToast('⚠️ 여러 파일을 한 번에 올리려면 모두 이미지(.jpg, .png, .webp)여야 합니다.');
+      showToast('⚠️ 여러 파일을 한 번에 올리려면 모두 이미지(.jpg, .png, .webp, .heic)여야 합니다.');
       return;
     }
     if (list.length > MAX_IMAGE_UPLOAD_COUNT) {
@@ -79,7 +79,7 @@ async function onPptChange(files) {
 
   const name = file.name.toLowerCase();
   if (!name.endsWith('.pptx') && !name.endsWith('.pdf') && !name.endsWith('.docx')) {
-    showToast('⚠️ .pptx, .pdf, .docx 또는 이미지(.jpg, .png, .webp) 파일만 업로드할 수 있습니다.');
+    showToast('⚠️ .pptx, .pdf, .docx 또는 이미지(.jpg, .png, .webp, .heic) 파일만 업로드할 수 있습니다.');
     return;
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -334,7 +334,10 @@ function setupDrop(zoneId, handler) {
   zone.addEventListener('drop', e => {
     e.preventDefault();
     zone.classList.remove('drag-over');
-    if (e.dataTransfer.files[0]) handler(e.dataTransfer.files[0]);
+    // U15: pass the whole FileList (not just files[0]) so multi-image drops
+    // work the same as the file picker's multi-select. Only call site today
+    // is pptZone/onPptChange, which already accepts a FileList (U8).
+    if (e.dataTransfer.files.length) handler(e.dataTransfer.files);
   });
 }
 
@@ -886,10 +889,38 @@ async function extractPdfPageImages(file) {
    unchanged. Single-note only; see note_creation.js. */
 const IMAGE_VISION_BATCH_SIZE = 4;   // images per vision call, matches image_gallery.js content-array style
 
+// ponytail: HEIC decodes natively in Safari but throws in Chrome/Firefox —
+// lazy-load the tiny converter only on first HEIC failure, cached after that
+// (no CSP restrictions here, same pattern as the jsDelivr lucide-icons load).
+let _heic2anyLoad = null;
+function loadHeic2Any() {
+  if (window.heic2any) return Promise.resolve(window.heic2any);
+  if (_heic2anyLoad) return _heic2anyLoad;
+  _heic2anyLoad = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+    script.onload = () => resolve(window.heic2any);
+    script.onerror = () => reject(new Error('HEIC 변환 도구 로드 실패'));
+    document.head.appendChild(script);
+  });
+  return _heic2anyLoad;
+}
+
 /* Downscale to Anthropic's ~1568px long-edge sweet spot before base64 —
    uploaded phone photos can be several MB / 4000px+ otherwise. */
 async function downscaleImageForVision(file, maxEdge = 1568) {
-  const bitmap = await createImageBitmap(file);
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch (e) {
+    // HEIC (iPhone photos): createImageBitmap fails outside Safari — convert
+    // to JPEG via heic2any and retry once. Any other failure (or a failed
+    // conversion) rethrows and the caller's per-image salvage handles it.
+    if (!file.name.toLowerCase().endsWith('.heic')) throw e;
+    const heic2any = await loadHeic2Any();
+    const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+    bitmap = await createImageBitmap(Array.isArray(converted) ? converted[0] : converted);
+  }
   try {
     const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
     const w = Math.max(1, Math.round(bitmap.width * scale));

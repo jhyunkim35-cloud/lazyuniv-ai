@@ -12,7 +12,7 @@ assert_contains public/js/pipeline.js "const hasPpt2 = pptText && pptText.trim()
 
 assert_contains public/js/pptx_parser.js "async function extractDocxText(file)" "U1-4a: extractDocxText 함수 존재 (JSZip으로 word/document.xml 파싱)"
 assert_contains public/js/pptx_parser.js "if (name.endsWith('.docx')) return extractDocxText(file);" "U1-4b: extractPresentationText가 .docx를 extractDocxText로 디스패치"
-assert_contains public/index.html 'id="pptInput" accept=".pptx,.pdf,.docx,.jpg,.jpeg,.png,.webp" multiple' "U1-4c: 단일 모드 pptInput accept에 .docx 포함 (U8: 이미지 확장자 + multiple 추가)"
+assert_contains public/index.html 'id="pptInput" accept=".pptx,.pdf,.docx,.jpg,.jpeg,.png,.webp,.heic" multiple' "U1-4c: 단일 모드 pptInput accept에 .docx 포함 (U8: 이미지 확장자 + multiple 추가, U15: .heic 추가)"
 assert_contains public/index.html 'id="batchPptInput" accept=".pptx,.pdf,.docx"' "U1-4d: 배치 모드 batchPptInput accept에 .docx 포함"
 
 assert_contains public/index.html 'id="pasteMemoBtn"' "U1-5a: 텍스트 붙여넣기 버튼이 녹취록 업로드 영역에 존재"

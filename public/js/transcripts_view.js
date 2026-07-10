@@ -5,7 +5,7 @@
 //   2. Preview modal (lazy-built singleton) — opens when a card is clicked
 //
 // Depends on: transcripts_store.js (saveTranscriptFS / getAllTranscriptsFS /
-//   getTranscriptFS / deleteTranscriptFS / renameTranscriptFS),
+//   getTranscriptFS / deleteTranscriptFS / renameTranscriptFS / saveSpeakerNamesFS),
 //   ui.js (showToast, switchView), markdown.js (escHtml), constants.js
 //   (currentUser).
 //
@@ -249,11 +249,14 @@
   }
 
   function useTranscriptForNewNote(t) {
-    const text = t.text || '';
-    if (!text) {
+    const raw = t.text || '';
+    if (!raw) {
       window.showToast?.('녹취록 내용이 없습니다.');
       return;
     }
+    // U15: apply the display-only speaker-name mapping so the pipeline sees
+    // "교수님:" instead of "발화자 1:" too — stored text itself stays untouched.
+    const text = applySpeakerNames(raw, t.speakerNames);
     const safeName = (t.title || 'transcript').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
     const file = new File([text], safeName + '.txt', { type: 'text/plain' });
     hidePreviewModal();
@@ -298,6 +301,7 @@
           <div class="transcript-preview-title-wrap">
             <div id="transcriptPreviewTitle" class="transcript-preview-title">제목</div>
             <div id="transcriptPreviewMeta" class="transcript-preview-meta"></div>
+            <button id="transcriptSpeakerRenameBtn" style="display:none;margin-top:0.4rem;font-size:0.78rem;padding:0.28rem 0.7rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;">🏷 발화자 이름 바꾸기</button>
           </div>
           <button id="transcriptPreviewCloseBtn" class="transcript-preview-close" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </header>
@@ -338,6 +342,9 @@
     document.getElementById('transcriptPreviewDeleteBtn').addEventListener('click', () => {
       const t = currentTranscript(); if (t) confirmDeleteTranscript(t);
     });
+    document.getElementById('transcriptSpeakerRenameBtn').addEventListener('click', () => {
+      const t = currentTranscript(); if (t) openSpeakerRenameModal(t);
+    });
 
     // Esc to close
     document.addEventListener('keydown', (e) => {
@@ -372,8 +379,12 @@
     // Render as preformatted text — preserves paragraph breaks from the
     // STT output without trying to interpret it as markdown. Speaker-label
     // prefixes ("[hh:mm:ss] 발화자 N:") get minimal emphasis so multi-speaker
-    // transcripts scan by speaker.
-    renderTranscriptPreviewBody(t.text || '');
+    // transcripts scan by speaker, and any saved speakerNames mapping (U15)
+    // swaps in the custom name at display time only.
+    renderTranscriptPreviewBody(t.text || '', t.speakerNames);
+
+    const renameBtn = document.getElementById('transcriptSpeakerRenameBtn');
+    if (renameBtn) renameBtn.style.display = hasSpeakerLabels(t.text || '') ? '' : 'none';
 
     _previewEl.classList.remove('hidden');
 
@@ -384,17 +395,101 @@
     if (t.diarizationJobId) checkDiarizationLabels(t);
   }
 
-  function renderTranscriptPreviewBody(rawText) {
+  // ── U15: speaker rename (display-time only) ─────────────
+  // Detects "발화자 N:" / "참석자 N:" labels (optionally "[hh:mm:ss] " prefixed).
+  const SPEAKER_LABEL_RE = /(발화자|참석자)\s*(\d+)\s*:/;
+  function hasSpeakerLabels(text) {
+    return SPEAKER_LABEL_RE.test(text || '');
+  }
+  function extractSpeakerNumbers(text) {
+    const re = new RegExp(SPEAKER_LABEL_RE, 'g');
+    const nums = new Set();
+    let m;
+    while ((m = re.exec(text || ''))) nums.add(m[2]);
+    return [...nums].sort((a, b) => Number(a) - Number(b));
+  }
+  // Rewrites "발화자 N:" / "참석자 N:" into "<name>:" for every mapped N —
+  // used when handing transcript text off to the note pipeline. Never
+  // mutates/persists the source text itself.
+  function applySpeakerNames(text, speakerNames) {
+    if (!text || !speakerNames || !Object.keys(speakerNames).length) return text;
+    let out = text;
+    for (const [num, name] of Object.entries(speakerNames)) {
+      if (!name) continue;
+      // replacer function — a literal `$` in the name must not trigger $-pattern expansion
+      out = out.replace(new RegExp(`(발화자|참석자)\\s*${num}\\s*:`, 'g'), () => `${name}:`);
+    }
+    return out;
+  }
+
+  function renderTranscriptPreviewBody(rawText, speakerNames) {
     const bodyEl = document.getElementById('transcriptPreviewBody');
     if (!bodyEl) return;
     if (typeof escHtml === 'function') {
       bodyEl.innerHTML = escHtml(rawText).replace(
-        /(^|\n)((?:\[[\d:]+\]\s*)?(?:발화자|참석자)\s*\d+\s*:)/g,
-        (m, br, label) => `${br}<span style="color:var(--primary,#7c4dff);font-weight:600">${label}</span>`
+        /(^|\n)((?:\[[\d:]+\]\s*)?(발화자|참석자)\s*(\d+)\s*:)/g,
+        (m, br, label, kind, num) => {
+          const custom = speakerNames && speakerNames[num];
+          const display = custom
+            ? label.replace(new RegExp(`${kind}\\s*${num}\\s*:`), () => `${escHtml(custom)}:`)
+            : label;
+          return `${br}<span style="color:var(--primary,#7c4dff);font-weight:600">${display}</span>`;
+        }
       );
     } else {
       bodyEl.textContent = rawText;
     }
+  }
+
+  // Small modal (reuses .db-modal pattern) — one text input per distinct
+  // speaker number found in the transcript text, prefilled from any
+  // previously-saved mapping.
+  function openSpeakerRenameModal(t) {
+    const nums = extractSpeakerNumbers(t.text || '');
+    if (!nums.length) return;
+    const existing = t.speakerNames || {};
+
+    const overlay = document.createElement('div');
+    overlay.className = 'db-modal-overlay';
+    overlay.innerHTML = `
+      <div class="db-modal" style="max-width:420px;">
+        <h3>🏷 발화자 이름 바꾸기</h3>
+        <div class="db-modal-list">
+          ${nums.map(n => `
+            <div class="db-modal-row" style="flex-direction:column;align-items:stretch;gap:0.3rem;">
+              <span>발화자 ${n} →</span>
+              <input type="text" data-speaker-num="${n}" value="${escHtml(existing[n] || '')}" placeholder="예: 교수님" style="padding:0.4rem 0.6rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:0.85rem;box-sizing:border-box;" />
+            </div>
+          `).join('')}
+        </div>
+        <div class="db-modal-footer" style="justify-content:flex-end;">
+          <button id="speakerRenameCancel" style="background:var(--surface3);color:var(--text);border:1px solid var(--border);">취소</button>
+          <button id="speakerRenameOk">저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#speakerRenameCancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('#speakerRenameOk').addEventListener('click', async () => {
+      const speakerNames = {};
+      overlay.querySelectorAll('input[data-speaker-num]').forEach(inp => {
+        const v = inp.value.trim();
+        if (v) speakerNames[inp.dataset.speakerNum] = v;
+      });
+      try {
+        await saveSpeakerNamesFS(t.id, speakerNames);
+        t.speakerNames = speakerNames;
+        if (_previewEl?._currentTranscript?.id === t.id) _previewEl._currentTranscript.speakerNames = speakerNames;
+        renderTranscriptPreviewBody(t.text || '', speakerNames);
+        window.showToast?.('✅ 발화자 이름이 저장되었습니다.');
+        close();
+      } catch (e) {
+        console.error('[speakerRename] failed:', e);
+        window.showToast?.('❌ 저장에 실패했습니다.');
+      }
+    });
   }
 
   async function checkDiarizationLabels(t) {
@@ -417,7 +512,9 @@
       // Re-render only if this transcript's preview is still the one open.
       const titleEl = document.getElementById('transcriptPreviewTitle');
       if (titleEl && titleEl.dataset.transcriptId === t.id) {
-        renderTranscriptPreviewBody(j.text);
+        renderTranscriptPreviewBody(j.text, t.speakerNames);
+        const renameBtn = document.getElementById('transcriptSpeakerRenameBtn');
+        if (renameBtn) renameBtn.style.display = hasSpeakerLabels(j.text) ? '' : 'none';
       }
       window.showToast?.('화자 라벨이 적용되었습니다');
     } catch (e) {

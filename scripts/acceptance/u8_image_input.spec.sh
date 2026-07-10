@@ -4,7 +4,7 @@
 # 그대로 동작하는지 잠금.
 
 # ── 입력: accept + multiple ──
-assert_contains public/index.html 'id="pptInput" accept=".pptx,.pdf,.docx,.jpg,.jpeg,.png,.webp" multiple' "U8-1a: pptInput accept에 이미지 확장자 포함 + multiple 속성"
+assert_contains public/index.html 'id="pptInput" accept=".pptx,.pdf,.docx,.jpg,.jpeg,.png,.webp,.heic" multiple' "U8-1a: pptInput accept에 이미지 확장자 포함 + multiple 속성 (U15: .heic 추가)"
 assert_contains public/js/main_inline.js "if (e.target.files.length) onPptChange(e.target.files);" "U8-1b: pptInput change 핸들러가 FileList 전체를 onPptChange에 전달"
 
 # ── 상태: imageFiles ──
