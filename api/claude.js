@@ -97,6 +97,9 @@ const ALLOWED_ORIGINS = [
 ];
 
 const DEVELOPER_EMAILS = ['jhyun.kim35@gmail.com'];
+// U16: 월정액 공정사용 상한 — 노트 분석 100회/월. 원가(₩80~130/노트) 기준
+// 최악 케이스도 ₩7,900 이내가 되는 값. 초과 시 클라에 monthly_fairuse로 응답.
+const MONTHLY_FAIRUSE_CAP = 100;
 
 // Server-side quota gate. Returns { allowed, reason?, uid?, slot?, email? }
 async function checkQuota(idToken) {
@@ -132,17 +135,22 @@ async function checkQuota(idToken) {
   const data = snap.exists ? snap.data() : {};
 
   const now = new Date();
-
-  // Monthly plan with valid expiry — unlimited
+  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const monthCount = (data.usage && data.usage[monthKey]) || 0;
   const plan = data.plan || 'free';
   const planExpiry = data.planExpiry ? new Date(data.planExpiry) : null;
+
+  // Monthly plan with valid expiry — fair-use cap (U16).
+  // 실측 원가 노트당 ~₩80~130 all-in: 무제한 방치 시 월 62노트부터 ₩7,900 역마진.
+  // 100/월(하루 3.3개)이면 최악 케이스도 원가 ≤ 매출 — 정상 사용자는 체감 불가.
   if (plan === 'monthly' && planExpiry && planExpiry > now) {
-    return { allowed: true, uid, email, slot: 'monthly' };
+    if (monthCount < MONTHLY_FAIRUSE_CAP) {
+      return { allowed: true, uid, email, slot: 'monthly', monthKey };
+    }
+    return { allowed: false, reason: 'monthly_fairuse', uid, email, monthCount };
   }
 
   // Free tier — 3 per month
-  const monthKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  const monthCount = (data.usage && data.usage[monthKey]) || 0;
   if (monthCount < 3) {
     return { allowed: true, uid, email, slot: 'free', monthKey };
   }
@@ -314,6 +322,8 @@ module.exports = async (req, res) => {
       if (!quota.allowed) {
         const message = quota.reason === 'quota_exceeded'
           ? '월 무료 한도(3회)를 초과했습니다.'
+          : quota.reason === 'monthly_fairuse'
+          ? '이번 달 공정 사용 한도(노트 100회)에 도달했습니다. 다음 달에 초기화됩니다.'
           : (quota.reason === 'invalid_token' || quota.reason === 'missing_token'
             ? '인증이 필요합니다. 다시 로그인 후 시도해주세요.'
             : '서버 설정 오류입니다. 관리자에게 문의해주세요.');
@@ -394,10 +404,12 @@ module.exports = async (req, res) => {
             slot: quota.slot,
           });
 
-          if (quota.slot === 'developer' || quota.slot === 'monthly') return;
+          if (quota.slot === 'developer') return;
 
           const userRef = admin.firestore().collection('users').doc(uid);
-          if (quota.slot === 'free' && quota.monthKey) {
+          // U16: monthly counts into the same usage[monthKey] as free — the
+          // fair-use cap in checkQuota reads this counter.
+          if ((quota.slot === 'free' || quota.slot === 'monthly') && quota.monthKey) {
             tx.set(
               userRef,
               { usage: { [quota.monthKey]: admin.firestore.FieldValue.increment(1) } },
@@ -414,9 +426,9 @@ module.exports = async (req, res) => {
       } else if (ctx.mode === 'legacy') {
         // Old isFirstCall path — keep working for any client that hasn't
         // been updated to send analysisId yet.
-        if (ctx.slot === 'developer' || ctx.slot === 'monthly') return;
+        if (ctx.slot === 'developer') return;
         const ref = admin.firestore().collection('users').doc(ctx.uid);
-        if (ctx.slot === 'free' && ctx.monthKey) {
+        if ((ctx.slot === 'free' || ctx.slot === 'monthly') && ctx.monthKey) {
           await ref.set(
             { usage: { [ctx.monthKey]: admin.firestore.FieldValue.increment(1) } },
             { merge: true }
