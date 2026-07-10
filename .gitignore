@@ -22,3 +22,4 @@ index_new.html
 worker/.venv/
 worker/*.wav
 worker/serviceAccount.json
+__pycache__/
