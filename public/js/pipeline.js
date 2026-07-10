@@ -1,6 +1,16 @@
 // Agent pipeline orchestration, note writers, critic.
 // Depends on: constants.js (analyzeBtn, storedPptText, storedFilteredText, storedNotesText, storedHighlightedTranscript, currentNoteId, currentSummaryLayers, currentStudyTools, DONE_SIGNAL, MAX_ITERATIONS, MAX_TOKENS_NOTES, MAX_TOKENS_CRITIQUE, iterChipData, debugLog), markdown.js (renderMarkdown, escHtml, citeChip), api.js (callClaudeOnce, callClaudeStream), ui.js (agentLog, setProgress, setAgentNode, resetAgentNodes, makeAgentDot, updateIterCounter, addIterChip, updateETA, startElapsedTimer, stopElapsedTimer, showToast, showSuccessToast), firestore_sync.js (getNoteFS, saveNoteFS).
 
+// Fix 6 (Q3): agent1's full instructions live inside its cached user-content
+// block; every agent1 call passes this minimal string as `system` instead.
+// U12: module-scoped (was local to agent1_writeNotes) — the cached-critic path
+// must send a byte-identical system or agent1's cache entry never matches.
+const MINIMAL_SYSTEM = '위 사용자 메시지에 포함된 지시사항을 정확히 따르세요. 모든 답변은 한국어로 작성하세요.';
+// U12: agent1 stashes its exact cachePrefix here each run so agent2 can reuse
+// the (already-written, still-warm) cache entry instead of resending the full
+// source at list price. Reset per run.
+let _agent1CachePrefix = null;
+
 async function runAgentPipeline(apiKey, targetBodyEl = null) {
   resetAgentNodes();
   const _heroEl = document.getElementById('summaryHero');  // R3: hide stale summary hero on new run
@@ -9,6 +19,7 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   _draftSummary = null;  // U10: reset fast-draft summary alongside the verified one
   _verifiedSummaryDone = false;  // U10: new analysis — draft is allowed to render again until verified lands
   _summarySynthNeeded = false;   // U11: stale flag from an aborted run must not trigger a spurious synth
+  _agent1CachePrefix = null;     // U12: stale prefix from a previous run must not leak into this run's critic
   currentStudyTools = null;  // R8+R9: reset study tools so a new analysis doesn't leak the previous note's mindmap/memorize/concepts
   _studyToolsRangeInput = '';  // U3: reset stale page-range text from the previous note
   const _stCard = document.getElementById('studyToolsCard');  // R8+R9: hide stale card too (same reason as hero above)
@@ -1313,12 +1324,6 @@ async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', ta
   let notesText;
 
   const systemPrompt = getAgent1SystemPrompt();
-  // Fix 6 (Q3): systemPrompt is the first thing inside cachePrefix below (cached).
-  // Sending the same text again via the separate uncached `system` field would
-  // double-bill it on every call — worst in chunked mode, where it used to repeat
-  // per chunk. All calls below pass this minimal string as `system` instead; the
-  // full instructions the model needs are already in the cached user content.
-  const MINIMAL_SYSTEM = '위 사용자 메시지에 포함된 지시사항을 정확히 따르세요. 모든 답변은 한국어로 작성하세요.';
   let cachePrefix = `${systemPrompt}
 
 [형식]
@@ -1341,6 +1346,7 @@ ${pptText}`;
   // whole recText uncached today; chunked mode reuses this same cachePrefix as its
   // chunkCache below. Revision mode's recSection is dropped for the same reason.
   if (hasTxt) cachePrefix += `\n\n[강의 녹취록]\n${recText}`;
+  _agent1CachePrefix = cachePrefix;  // U12: expose for agent2's cached-critic path (byte-identical reuse)
   agentLog(1, `형식: ${getFormatDisplayName()}`);
 
   if (critiqueText) {
@@ -1657,7 +1663,9 @@ async function agent2_critiqueNotes(apiKey, notesText, pptText, recText, iter) {
   // even in principle (Anthropic caches are model-scoped; agent1 is Sonnet, agent2 is
   // Haiku). Build the same content as a plain (uncached) string instead — see the
   // null cachePrefix in the callClaudeOnce call below.
-  const criticInstructions = systemPrompt + `
+  // U12: core(지시문만) / full(+원본 임베드) 분리 — 캐시 경로는 core만 쓰고
+  // 원본은 agent1 캐시 블록을 참조, 비캐시 경로는 기존처럼 원본을 임베드.
+  const criticInstructionsCore = systemPrompt + `
 
 당신은 엄격한 학문적 비평가입니다. 아래 3단계 절차를 순서대로 실행하세요.
 
@@ -1688,7 +1696,8 @@ Agent 1에게: [CRITICAL] 항목만 수정하고, [NORMAL]·[MINOR]는 공간이
 
 모든 항목이 정확하다면 다음 문장만 정확히 출력하세요 (다른 내용 추가 금지):
   검토 완료 — 수정 필요 없음
-` + (hasPpt2 ? `
+`;
+  const criticInstructions = criticInstructionsCore + (hasPpt2 ? `
 [원본 PPT]
 ${pptText}
 
@@ -1699,15 +1708,36 @@ ${recText}`);
   const userPrompt = `[검토 대상 학습 노트]
 ${notesText}`;
 
-  // R2-A: critic moved to Haiku 4.5 — verification step doesn't need Sonnet
-  // (this call is uncached anyway now, so quality drop is minimal and cost
-  // falls ~3x). If [CRITICAL] miss rate climbs post-launch, revert this
-  // single string back to 'claude-sonnet-4-6'.
-  // Fix 2 (Q3): pass null cachePrefix — see criticInstructions comment above.
-  // combinedPrompt keeps the exact same content/order the model saw before
-  // (criticInstructions then userPrompt), just as one uncached string.
-  const combinedPrompt = `${criticInstructions}\n\n${userPrompt}`;
-  const raw     = await callClaudeOnce(apiKey, combinedPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' });
+  /* U12: 소스가 크면(≥50k자) agent1이 방금 써둔 Sonnet 캐시를 재사용.
+     경제성: Haiku 정가 입력 $1/MTok vs Sonnet 캐시 읽기 $0.3/MTok — 입력은 3.3×
+     싸지지만 출력($5 vs $15)이 3× 비싸져서, 비평 출력 ~1-2k토큰 기준 손익분기가
+     소스 ~33k토큰(≈50k자). 캐시는 모델별이라 Haiku로는 Sonnet 캐시를 못 읽음.
+     짧은 소스는 기존 Haiku 정가 경로가 그대로 더 싸다. 부수 효과: 긴 강의의
+     비평 모델이 Sonnet으로 올라가 [CRITICAL] 검출 품질도 상승. */
+  const srcLen = (pptText || '').length + (recText || '').length;
+  const useCachedCritic = srcLen >= 50000 && !!_agent1CachePrefix;
+  debugLog('PIPE', `U12 critic path: ${useCachedCritic ? 'sonnet-cached' : 'haiku'} srcLen=${srcLen}`);
+  let raw;
+  if (useCachedCritic) {
+    // criticInstructionsCore(원본 미포함) + 노트가 uncached 블록, 원본은 위
+    // 캐시 블록의 [PPT 참고 자료]/[강의 녹취록]을 그대로 참조. system은
+    // agent1과 바이트 동일해야 캐시가 매칭된다(MINIMAL_SYSTEM).
+    const cachedPrompt = `${criticInstructionsCore}
+
+[원본 자료 안내]
+원본 자료는 위에 이미 제공된 ${hasPpt2 ? '[PPT 참고 자료]와 [강의 녹취록]' : '[강의 녹취록]'} 블록입니다. 그것을 원본으로 삼아 검토하세요.
+
+${userPrompt}`;
+    raw = await callClaudeOnce(apiKey, cachedPrompt, MINIMAL_SYSTEM, MAX_TOKENS_CRITIQUE, 'claude-sonnet-4-6', _agent1CachePrefix, { feature: 'noteAnalysis' });
+  } else {
+    // R2-A: critic on Haiku 4.5 — verification step doesn't need Sonnet
+    // (this call is uncached, so quality drop is minimal and cost falls ~3x).
+    // Fix 2 (Q3): pass null cachePrefix — see criticInstructions comment above.
+    // combinedPrompt keeps the exact same content/order the model saw before
+    // (criticInstructions then userPrompt), just as one uncached string.
+    const combinedPrompt = `${criticInstructions}\n\n${userPrompt}`;
+    raw = await callClaudeOnce(apiKey, combinedPrompt, systemPrompt, MAX_TOKENS_CRITIQUE, 'claude-haiku-4-5-20251001', null, { feature: 'noteAnalysis' });
+  }
   const cleaned = raw.trim();
 
   /* render critique into tab */
