@@ -20,10 +20,16 @@ import subprocess
 import traceback
 import wave
 
+import functools
+
 import numpy as np
 import requests
 import firebase_admin
 from firebase_admin import credentials, firestore
+
+# Logs must survive piped/background execution — Python buffers stdout when
+# it's not a TTY, which hid job-completion lines during the loopback test.
+print = functools.partial(print, flush=True)
 
 # ── Config ───────────────────────────────────────────────────────────────
 HERE = os.path.dirname(os.path.abspath(__file__))
