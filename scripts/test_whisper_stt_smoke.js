@@ -101,6 +101,8 @@ const TURNS = [
   { start: 22, end: 26, speaker: 'SPEAKER_02' },
 ];
 
+let lastGroqForm = null; // capture the FormData sent to Groq for prompt assertions
+
 function jsonRes(status, obj) {
   return {
     ok: status >= 200 && status < 300,
@@ -118,6 +120,7 @@ globalThis.fetch = async (url, opts = {}) => {
   if (u.includes('api.groq.com/openai/v1/audio/transcriptions')) {
     assert.ok(opts.headers.Authorization.includes('gk_test_fake'));
     assert.ok(opts.body && typeof opts.body.append === 'function' || opts.body instanceof FormData, 'multipart form sent');
+    lastGroqForm = opts.body;
     return jsonRes(200, GROQ_FIXTURE);
   }
   throw new Error('unexpected fetch: ' + u);
@@ -264,6 +267,31 @@ async function transcribe() {
   }), res);
   assert.strictEqual(res._status, 404);
   console.log('[ok] labels: wrong uid → 404 not_found');
+
+  // 12. terminology prompt: control chars stripped + whitespace collapsed before Groq FormData
+  res = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL, prompt: '\x01세포막\x02삼투압\x03' } }), res);
+  assert.strictEqual(res._status, 200);
+  assert.strictEqual(lastGroqForm.get('prompt'), '세포막 삼투압');
+  console.log('[ok] transcribe: sanitized prompt forwarded to Groq FormData');
+
+  // 13. terminology prompt: >500 chars capped at 500
+  res = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL, prompt: 'x'.repeat(700) } }), res);
+  assert.strictEqual(res._status, 200);
+  assert.strictEqual(lastGroqForm.get('prompt').length, 500);
+  console.log('[ok] transcribe: prompt capped at 500 chars');
+
+  // 14. terminology prompt: missing/non-string prompt → no prompt field appended
+  res = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL } }), res);
+  assert.strictEqual(res._status, 200);
+  assert.strictEqual(lastGroqForm.get('prompt'), null, 'no prompt field when body.prompt absent');
+  res = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL, prompt: 42 } }), res);
+  assert.strictEqual(res._status, 200);
+  assert.strictEqual(lastGroqForm.get('prompt'), null, 'no prompt field when body.prompt is non-string');
+  console.log('[ok] transcribe: missing/non-string prompt → no prompt field');
 
   console.log('\nwhisper-stt.js mocked E2E smoke: ALL GREEN');
 })().catch((e) => { console.error('SMOKE FAILED:', e); process.exit(1); });

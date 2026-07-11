@@ -1,0 +1,146 @@
+[
+ {
+  "clip": "conv1",
+  "truth_speakers": 2,
+  "base": {
+   "der": 0.1567,
+   "speakers": 2
+  },
+  "loudnorm": {
+   "der": 0.167,
+   "speakers": 2
+  },
+  "hint": {
+   "der": 0.1567,
+   "speakers": 2
+  },
+  "quiet": {
+   "der": 0.1542,
+   "speakers": 2
+  },
+  "quiet_loudnorm": {
+   "der": 0.1655,
+   "speakers": 2
+  }
+ },
+ {
+  "clip": "conv2",
+  "truth_speakers": 3,
+  "base": {
+   "der": 0.181,
+   "speakers": 3
+  },
+  "loudnorm": {
+   "der": 0.2053,
+   "speakers": 3
+  },
+  "hint": {
+   "der": 0.181,
+   "speakers": 3
+  },
+  "quiet": {
+   "der": 0.1799,
+   "speakers": 3
+  },
+  "quiet_loudnorm": {
+   "der": 0.1989,
+   "speakers": 3
+  }
+ },
+ {
+  "clip": "conv3",
+  "truth_speakers": 5,
+  "base": {
+   "der": 0.204,
+   "speakers": 5
+  },
+  "loudnorm": {
+   "der": 0.2272,
+   "speakers": 5
+  },
+  "hint": {
+   "der": 0.204,
+   "speakers": 5
+  },
+  "quiet": {
+   "der": 0.2064,
+   "speakers": 5
+  },
+  "quiet_loudnorm": {
+   "der": 0.2383,
+   "speakers": 5
+  }
+ },
+ {
+  "clip": "conv4",
+  "truth_speakers": 3,
+  "base": {
+   "der": 0.2214,
+   "speakers": 4
+  },
+  "loudnorm": {
+   "der": 0.2182,
+   "speakers": 4
+  },
+  "hint": {
+   "der": 0.2226,
+   "speakers": 3
+  },
+  "quiet": {
+   "der": 0.2185,
+   "speakers": 4
+  },
+  "quiet_loudnorm": {
+   "der": 0.2135,
+   "speakers": 4
+  }
+ },
+ {
+  "clip": "multi_discussion",
+  "truth_speakers": 3,
+  "base": {
+   "der": null,
+   "speakers": 3
+  },
+  "loudnorm": {
+   "der": null,
+   "speakers": 3
+  },
+  "hint": {
+   "der": null,
+   "speakers": 3
+  },
+  "quiet": {
+   "der": null,
+   "speakers": 3
+  },
+  "quiet_loudnorm": {
+   "der": null,
+   "speakers": 3
+  }
+ },
+ {
+  "clip": "single_lecture",
+  "truth_speakers": 1,
+  "base": {
+   "der": null,
+   "speakers": 1
+  },
+  "loudnorm": {
+   "der": null,
+   "speakers": 1
+  },
+  "hint": {
+   "der": null,
+   "speakers": 1
+  },
+  "quiet": {
+   "der": null,
+   "speakers": 1
+  },
+  "quiet_loudnorm": {
+   "der": null,
+   "speakers": 1
+  }
+ }
+]

@@ -1183,6 +1183,33 @@
     handleAudioBlob(file, file.name);
   }
 
+  // ── Build a Whisper vocabulary-biasing prompt from attached lecture material ───
+  // Best-effort: never throws — a parse failure must not block recording delivery.
+  async function buildSttTermsPrompt() {
+    if (!pptFile) return null;
+    try {
+      const text = await extractPresentationText(pptFile);
+      const tokens = text.match(/[A-Za-z][A-Za-z0-9-]+|[가-힣]{2,}/g) || [];
+      const stoplist = new Set(['페이지', '슬라이드']);
+      const counts = new Map();
+      for (const t of tokens) {
+        if (stoplist.has(t)) continue;
+        counts.set(t, (counts.get(t) || 0) + 1);
+      }
+      const terms = [...counts.entries()]
+        .filter(([, c]) => c >= 2)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 30)
+        .map(([term]) => term)
+        .reverse(); // ascending frequency — Whisper only keeps the final ~224 tokens of the prompt
+      if (!terms.length) return null;
+      return terms.join(', ').slice(-300);
+    } catch (err) {
+      console.warn('[recorder] STT terms prompt extraction failed (non-fatal)', err);
+      return null;
+    }
+  }
+
   // ── Upload to Firebase Storage + AssemblyAI pipeline ───
   async function handleAudioBlob(blob, filename) {
     if (!currentUser) {
@@ -1196,6 +1223,8 @@
     modalState.lastFilename = filename;
     modalState.transcriptId = null;
     modalState.pollFailCount = 0;
+    // Kick off term extraction now so it runs in parallel with the upload below.
+    const sttPromptPromise = buildSttTermsPrompt();
     switchScreen('upload');
     document.getElementById('recUploadStatus').textContent = '업로드 중…';
     document.getElementById('recUploadBar').style.width = '0%';
@@ -1244,13 +1273,18 @@
     let transcriptId;
     try {
       const idToken = await currentUser.getIdToken();
+      const reqBody = { audio_url: downloadUrl };
+      if (sttApi === '/api/whisper-stt') {
+        const sttPrompt = await sttPromptPromise;
+        if (sttPrompt) reqBody.prompt = sttPrompt;
+      }
       const tr = await fetch(sttApi + '?action=transcribe', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           'authorization': 'Bearer ' + idToken,
         },
-        body: JSON.stringify({ audio_url: downloadUrl }),
+        body: JSON.stringify(reqBody),
       });
       const trJson = await tr.json();
       if (!tr.ok || !trJson.transcript_id) {

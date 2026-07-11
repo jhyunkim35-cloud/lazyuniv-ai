@@ -232,6 +232,13 @@ module.exports = async (req, res) => {
       form.append('temperature', '0');
       form.append('timestamp_granularities[]', 'word');
       form.append('timestamp_granularities[]', 'segment');
+      // U7e: optional vocabulary-biasing prompt (lecture-material terminology
+      // extracted client-side). Sanitize defensively even though the client
+      // already caps it — Whisper silently keeps only the final 224 tokens.
+      if (typeof body?.prompt === 'string') {
+        const p = body.prompt.replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+        if (p) form.append('prompt', p);
+      }
 
       const groqRes = await fetch(GROQ_TRANSCRIBE_URL, {
         method: 'POST',
