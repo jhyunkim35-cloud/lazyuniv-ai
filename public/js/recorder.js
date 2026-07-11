@@ -468,6 +468,20 @@
               </label>
               <input type="file" id="recFileInput" accept="audio/*,.m4a,.mp3,.wav,.webm,.ogg,.aac,.flac" style="display:none" />
             </div>
+            <div class="rec-speakers-row">
+              <label class="rec-speakers-label" for="recSpeakersHint">발화자 수</label>
+              <select id="recSpeakersHint" class="rec-speakers-select">
+                <option value="" selected>자동 감지</option>
+                <option value="1">1명 (혼자 강의)</option>
+                <option value="2">2명</option>
+                <option value="3">3명</option>
+                <option value="4">4명</option>
+                <option value="5">5명</option>
+                <option value="6">6명</option>
+                <option value="7">7명</option>
+                <option value="8">8명</option>
+              </select>
+            </div>
           </div>
 
           <!-- Recording / paused -->
@@ -1277,6 +1291,10 @@
       if (sttApi === '/api/whisper-stt') {
         const sttPrompt = await sttPromptPromise;
         if (sttPrompt) reqBody.prompt = sttPrompt;
+        // U7e: optional speaker-count hint → pyannote exact-N clustering.
+        // Unset ("자동 감지") sends nothing = unknown-N auto, today's behavior.
+        const hintVal = parseInt(document.getElementById('recSpeakersHint')?.value, 10);
+        if (hintVal >= 1) reqBody.speakers_hint = hintVal;
       }
       const tr = await fetch(sttApi + '?action=transcribe', {
         method: 'POST',

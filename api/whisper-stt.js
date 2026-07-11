@@ -200,6 +200,11 @@ module.exports = async (req, res) => {
       }
 
       // 1. Enqueue the (async) diarization job for the local worker to pick up.
+      // U7e: optional user-provided speaker count ("발화자 수" select) — workers
+      // pass it to pyannote as num_speakers (exact-N clustering). Absent/invalid
+      // → field omitted = unknown-N auto, unchanged behavior.
+      const speakersHint = (Number.isInteger(body?.speakers_hint)
+        && body.speakers_hint >= 1 && body.speakers_hint <= 10) ? body.speakers_hint : null;
       const jobId = crypto.randomUUID();
       const admin = getAdmin();
       await admin.firestore().collection('diarizationJobs').doc(jobId).set({
@@ -207,6 +212,7 @@ module.exports = async (req, res) => {
         audioUrl: audio_url,
         status: 'pending',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        ...(speakersHint ? { numSpeakers: speakersHint } : {}),
       });
 
       // 2. Transcribe synchronously with Groq Whisper.

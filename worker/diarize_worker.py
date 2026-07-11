@@ -251,7 +251,11 @@ def process_job(db, job_id, job):
         t_conv = time.time()
 
         audio, duration = load_waveform(wav_path)
-        output = get_pipeline()(audio)  # num_speakers unset = unknown-N auto
+        # U7e: user-provided speaker-count hint → exact-N clustering.
+        # Unset/invalid = unknown-N auto (unchanged default).
+        n = job.get('numSpeakers')
+        kwargs = {'num_speakers': int(n)} if isinstance(n, int) and 1 <= n <= 10 else {}
+        output = get_pipeline()(audio, **kwargs)
         turns = postprocess_turns(extract_turns(output))
         t_diar = time.time()
 

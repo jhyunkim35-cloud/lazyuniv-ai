@@ -181,6 +181,22 @@ async function transcribe() {
   assert.ok(!('tokens' in (stashed.segments[0] || {})), 'verbose_json trimmed (tokens dropped)');
   console.log('[ok] transcribe: diarizationJobs doc enqueued + Groq transcript + Storage stash');
 
+  // 3b. U7e speaker-count hint: valid hint lands on the job doc as numSpeakers;
+  // invalid (out of range / non-integer) is dropped entirely.
+  let res2 = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL, speakers_hint: 3 } }), res2);
+  assert.strictEqual(res2._status, 200);
+  assert.strictEqual(jobsStore.get(res2._json.transcript_id).numSpeakers, 3);
+  res2 = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL, speakers_hint: 99 } }), res2);
+  assert.strictEqual(res2._status, 200);
+  assert.ok(!('numSpeakers' in jobsStore.get(res2._json.transcript_id)), 'out-of-range hint dropped');
+  res2 = makeRes();
+  await handler(makeReq({ query: { action: 'transcribe' }, body: { audio_url: AUDIO_URL, speakers_hint: '3' } }), res2);
+  assert.strictEqual(res2._status, 200);
+  assert.ok(!('numSpeakers' in jobsStore.get(res2._json.transcript_id)), 'non-integer hint dropped');
+  console.log('[ok] transcribe: speakers_hint → numSpeakers on job doc (invalid dropped)');
+
   // 4. poll while diarization runs (fresh job, within grace window)
   res = makeRes();
   await handler(makeReq({ method: 'GET', query: { action: 'status', id: jobId } }), res);

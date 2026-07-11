@@ -151,7 +151,10 @@ def diarize_job(job_id: str):
                                             token=os.environ['HF_TOKEN'])
         pipeline.to(torch.device('cuda'))
         pipeline.instantiate(TUNED_PARAMS)
-        output = pipeline({'waveform': waveform, 'sample_rate': 16000})
+        # U7e: speaker-count hint — keep in sync with diarize_worker.process_job.
+        n = job.get('numSpeakers')
+        kwargs = {'num_speakers': int(n)} if isinstance(n, int) and 1 <= n <= 10 else {}
+        output = pipeline({'waveform': waveform, 'sample_rate': 16000}, **kwargs)
         hf_cache.commit()
 
         ann = getattr(output, 'exclusive_speaker_diarization', None)
