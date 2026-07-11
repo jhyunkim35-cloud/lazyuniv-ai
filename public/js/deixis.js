@@ -40,9 +40,22 @@ function _countOccurrences(haystack, needle) {
 function parseDeixisAnnotations(rawModelText, recText, pptText) {
   let arr;
   try {
-    const m = (rawModelText || '').match(/\[[\s\S]*\]/);
-    if (!m) return [];
-    arr = JSON.parse(m[0]);
+    const raw = (rawModelText || '');
+    const firstBracket = raw.indexOf('[');
+    if (firstBracket === -1) return [];
+    // Bounded backward scan: find each ']' position from the LAST, try JSON.parse on slices,
+    // stop at first success or after 20 attempts.
+    let attempts = 0;
+    for (let i = raw.length - 1; i > firstBracket && attempts < 20; i--) {
+      if (raw[i] === ']') {
+        attempts++;
+        try {
+          arr = JSON.parse(raw.substring(firstBracket, i + 1));
+          if (Array.isArray(arr)) break; // Found valid array.
+        } catch (_) { /* continue to next ']' */ }
+      }
+    }
+    if (!Array.isArray(arr)) return [];
   } catch (_) { return []; }
   if (!Array.isArray(arr)) return [];
   const slideNums = new Set(
@@ -96,7 +109,8 @@ function injectDeixisChips(escapedHtml, annotations) {
     const eq = _escHtmlForDeixis(a.q);
     if (_countOccurrences(html, eq) !== 1) continue; // escaping shifted things — skip, never guess
     const chip = `<span class="deixis-quote">${eq}</span><span class="deixis-chip" title="AI가 슬라이드 대조로 추론한 해석입니다">→ ${_escHtmlForDeixis(a.ref)}${a.slide !== null ? ` (p.${a.slide})` : ''}</span>`;
-    html = html.replace(eq, chip);
+    // function replacer: ref may contain $-patterns (e.g. LaTeX $$) — must not trigger GetSubstitution
+    html = html.replace(eq, () => chip);
   }
   return html;
 }
