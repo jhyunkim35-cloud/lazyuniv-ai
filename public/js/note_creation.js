@@ -134,11 +134,15 @@ async function runSingleNoteAnalysis() {
     // records (display layer for the preview modal). Fire-and-forget; text untouched.
     if (typeof storedDeixisAnnotations !== 'undefined' && storedDeixisAnnotations.length > 0) {
       for (let i = 0; i < recFiles.length; i++) {
-        const tid = recFiles[i].file._transcriptId;
-        if (!tid) continue;
-        const recRaw = await recFiles[i].file.text();
-        const mine = assignAnnotationsToRecordText(storedDeixisAnnotations, recRaw);
-        if (mine.length > 0) saveDeixisAnnotationsFS(tid, mine).catch(e => console.warn('[deixis] save failed:', e));
+        try {
+          const tid = recFiles[i].file._transcriptId;
+          if (!tid) continue;
+          const recRaw = await recFiles[i].file.text();
+          const mine = assignAnnotationsToRecordText(storedDeixisAnnotations, recRaw);
+          if (mine.length > 0) saveDeixisAnnotationsFS(tid, mine).catch(e => console.warn('[deixis] save failed:', e));
+        } catch (e) {
+          console.warn('[deixis] annotation loop failed:', e);
+        }
       }
     }
 
