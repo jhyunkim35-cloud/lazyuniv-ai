@@ -10,6 +10,7 @@ const MINIMAL_SYSTEM = '위 사용자 메시지에 포함된 지시사항을 정
 // the (already-written, still-warm) cache entry instead of resending the full
 // source at list price. Reset per run.
 let _agent1CachePrefix = null;
+let storedDeixisAnnotations = [];   // U17: high-conf annotations from the current run
 
 async function runAgentPipeline(apiKey, targetBodyEl = null) {
   resetAgentNodes();
@@ -50,6 +51,24 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
   try {
     setAgentNode(0, 'done', '스킵 — 원본 전달');
 
+    // U17: deixis-resolution stage — before agent1 so notes are written with resolved
+    // referents. Shares agent1's exact cache prefix (writes the entry agent1 reads).
+    storedDeixisAnnotations = [];
+    let deixisSection = '';
+    if (storedPptText && storedFilteredText && detectDeixisCandidates(storedFilteredText)) {
+      try {
+        setAgentNode(1, 'loading', '지시어 해석 중…');
+        const prefix = buildAgent1CachePrefix(storedPptText, storedFilteredText);
+        const raw = await callClaudeOnce(apiKey, buildDeixisUserPrompt(), MINIMAL_SYSTEM,
+          2000, 'claude-sonnet-4-6', prefix, { isFirstCall: false, feature: 'noteAnalysis' });
+        storedDeixisAnnotations = parseDeixisAnnotations(raw, storedFilteredText, storedPptText);
+        deixisSection = buildDeixisSection(storedDeixisAnnotations);
+        agentLog(1, `지시어 해석 ${storedDeixisAnnotations.length}건 (고신뢰만 채택)`);
+      } catch (e) {
+        console.warn('[deixis] resolution skipped:', e); // fail-open: notes proceed unannotated
+      }
+    }
+
     for (let iter = 1; iter <= MAX_ITERATIONS; iter++) {
       const iterStart = Date.now();
       updateIterCounter('running', iter);
@@ -68,7 +87,7 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
         }
         analyzeBtn.textContent = `⏳ Agent 1: 노트 작성 중… (${fmtName})`;
         setProgress(20, `Agent 1: 노트 작성 중… ${fmtName}`);
-        notesText = await agent1_writeNotes(apiKey, storedPptText, storedFilteredText, '', targetBodyEl, { isFirstCall: true, feature: 'noteAnalysis' });
+        notesText = await agent1_writeNotes(apiKey, storedPptText, storedFilteredText, '', targetBodyEl, { isFirstCall: true, feature: 'noteAnalysis' }, deixisSection);
         debugLog('PIPE', `Iter ${iter} — Agent1 done, notes=${notesText.length}chars`);
         if (!targetBodyEl) document.getElementById('notesCardTitle').textContent = '📚 통합 학습 노트';
 
@@ -1308,11 +1327,24 @@ function buildPrevNotesDigest(notes, maxChars = 4000) {
 /* ═══════════════════════════════════════════════
    Agent 1 — Note Writer / Reviser (streams to hero card)
 ═══════════════════════════════════════════════ */
-async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', targetBodyEl = null, meta = {}) {
+// U17: single source of truth for agent1's cached prefix. The deixis stage sends
+// this EXACT string as its cached block so agent1 reads the cache it wrote (0.1x).
+// Any byte drift here silently breaks both that and the U12 cached-critic path.
+function buildAgent1CachePrefix(pptText, recText) {
+  const { formatSection, rulesSection } = getNoteFormatBlocks();
+  const hasTxt = recText && recText.trim().length > 0;
+  const hasPpt = pptText && pptText.trim().length > 0;
+  const systemPrompt = getAgent1SystemPrompt();
+  let cachePrefix = `${systemPrompt}\n\n[형식]\n${formatSection}\n\n[규칙]\n${rulesSection}`;
+  if (hasPpt) cachePrefix += `\n\n${PPT_STRUCTURE_CLAUSE}\n\n[PPT 참고 자료]\n${pptText}`;
+  if (hasTxt) cachePrefix += `\n\n[강의 녹취록]\n${recText}`;
+  return cachePrefix;
+}
+
+async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', targetBodyEl = null, meta = {}, deixisSection = '') {
   let needsSummarySynth = false;  // R2: set by single-pass / PPT-only paths
   setAgentNode(1, 'loading', critiqueText ? '노트 수정 중…' : '노트 작성 중…');
 
-  const { formatSection, rulesSection } = getNoteFormatBlocks();
   const hasTxt   = recText && recText.trim().length > 0;
   const hasPpt   = pptText && pptText.trim().length > 0;
   const srcLabel = hasTxt && hasPpt ? 'PPT 내용과 강의 녹취록을'
@@ -1323,29 +1355,7 @@ async function agent1_writeNotes(apiKey, pptText, recText, critiqueText = '', ta
   const dot      = makeAgentDot(1);
   let notesText;
 
-  const systemPrompt = getAgent1SystemPrompt();
-  let cachePrefix = `${systemPrompt}
-
-[형식]
-${formatSection}
-
-[규칙]
-${rulesSection}`;
-  // U1: transcript-only mode has no PPT at all — omit the PPT structure clause
-  // and reference block entirely rather than send an empty [PPT 참고 자료].
-  if (hasPpt) {
-    cachePrefix += `
-
-${PPT_STRUCTURE_CLAUSE}
-
-[PPT 참고 자료]
-${pptText}`;
-  }
-  // Fix 1 (Q3) sanity: fold the full transcript into the shared cache block too
-  // (not just the PPT) whenever this call has one — single-pass mode sends the
-  // whole recText uncached today; chunked mode reuses this same cachePrefix as its
-  // chunkCache below. Revision mode's recSection is dropped for the same reason.
-  if (hasTxt) cachePrefix += `\n\n[강의 녹취록]\n${recText}`;
+  let cachePrefix = buildAgent1CachePrefix(pptText, recText);
   _agent1CachePrefix = cachePrefix;  // U12: expose for agent2's cached-critic path (byte-identical reuse)
   agentLog(1, `형식: ${getFormatDisplayName()}`);
 
@@ -1366,7 +1376,7 @@ ${critiqueText}`;
     // and (Fix 1, Q3) the full recText when hasTxt — repeat only the revision-specific
     // instruction here to avoid resending the transcript a second time uncached.
     const refLabel = hasPpt ? 'PPT 자료' : '녹취록 자료';
-    const userPrompt = `위 형식·규칙·${refLabel}를 참고하여 학습 노트를 수정하세요.${revisionClause}`;
+    const userPrompt = deixisSection + `위 형식·규칙·${refLabel}를 참고하여 학습 노트를 수정하세요.${revisionClause}`;
 
     agentLog(1, 'Claude AI 응답 스트리밍 수신 중…');
     const revisionMeta = { isFirstCall: false, feature: 'noteAnalysis' };
@@ -1436,7 +1446,7 @@ ${critiqueText}`;
           ? `\n\n[이미 작성된 섹션·용어 (중복 금지)]\n${buildPrevNotesDigest(accumulatedNotes)}`
           : '';
 
-        const chunkPrompt = `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}${prevNotesBlock}`;
+        const chunkPrompt = deixisSection + `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. ${chunkInstruction}${prevNotesBlock}`;
         const chunkMeta = c === 0 ? meta : { isFirstCall: false, feature: 'noteAnalysis' };
 
         // Fix 4 (Q1): one retry with backoff on chunk failure. If the FIRST
@@ -1493,9 +1503,9 @@ ${critiqueText}`;
 
       // Fix 1 (Q3): recText already lives in cachePrefix (see `if (hasTxt)` above) —
       // don't resend it uncached here too.
-      const userPrompt = hasPpt
+      const userPrompt = deixisSection + (hasPpt
         ? `위 PPT 자료와 강의 녹취록을 바탕으로 학습 가이드를 작성하세요.`
-        : `위 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. PPT 자료가 없으므로 녹취록 내용만으로 핵심 개념을 충실히 정리하세요.`;
+        : `위 강의 녹취록을 바탕으로 학습 가이드를 작성하세요. PPT 자료가 없으므로 녹취록 내용만으로 핵심 개념을 충실히 정리하세요.`);
 
       agentLog(1, 'Claude Sonnet 응답 스트리밍 수신 중…');
       debugLog('PIPE', `Agent1 single-pass: transcript=${recText.length}chars`);
