@@ -27,7 +27,7 @@ assert.strictEqual(parseDeixisAnnotations(raw + '\n참고: 교재 [3장] 관련'
 
 // 2c) $-pattern safety: function replacer prevents $& expansion when ref contains $-patterns
 const dollarAnns = [{q:'값이 나옵니다', ref:'가격 $$100 및 $& 검증', slide:8, conf:'high'}];
-const dHtml = injectDeixisChips(rec.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'), dollarAnns);
+const dHtml = injectDeixisChips(rec.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'), dollarAnns);
 assert.ok(dHtml.includes('가격 $$100 및 $&amp; 검증'));
 
 // 3) parse failure / garbage → []
@@ -44,10 +44,26 @@ assert.strictEqual(assignAnnotationsToRecordText(anns, rec).length, 1);
 assert.strictEqual(assignAnnotationsToRecordText(anns, '전혀 다른 텍스트').length, 0);
 
 // 6) chip injection into escaped HTML (no double-annotation, chip is a span)
-const esc = rec.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc = rec.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const html = injectDeixisChips(esc, anns);
 assert.ok(html.includes('deixis-chip'));
 assert.ok(html.includes('오일러 공식'));
 assert.strictEqual((html.match(/deixis-chip/g) || []).length, 1);
+
+// 7) apostrophe in quote: should match and inject chip (previously would fail due to missing ' escape)
+const apostropheRec = "Taylor's formula를 이용하면 근사가 됩니다.";
+const apostrophePpt = '[슬라이드 5]\nTaylor\'s expansion';
+const apostropheAnns = [{q:"Taylor's formula를 이용하면", ref:"Taylor 전개식", slide:5, conf:'high'}];
+const apostropheEsc = apostropheRec.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const apostropheHtml = injectDeixisChips(apostropheEsc, apostropheAnns);
+assert.ok(apostropheHtml.includes('deixis-chip'), 'apostrophe quote should be matched and chip injected');
+assert.ok(apostropheHtml.includes('Taylor 전개식'));
+
+// 8) non-integer slide: should inject chip but without (p.N) suffix
+const nonIntSlideAnns = [{q:'값이 나옵니다', ref:'테스트 공식', slide:"3.5", conf:'high'}];
+const nonIntHtml = injectDeixisChips(esc, nonIntSlideAnns);
+assert.ok(nonIntHtml.includes('deixis-chip'), 'non-integer slide should still inject chip');
+assert.ok(nonIntHtml.includes('테스트 공식'));
+assert.ok(!nonIntHtml.includes('(p.3.5)'), 'non-integer slide should not render (p.N) suffix');
 
 console.log('test_deixis: ALL PASS');

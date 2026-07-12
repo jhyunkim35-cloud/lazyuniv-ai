@@ -98,7 +98,12 @@ function assignAnnotationsToRecordText(annotations, recordText) {
 }
 
 function _escHtmlForDeixis(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // escapedHtml: output of escHtml() over the raw record text (transcripts_view contract).
@@ -108,7 +113,7 @@ function injectDeixisChips(escapedHtml, annotations) {
   for (const a of (annotations || [])) {
     const eq = _escHtmlForDeixis(a.q);
     if (_countOccurrences(html, eq) !== 1) continue; // escaping shifted things — skip, never guess
-    const chip = `<span class="deixis-quote">${eq}</span><span class="deixis-chip" title="AI가 슬라이드 대조로 추론한 해석입니다">→ ${_escHtmlForDeixis(a.ref)}${a.slide !== null ? ` (p.${a.slide})` : ''}</span>`;
+    const chip = `<span class="deixis-quote">${eq}</span><span class="deixis-chip" title="AI가 슬라이드 대조로 추론한 해석입니다">→ ${_escHtmlForDeixis(a.ref)}${Number.isInteger(a.slide) ? ` (p.${a.slide})` : ''}</span>`;
     // function replacer: ref may contain $-patterns (e.g. LaTeX $$) — must not trigger GetSubstitution
     html = html.replace(eq, () => chip);
   }
