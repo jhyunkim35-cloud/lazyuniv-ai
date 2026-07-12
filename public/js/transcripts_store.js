@@ -155,6 +155,16 @@ async function saveSpeakerNamesFS(id, speakerNames) {
   return patch;
 }
 
+// U17: deixis annotation layer — stored beside text, text itself never rewritten
+// (same contract as speakerNames). [{q, ref, slide, conf:'high'}]
+async function saveDeixisAnnotationsFS(id, deixisAnnotations) {
+  const ref = userTranscriptsRef();
+  if (!ref || !id) return null;
+  const patch = { deixisAnnotations: deixisAnnotations || [], updatedAt: new Date().toISOString() };
+  await ref.doc(id).set(patch, { merge: true });
+  return patch;
+}
+
 // Attach a transcript to a note (for "used in" tracking). Best-effort.
 async function markTranscriptUsedInNote(transcriptId, noteId) {
   const ref = userTranscriptsRef();
@@ -177,5 +187,6 @@ window.deleteTranscriptFS       = deleteTranscriptFS;
 window.renameTranscriptFS       = renameTranscriptFS;
 window.applyDiarizationLabelsFS = applyDiarizationLabelsFS;
 window.saveSpeakerNamesFS       = saveSpeakerNamesFS;
+window.saveDeixisAnnotationsFS  = saveDeixisAnnotationsFS;
 window.markTranscriptUsedInNote = markTranscriptUsedInNote;
 window.defaultTranscriptTitle   = defaultTranscriptTitle;

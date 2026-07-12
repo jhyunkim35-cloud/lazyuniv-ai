@@ -130,6 +130,18 @@ async function runSingleNoteAnalysis() {
     setProgress(20, 'AI 노트 작성·검토 시작…');
     await runAgentPipeline(apiKey);
 
+    // U17: persist high-conf deixis annotations back onto their source transcript
+    // records (display layer for the preview modal). Fire-and-forget; text untouched.
+    if (typeof storedDeixisAnnotations !== 'undefined' && storedDeixisAnnotations.length > 0) {
+      for (let i = 0; i < recFiles.length; i++) {
+        const tid = recFiles[i].file._transcriptId;
+        if (!tid) continue;
+        const recRaw = await recFiles[i].file.text();
+        const mine = assignAnnotationsToRecordText(storedDeixisAnnotations, recRaw);
+        if (mine.length > 0) saveDeixisAnnotationsFS(tid, mine).catch(e => console.warn('[deixis] save failed:', e));
+      }
+    }
+
     setProgress(100, '완료!');
     setTimeout(() => setProgress(null), 800);
 

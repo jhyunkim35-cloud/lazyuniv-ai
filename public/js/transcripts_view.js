@@ -259,6 +259,7 @@
     const text = applySpeakerNames(raw, t.speakerNames);
     const safeName = (t.title || 'transcript').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
     const file = new File([text], safeName + '.txt', { type: 'text/plain' });
+    file._transcriptId = t.id; // U17: thread record id so post-analysis deixis save can target it
     hidePreviewModal();
     if (typeof switchView === 'function') switchView('new');
     // Slight delay so switchView finishes rendering before DOM manipulation
@@ -381,7 +382,7 @@
     // prefixes ("[hh:mm:ss] 발화자 N:") get minimal emphasis so multi-speaker
     // transcripts scan by speaker, and any saved speakerNames mapping (U15)
     // swaps in the custom name at display time only.
-    renderTranscriptPreviewBody(t.text || '', t.speakerNames);
+    renderTranscriptPreviewBody(t.text || '', t.speakerNames, t.deixisAnnotations);
 
     const renameBtn = document.getElementById('transcriptSpeakerRenameBtn');
     if (renameBtn) renameBtn.style.display = hasSpeakerLabels(t.text || '') ? '' : 'none';
@@ -422,11 +423,18 @@
     return out;
   }
 
-  function renderTranscriptPreviewBody(rawText, speakerNames) {
+  function renderTranscriptPreviewBody(rawText, speakerNames, deixisAnnotations) {
     const bodyEl = document.getElementById('transcriptPreviewBody');
     if (!bodyEl) return;
     if (typeof escHtml === 'function') {
-      bodyEl.innerHTML = escHtml(rawText).replace(
+      let escaped = escHtml(rawText);
+      // U17: inject inferred-reference chips before the speaker-label pass — chips
+      // wrap mid-line quoted spans, label spans wrap line-start prefixes, so order
+      // doesn't create overlap as long as chip quotes never contain a line start.
+      if (deixisAnnotations?.length && typeof injectDeixisChips === 'function' && typeof assignAnnotationsToRecordText === 'function') {
+        escaped = injectDeixisChips(escaped, assignAnnotationsToRecordText(deixisAnnotations, rawText));
+      }
+      bodyEl.innerHTML = escaped.replace(
         /(^|\n)((?:\[[\d:]+\]\s*)?(발화자|참석자)\s*(\d+)\s*:)/g,
         (m, br, label, kind, num) => {
           const custom = speakerNames && speakerNames[num];
@@ -482,7 +490,7 @@
         await saveSpeakerNamesFS(t.id, speakerNames);
         t.speakerNames = speakerNames;
         if (_previewEl?._currentTranscript?.id === t.id) _previewEl._currentTranscript.speakerNames = speakerNames;
-        renderTranscriptPreviewBody(t.text || '', speakerNames);
+        renderTranscriptPreviewBody(t.text || '', speakerNames, t.deixisAnnotations);
         window.showToast?.('✅ 발화자 이름이 저장되었습니다.');
         close();
       } catch (e) {
@@ -512,7 +520,7 @@
       // Re-render only if this transcript's preview is still the one open.
       const titleEl = document.getElementById('transcriptPreviewTitle');
       if (titleEl && titleEl.dataset.transcriptId === t.id) {
-        renderTranscriptPreviewBody(j.text, t.speakerNames);
+        renderTranscriptPreviewBody(j.text, t.speakerNames, t.deixisAnnotations);
         const renameBtn = document.getElementById('transcriptSpeakerRenameBtn');
         if (renameBtn) renameBtn.style.display = hasSpeakerLabels(j.text) ? '' : 'none';
       }

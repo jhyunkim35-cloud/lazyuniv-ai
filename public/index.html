@@ -784,6 +784,16 @@
     }
     .page-cite-chip:hover { background: rgba(124, 58, 237, 0.22); }
 
+    /* U17: deixis-resolution inferred-reference chips (mirrors .page-cite-chip's
+       color/theme handling — --primary is a single value, not split by theme). */
+    .deixis-quote { border-bottom: 1px dashed var(--primary); }
+    .deixis-chip {
+      display: inline-block; margin: 0 2px; padding: 0 6px; border-radius: 8px;
+      font-size: 0.78em; font-style: italic; opacity: 0.85;
+      background: rgba(124, 58, 237, 0.12);
+      color: var(--primary); vertical-align: baseline;
+    }
+
     .md-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .md-table th, .md-table td { border: 1px solid var(--border-bright); padding: 0.4rem 0.7rem; text-align: left; min-width: 60px; }
     .md-table th { background: var(--surface3); color: var(--secondary); font-weight: 600; }
@@ -4949,16 +4959,17 @@
 <script defer src="/js/icons.js?v=u15polish"></script>
 <script defer src="/js/storage.js?v=u15polish"></script>
 <script defer src="/js/firestore_sync.js?v=u15polish"></script>
-<script defer src="/js/transcripts_store.js?v=u7bworker"></script>
+<script defer src="/js/transcripts_store.js?v=u17deixis"></script>
 <script defer src="/js/api.js?v=u15polish"></script>
 <script defer src="/js/pptx_parser.js?v=u15polish"></script>
 <script defer src="/js/quiz.js?v=u15polish"></script>
 <script defer src="/js/ui.js?v=u15polish"></script>
 <script defer src="/js/viewers.js?v=u15polish"></script>
 <script defer src="/js/image_gallery.js?v=u15polish"></script>
-<script defer src="/js/pipeline.js?v=u15polish"></script>
+<script defer src="/js/deixis.js?v=u17deixis"></script>
+<script defer src="/js/pipeline.js?v=u17deixis"></script>
 <script defer src="/js/batch.js?v=u15polish"></script>
-<script defer src="/js/note_creation.js?v=u15polish"></script>
+<script defer src="/js/note_creation.js?v=u17deixis"></script>
 <script defer src="/js/notes_crud.js?v=u15polish"></script>
 <script defer src="/js/notion_viewer.js?v=u15polish"></script>
 <script defer src="/js/notion_clipboard.js?v=u15polish"></script>
@@ -4968,11 +4979,11 @@
 <script defer src="/js/timetable.js?v=u15polish"></script>
 <script defer src="/js/srs_review.js?v=u15polish"></script>
 <script defer src="/js/home_view.js?v=u15polish"></script>
-<script defer src="/js/transcripts_view.js?v=u7bworker"></script>
+<script defer src="/js/transcripts_view.js?v=u17deixis"></script>
 <script defer src="/js/bulk.js?v=u15polish"></script>
 <script defer src="/js/firebase_auth.js?v=u15polish"></script>
 <script defer src="/js/payment.js?v=u15polish"></script>
-<script defer src="/js/recorder.js?v=u7ehint"></script>
+<script defer src="/js/recorder.js?v=u17deixis"></script>
 <script defer src="/js/groups.js?v=u15polish"></script>
 <script defer src="/js/study_rooms.js?v=u15polish"></script>
 <script defer src="/js/bug_report.js?v=u15polish"></script>

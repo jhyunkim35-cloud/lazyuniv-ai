@@ -1494,6 +1494,7 @@
     // Step 3: feed text into new-note slots (existing behavior)
     const baseName = (sourceFilename || 'recording').replace(/\.[^.]+$/, '');
     const file = new File([cleanText], baseName + '.txt', { type: 'text/plain' });
+    if (savedTranscript?.id) file._transcriptId = savedTranscript.id; // U17: thread record id for post-analysis deixis save
 
     // Always keep a reference so the "다음" CTA can add it later if needed
     modalState.pendingFile = file;
