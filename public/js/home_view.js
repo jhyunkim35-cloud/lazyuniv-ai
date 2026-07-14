@@ -152,7 +152,7 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const recentSection = document.getElementById('recentSection');
   const folderBackBtn = document.getElementById('folderBackBtn');
   const allNotesTitle = document.getElementById('allNotesTitle');
-  if (recentSection) recentSection.style.display = isFolderView ? 'none' : '';
+  // (recent section visibility is set below, after notes are known)
   if (folderBackBtn) folderBackBtn.style.display  = isFolderView ? ''     : 'none';
 
   // Hide the home-page record card while inside a folder view — it belongs
@@ -271,12 +271,17 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const emptyMsg  = document.getElementById('emptyHomeMsg');
   if (!recentGrid || !allGrid) return;
 
-  // Recent grid: only unfiled notes in home view; hidden in folder view
+  // Recent grid: 4 most recently updated notes across ALL folders (getAllNotesFS
+  // sorts by updatedAt desc). Filed notes are otherwise hidden behind folder
+  // cards on home, so this is the only one-click path back to yesterday's note —
+  // the old unfiled-only filter left the section permanently empty for users who
+  // organize everything. Hidden in folder view; header hidden when no notes.
   recentGrid.innerHTML = '';
   if (!isFolderView) {
-    notes.filter(n => !n.folderId).slice(0, 4).forEach(note =>
+    notes.slice(0, 4).forEach(note =>
       recentGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
   }
+  if (recentSection) recentSection.style.display = (isFolderView || notes.length === 0) ? 'none' : '';
 
   allGrid.innerHTML = '';
   if (_bulkSelectMode) {
