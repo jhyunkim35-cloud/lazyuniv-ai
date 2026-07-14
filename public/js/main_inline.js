@@ -387,6 +387,14 @@ splitViewBtn.addEventListener('click', async () => {
     }
   }
 
+  // Transcript-only / text-only notes have no slides — say so instead of
+  // leaving a silent blank pane that reads as a rendering failure.
+  if (!splitSlides.children.length) {
+    splitSlides.innerHTML =
+      '<div class="split-no-slides"><i data-lucide="mic" style="width:26px;height:26px;"></i>' +
+      '<div>슬라이드 없는 노트</div><span>녹취록·텍스트만으로 만든 노트예요</span></div>';
+  }
+
   populateSplitImagePanel();
   // Round 2: bind IntersectionObserver to mark the currently-visible slide.
   initActiveSlideObserver();
