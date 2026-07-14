@@ -53,6 +53,7 @@ function defaultTranscriptTitle(date = new Date()) {
 // Save a freshly-completed transcript. Returns the saved record.
 // Throws if not logged in — caller should toast and bail.
 async function saveTranscriptFS({ text, audioFilename, durationSec, diarizationJobId }) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref) throw new Error('not_logged_in');
 
@@ -88,12 +89,25 @@ async function saveTranscriptFS({ text, audioFilename, durationSec, diarizationJ
   return record;
 }
 
+// U18: same 5s memo cache as getAllNotesFS — the global search hits this on
+// every debounced keystroke; transcripts carry full text so the repeated paid
+// collection read is even heavier than notes. Writers below invalidate.
+let _trCache = null, _trCacheAt = 0, _trCacheUid = null;
+const TR_CACHE_TTL_MS = 5000;
+function _invalidateTranscriptsCache() { _trCache = null; }
+
 async function getAllTranscriptsFS() {
   const ref = userTranscriptsRef();
   if (!ref) return [];
+  const uid = currentUser?.uid || null;
+  if (_trCache && _trCacheUid === uid && (Date.now() - _trCacheAt) < TR_CACHE_TTL_MS) {
+    return _trCache;
+  }
   try {
     const snap = await ref.orderBy('createdAt', 'desc').get();
-    return snap.docs.map(d => d.data());
+    const list = snap.docs.map(d => d.data());
+    _trCache = list; _trCacheAt = Date.now(); _trCacheUid = uid;
+    return list;
   } catch (e) {
     console.warn('[getAllTranscriptsFS] failed:', e.message);
     return [];
@@ -113,12 +127,14 @@ async function getTranscriptFS(id) {
 }
 
 async function deleteTranscriptFS(id) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref || !id) return;
   await ref.doc(id).delete();
 }
 
 async function renameTranscriptFS(id, newTitle) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref || !id) return null;
   const trimmed = (newTitle || '').trim();
@@ -132,6 +148,7 @@ async function renameTranscriptFS(id, newTitle) {
 // worker finishes — swaps in the labeled text and clears diarizationJobId so
 // transcripts_view.js's fire-and-forget check stops polling this doc.
 async function applyDiarizationLabelsFS(id, { text, charCount }) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref || !id) return null;
   const patch = {
@@ -160,6 +177,7 @@ async function applyDiarizationLabelsFS(id, { text, charCount }) {
 // touch the stored transcript text (labels stay "발화자 N:" in storage).
 // Consumers apply the mapping at render/consume time (transcripts_view.js).
 async function saveSpeakerNamesFS(id, speakerNames) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref || !id) return null;
   const patch = { speakerNames: speakerNames || {}, updatedAt: new Date().toISOString() };
@@ -170,6 +188,7 @@ async function saveSpeakerNamesFS(id, speakerNames) {
 // U17: deixis annotation layer — stored beside text, text itself never rewritten
 // (same contract as speakerNames). [{q, ref, slide, conf:'high'}]
 async function saveDeixisAnnotationsFS(id, deixisAnnotations) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref || !id) return null;
   const patch = { deixisAnnotations: deixisAnnotations || [], updatedAt: new Date().toISOString() };
@@ -189,6 +208,7 @@ async function searchTranscriptsFS(query) {
 
 // Attach a transcript to a note (for "used in" tracking). Best-effort.
 async function markTranscriptUsedInNote(transcriptId, noteId) {
+  _invalidateTranscriptsCache();
   const ref = userTranscriptsRef();
   if (!ref || !transcriptId || !noteId) return;
   try {
