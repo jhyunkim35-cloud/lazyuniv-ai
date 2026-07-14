@@ -40,6 +40,7 @@ async function saveNoteFS(note) {
   }
   console.log('[saveNoteFS]', note?.id, '|', note?.title || '(no title)', '|', _hasContent ? 'has content' : 'EMPTY');
   // ───── END DIAGNOSTIC ─────
+  _invalidateNotesCache();
   const now = new Date().toISOString();
   const id = note.id || uuidv4();
   const record = Object.assign({ folderId: null, createdAt: now }, note, { id, updatedAt: now });
@@ -172,9 +173,22 @@ async function getNoteFS(id) {
   }
 }
 
+// U18: short-lived memo cache — the global-search input calls getAllNotesFS on
+// every debounced keystroke, which was a full PAID Firestore collection read
+// (+ IDB mirror) per pause. 5s TTL bounds staleness; every write path below
+// calls _invalidateNotesCache() so same-tab mutations are never stale.
+// ponytail: same-tab cache only — cross-device staleness within 5s is acceptable.
+let _notesCache = null, _notesCacheAt = 0, _notesCacheUid = null;
+const NOTES_CACHE_TTL_MS = 5000;
+function _invalidateNotesCache() { _notesCache = null; }
+
 async function getAllNotesFS() {
   const ref = userNotesRef();
   if (!ref) return getAllNotes();
+  const uid = currentUser?.uid || null;
+  if (_notesCache && _notesCacheUid === uid && (Date.now() - _notesCacheAt) < NOTES_CACHE_TTL_MS) {
+    return _notesCache;
+  }
   try {
     const snap = await ref.get();
     const notes = snap.docs.map(d => _hydrateNoteForViewer(d.data()));
@@ -192,13 +206,16 @@ async function getAllNotesFS() {
         tx.onerror = e => rej(e.target.error);
       });
     } catch (e) { /* best-effort */ }
-    return notes.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    const sorted = notes.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    _notesCache = sorted; _notesCacheAt = Date.now(); _notesCacheUid = uid;
+    return sorted;
   } catch (e) {
     console.warn('[getAllNotesFS] Firestore read failed, falling back to IDB:', e.message);
     return getAllNotes();
   }
 }
 async function deleteNoteFS(id) {
+  _invalidateNotesCache();
   await deleteNote(id);
   const ref = userNotesRef();
   if (ref) {
@@ -236,6 +253,7 @@ async function searchNotesFS(query) {
 //
 // Returns true on success (any path), false if the write was refused.
 async function safeNotePartialUpdate(noteId, partial) {
+  _invalidateNotesCache();
   const ref = userNotesRef();
   if (!ref || !noteId) return false;
   try {
@@ -423,6 +441,7 @@ async function renameFolderFS(id, newName, color, lectureCode) {
   return updated;
 }
 async function updateNoteOrderFS(orderedIds) {
+  _invalidateNotesCache();
   // Always update IndexedDB so renderHomeView() (which reads IDB) sees the new order
   await updateNoteOrder(orderedIds);
   const ref = userNotesRef();

@@ -60,6 +60,16 @@ assert_contains public/js/transcripts_view.js "window.pickSavedTranscriptForSlot
 assert_contains public/js/pptx_parser.js "window.pickSavedTranscriptForSlot(item.id)" "U18-7c3: 빈 슬롯 버튼 → 픽커 호출"
 assert_contains public/index.html ".rec-pick-saved-btn" "U18-7c4: 슬롯 버튼 CSS 존재"
 
+# ── 7e) getAllNotesFS 메모 캐시 (검색 키스트로크당 유료 전체 리드 차단) ─
+assert_contains public/js/firestore_sync.js "const NOTES_CACHE_TTL_MS = 5000;" "U18-7e1: 5초 TTL 캐시 존재"
+assert_contains public/js/firestore_sync.js "function _invalidateNotesCache()" "U18-7e2: 무효화 헬퍼 존재"
+_u18_inv=$(grep -c "_invalidateNotesCache();" public/js/firestore_sync.js)
+if [ "$_u18_inv" -ge 4 ]; then
+  _pass "U18-7e3: 쓰기 경로 4곳(save/delete/partial/order) 무효화 (${_u18_inv}곳)"
+else
+  _fail "U18-7e3: 쓰기 경로 무효화 부족 (${_u18_inv}곳 < 4)"
+fi
+
 # ── 8) node --check ─────────────────────────────────────────
 for _u18_f in public/js/home_view.js public/js/transcripts_store.js public/js/main_inline.js; do
   if node --check "$_u18_f" >/dev/null 2>&1; then
