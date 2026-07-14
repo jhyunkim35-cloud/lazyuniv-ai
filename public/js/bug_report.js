@@ -77,7 +77,7 @@
       .br-hint { font-size: 11px; color: var(--text-muted, #94a3b8); margin-top: 4px; line-height: 1.4; }
       .br-attach {
         margin: 12px 0 14px; padding: 10px 12px; border-radius: 8px;
-        background: var(--surface-2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
+        background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
         font-size: 12px; color: var(--text-muted, #64748b); line-height: 1.5;
       }
       .br-attach-label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-weight: 600; color: var(--text, #0f172a); margin-bottom: 4px; }
@@ -91,7 +91,7 @@
       .br-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
       .br-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
       .br-btn-secondary { background: transparent; color: var(--text, #0f172a); border: 1px solid var(--border, #e2e8f0); }
-      .br-btn-secondary:hover { background: var(--surface-2, #f8fafc); }
+      .br-btn-secondary:hover { background: var(--surface2, #f8fafc); }
 
       /* Sidebar trigger — sits between the user-info block and the storage
          indicator. Subtle by default so we don't distract from the main

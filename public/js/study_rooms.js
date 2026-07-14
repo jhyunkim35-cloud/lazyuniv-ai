@@ -110,9 +110,9 @@
         background: transparent; color: var(--text, #0f172a);
         border: 1px solid var(--border, #e2e8f0);
       }
-      .sr-btn-secondary:hover { background: var(--surface-2, #f8fafc); }
+      .sr-btn-secondary:hover { background: var(--surface2, #f8fafc); }
       .sr-status-box {
-        background: var(--surface-2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
+        background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
         border-radius: 10px; padding: 14px; margin: 16px 0;
       }
 
@@ -122,7 +122,7 @@
       }
       .sr-choice-tile {
         padding: 18px 14px; border-radius: 12px;
-        border: 1px solid var(--border, #e2e8f0); background: var(--surface-2, #f8fafc);
+        border: 1px solid var(--border, #e2e8f0); background: var(--surface2, #f8fafc);
         cursor: pointer; text-align: left; transition: all 0.15s;
         display: flex; flex-direction: column; gap: 6px;
       }
@@ -137,7 +137,7 @@
       /* Join modal: tab switcher between token and code */
       .sr-tab-switcher {
         display: flex; gap: 4px; padding: 4px;
-        background: var(--surface-2, #f8fafc); border-radius: 8px; margin-bottom: 14px;
+        background: var(--surface2, #f8fafc); border-radius: 8px; margin-bottom: 14px;
       }
       .sr-tab-switcher button {
         flex: 1; padding: 8px 12px; border-radius: 6px;
@@ -621,7 +621,7 @@
       .sr-member-row {
         display: grid; grid-template-columns: 40px 1fr auto;
         align-items: center; gap: 12px; padding: 12px;
-        background: var(--surface-2, #f8fafc);
+        background: var(--surface2, #f8fafc);
         border: 1px solid var(--border, #e2e8f0); border-radius: 12px;
       }
       .sr-member-row.is-self {
@@ -631,7 +631,7 @@
       .sr-member-avatar {
         width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
         display: flex; align-items: center; justify-content: center;
-        background: var(--surface-3, #e2e8f0); color: var(--text, #0f172a);
+        background: var(--surface3, #e2e8f0); color: var(--text, #0f172a);
         font-weight: 700; font-size: 16px;
       }
       .sr-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -665,7 +665,7 @@
       }
       .sr-progress-bar {
         width: 60px; height: 6px; border-radius: 3px;
-        background: var(--surface-3, #e2e8f0); overflow: hidden;
+        background: var(--surface3, #e2e8f0); overflow: hidden;
       }
       .sr-progress-fill {
         height: 100%; background: linear-gradient(90deg, var(--primary, #7c3aed), #a855f7);

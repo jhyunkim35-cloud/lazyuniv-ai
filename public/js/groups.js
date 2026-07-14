@@ -97,9 +97,9 @@
         background: transparent; color: var(--text, #0f172a);
         border: 1px solid var(--border, #e2e8f0);
       }
-      .groups-btn-secondary:hover { background: var(--surface-2, #f8fafc); }
+      .groups-btn-secondary:hover { background: var(--surface2, #f8fafc); }
       .groups-invite-box {
-        background: var(--surface-2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
+        background: var(--surface2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
         border-radius: 10px; padding: 14px; margin: 16px 0;
       }
       .groups-invite-url {
@@ -227,7 +227,7 @@
     modal.appendChild(field('예상 강의 시간 (분)', minutesInput));
 
     // Info row: audio is auto-linked from the note — no user input required
-    const audioInfo = $('div', { style: 'background:var(--surface-2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text-muted,#64748b);display:flex;align-items:center;gap:8px' });
+    const audioInfo = $('div', { style: 'background:var(--surface2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--text-muted,#64748b);display:flex;align-items:center;gap:8px' });
     audioInfo.appendChild($('span', { style: 'flex-shrink:0' }, '🎙️'));
     audioInfo.appendChild($('span', {}, '녹음 파일이 이 노트에 자동 연결됩니다'));
     modal.appendChild(audioInfo);
@@ -395,7 +395,7 @@
     modal.appendChild($('h2', {}, '👥 강의 그룹 합류'));
     modal.appendChild($('p', { class: 'subtitle' }, '친구가 공유한 강의 노트/녹취록 그룹에 합류합니다.'));
 
-    const summary = $('div', { style: 'background:var(--surface-2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:14px;margin-bottom:8px;font-size:13px;line-height:1.6' });
+    const summary = $('div', { style: 'background:var(--surface2,#f8fafc);border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:14px;margin-bottom:8px;font-size:13px;line-height:1.6' });
     summary.appendChild($('div', { style: 'font-weight:600;margin-bottom:6px' }, '합류하면…'));
     const ul = $('ul', { style: 'margin:0;padding-left:18px;color:var(--text-muted,#64748b)' });
     ul.appendChild($('li', {}, '그룹의 강의 노트와 녹취록을 함께 볼 수 있어요'));
@@ -836,7 +836,7 @@
         display: grid;
         grid-template-columns: 40px 1fr auto;
         align-items: center; gap: 12px; padding: 12px;
-        background: var(--surface-2, #f8fafc);
+        background: var(--surface2, #f8fafc);
         border: 1px solid var(--border, #e2e8f0);
         border-radius: 12px;
       }
@@ -849,7 +849,7 @@
       .groups-member-avatar {
         width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
         display: flex; align-items: center; justify-content: center;
-        background: var(--surface-3, #e2e8f0); color: var(--text, #0f172a);
+        background: var(--surface3, #e2e8f0); color: var(--text, #0f172a);
         font-weight: 700; font-size: 16px;
       }
       .groups-member-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -861,7 +861,7 @@
       }
       .groups-self-tag, .groups-role-tag {
         font-size: 10px; padding: 2px 6px; border-radius: 999px;
-        background: var(--surface-3, #e2e8f0); color: var(--text-muted, #64748b);
+        background: var(--surface3, #e2e8f0); color: var(--text-muted, #64748b);
         font-weight: 600;
       }
       .groups-role-tag {
@@ -906,7 +906,7 @@
       .groups-settlement-summary {
         margin: 8px 24px 4px;
         padding: 10px 12px;
-        background: var(--surface-2, #f8fafc);
+        background: var(--surface2, #f8fafc);
         border-radius: 8px;
         font-size: 12px; color: var(--text-muted, #64748b);
         display: flex; gap: 8px; flex-wrap: wrap;
@@ -915,7 +915,7 @@
 
       .groups-transcript-box {
         margin: 0 24px 16px;
-        background: var(--surface-2, #f8fafc);
+        background: var(--surface2, #f8fafc);
         border: 1px solid var(--border, #e2e8f0);
         border-radius: 10px; padding: 14px;
         font-size: 13px; max-height: 320px; overflow-y: auto;
