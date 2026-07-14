@@ -138,8 +138,13 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   let displayNotes = filteredNotes !== undefined ? filteredNotes : notes;
   const isHomeView   = !_activeFolderId;             // null → home (unfiled + folder cards)
   const isFolderView = _activeFolderId && _activeFolderId !== 'none'; // specific folder UUID
+  const isSearch     = !!activeQuery;                // global search overrides folder scoping
 
-  if (_activeFolderId === 'none') {
+  if (isSearch) {
+    // Global search: flat result list across ALL folders (cards carry their
+    // folder tag). The unfiled-only home filter used to swallow every filed
+    // match, making the search bar useless for users who organize notes.
+  } else if (_activeFolderId === 'none') {
     displayNotes = displayNotes.filter(n => !n.folderId);
   } else if (isFolderView) {
     displayNotes = displayNotes.filter(n => n.folderId === _activeFolderId);
@@ -258,7 +263,9 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   }
 
   if (allNotesTitle) {
-    if (isFolderView) {
+    if (isSearch) {
+      allNotesTitle.innerHTML = `<i data-lucide="search" class="icon-sm"></i><span>"${escHtml(activeQuery)}" 검색 결과</span>`;
+    } else if (isFolderView) {
       const folderName = folderMap[_activeFolderId] || '폴더';
       // Folder header title: lucide folder icon + name (replaces 📁 emoji
       // prefix). The Mutation observer in icons.js will mount the SVG.
@@ -281,7 +288,7 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     notes.slice(0, 4).forEach(note =>
       recentGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
   }
-  if (recentSection) recentSection.style.display = (isFolderView || notes.length === 0) ? 'none' : '';
+  if (recentSection) recentSection.style.display = (isFolderView || isSearch || notes.length === 0) ? 'none' : '';
 
   allGrid.innerHTML = '';
   if (_bulkSelectMode) {
@@ -297,7 +304,7 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const folderCountMap = {};
   notes.forEach(n => { if (n.folderId) folderCountMap[n.folderId] = (folderCountMap[n.folderId] || 0) + 1; });
 
-  const hasContent = isHomeView ? (folders.length > 0 || displayNotes.length > 0) : displayNotes.length > 0;
+  const hasContent = (isHomeView && !isSearch) ? (folders.length > 0 || displayNotes.length > 0) : displayNotes.length > 0;
   if (!hasContent) {
     emptyMsg.style.display = '';
     const icon = document.getElementById('emptyHomeIcon');
@@ -327,11 +334,14 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     }
   } else {
     emptyMsg.style.display = 'none';
-    // In home view: prepend folder cards, then unfiled note cards
-    if (isHomeView) {
+    // In home view: prepend folder cards, then unfiled note cards.
+    // During search: no folder cards, and keep searchNotesFS's recency order
+    // (sortOrder is per-folder drag position — meaningless across folders).
+    if (isHomeView && !isSearch) {
       folders.forEach(f => allGrid.appendChild(buildFolderCard(f, folderCountMap[f.id] || 0)));
     }
-    const sorted = [...displayNotes].sort((a, b) => (a.sortOrder ?? Infinity) - (b.sortOrder ?? Infinity));
+    const sorted = isSearch ? displayNotes
+      : [...displayNotes].sort((a, b) => (a.sortOrder ?? Infinity) - (b.sortOrder ?? Infinity));
     sorted.forEach(note => allGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
   }
 
