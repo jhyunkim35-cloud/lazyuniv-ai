@@ -66,4 +66,37 @@ assert.ok(nonIntHtml.includes('deixis-chip'), 'non-integer slide should still in
 assert.ok(nonIntHtml.includes('테스트 공식'));
 assert.ok(!nonIntHtml.includes('(p.3.5)'), 'non-integer slide should not render (p.N) suffix');
 
+// 9) preamble containing a bracketed header must not break extraction
+const goodArr = JSON.stringify([{q:'이 식을 여기 대입하면', ref:'오일러 공식', slide:8, conf:'high'}]);
+assert.strictEqual(parseDeixisAnnotations('[작업: 지시어 해석] 결과:\n' + goodArr, rec, ppt).length, 1,
+  'preamble with bracketed header should not break parsing');
+
+// 10) postamble with 20+ ']' characters must not exhaust the extractor
+assert.strictEqual(parseDeixisAnnotations(goodArr + '\n' + '[슬라이드 1]'.repeat(25), rec, ppt).length, 1,
+  'bracket-heavy postamble should not break parsing');
+
+// 11) max_tokens truncation: salvage complete objects, drop the cut one
+const truncated = '[' + JSON.stringify({q:'이 식을 여기 대입하면', ref:'오일러 공식', slide:8, conf:'high'})
+  + ',{"q":"값이 나옵'; // cut mid-string, no closing bracket
+assert.strictEqual(parseDeixisAnnotations(truncated, rec, ppt).length, 1,
+  'truncated array should salvage complete objects');
+
+// 12) string-typed slide is REJECTED (not laundered to null past the existence gate)
+assert.strictEqual(parseDeixisAnnotations(
+  JSON.stringify([{q:'이 식을 여기 대입하면', ref:'오일러 공식', slide:'99', conf:'high'}]), rec, ppt).length, 0,
+  'string slide must be rejected, not treated as context-only');
+assert.strictEqual(parseDeixisAnnotations(
+  JSON.stringify([{q:'이 식을 여기 대입하면', ref:'오일러 공식', slide:null, conf:'high'}]), rec, ppt).length, 1,
+  'explicit null slide stays a valid context-only resolution');
+
+// 13) quotes with interior newlines or speaker-label prefixes are rejected
+//     (they would wrap a line start and break the preview label pass)
+assert.strictEqual(parseDeixisAnnotations(
+  JSON.stringify([{q:'값이 나옵니다.\n\n[00:02:00] 발화자 1', ref:'테스트', slide:8, conf:'high'}]), rec, ppt).length, 0,
+  'multi-line quote must be rejected');
+assert.strictEqual(parseDeixisAnnotations(
+  JSON.stringify([{q:'발화자 1: 이 식을 여기 대입하면', ref:'테스트', slide:8, conf:'high'}]),
+  '발화자 1: 이 식을 여기 대입하면 됩니다', ppt).length, 0,
+  'quote swallowing a speaker label must be rejected');
+
 console.log('test_deixis: ALL PASS');

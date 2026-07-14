@@ -260,6 +260,8 @@
     const safeName = (t.title || 'transcript').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
     const file = new File([text], safeName + '.txt', { type: 'text/plain' });
     file._transcriptId = t.id; // U17: thread record id so post-analysis deixis save can target it
+    file._rawText = raw;       // U17: annotations must anchor in the RAW stored text the preview renders,
+                               // not the name-applied analysis text (they differ when speakers are renamed)
     hidePreviewModal();
     if (typeof switchView === 'function') switchView('new');
     // Slight delay so switchView finishes rendering before DOM manipulation

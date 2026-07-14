@@ -11,6 +11,8 @@ const MINIMAL_SYSTEM = '위 사용자 메시지에 포함된 지시사항을 정
 // source at list price. Reset per run.
 let _agent1CachePrefix = null;
 let storedDeixisAnnotations = [];   // U17: high-conf annotations from the current run
+let storedDeixisRan = false;        // U17: true iff the deixis stage produced a (possibly empty)
+                                    // result this run — gates the stale-annotation overwrite.
 
 async function runAgentPipeline(apiKey, targetBodyEl = null) {
   resetAgentNodes();
@@ -54,14 +56,19 @@ async function runAgentPipeline(apiKey, targetBodyEl = null) {
     // U17: deixis-resolution stage — before agent1 so notes are written with resolved
     // referents. Shares agent1's exact cache prefix (writes the entry agent1 reads).
     storedDeixisAnnotations = [];
+    storedDeixisRan = false;
     let deixisSection = '';
     if (storedPptText && storedFilteredText && detectDeixisCandidates(storedFilteredText)) {
       try {
         setAgentNode(1, 'loading', '지시어 해석 중…');
         const prefix = buildAgent1CachePrefix(storedPptText, storedFilteredText);
+        // 8192: the prompt allows up to 40 annotations (~180 Korean chars of JSON each);
+        // 2000 truncated dense lectures mid-array. parseDeixisAnnotations salvages
+        // complete objects if truncation still happens.
         const raw = await callClaudeOnce(apiKey, buildDeixisUserPrompt(), MINIMAL_SYSTEM,
-          2000, 'claude-sonnet-4-6', prefix, { isFirstCall: false, feature: 'noteAnalysis' });
+          8192, 'claude-sonnet-4-6', prefix, { isFirstCall: false, feature: 'noteAnalysis' });
         storedDeixisAnnotations = parseDeixisAnnotations(raw, storedFilteredText, storedPptText);
+        storedDeixisRan = true;  // only after a parsed result — an API failure must NOT wipe stored annotations
         deixisSection = buildDeixisSection(storedDeixisAnnotations);
         agentLog(1, `지시어 해석 ${storedDeixisAnnotations.length}건 (고신뢰만 채택)`);
       } catch (e) {

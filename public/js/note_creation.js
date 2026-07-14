@@ -132,14 +132,27 @@ async function runSingleNoteAnalysis() {
 
     // U17: persist high-conf deixis annotations back onto their source transcript
     // records (display layer for the preview modal). Fire-and-forget; text untouched.
-    if (typeof storedDeixisAnnotations !== 'undefined' && storedDeixisAnnotations.length > 0) {
+    // Runs whenever the deixis stage produced a result — INCLUDING an empty one —
+    // so a re-analysis with a different deck overwrites stale annotations instead
+    // of leaving old slide citations behind.
+    if (typeof storedDeixisRan !== 'undefined' && storedDeixisRan) {
+      // Anchor against the RAW stored text (threaded by transcripts_view), not the
+      // speaker-names-applied analysis text — the preview modal anchors in raw
+      // t.text, so anything validated on a different form would silently never render.
+      const rawTexts = [];
+      for (const s of recFiles) {
+        try { rawTexts.push(typeof s.file._rawText === 'string' ? s.file._rawText : await s.file.text()); }
+        catch (e) { rawTexts.push(''); console.warn('[deixis] raw read failed:', e); }
+      }
       for (let i = 0; i < recFiles.length; i++) {
         try {
           const tid = recFiles[i].file._transcriptId;
           if (!tid) continue;
-          const recRaw = await recFiles[i].file.text();
-          const mine = assignAnnotationsToRecordText(storedDeixisAnnotations, recRaw);
-          if (mine.length > 0) saveDeixisAnnotationsFS(tid, mine).catch(e => console.warn('[deixis] save failed:', e));
+          // Unambiguous attribution: the quote must anchor exactly once in THIS
+          // file and nowhere in any sibling file of the same run.
+          const mine = assignAnnotationsToRecordText(storedDeixisAnnotations, rawTexts[i])
+            .filter(a => rawTexts.every((t2, j) => j === i || _countOccurrences(t2, a.q) === 0));
+          saveDeixisAnnotationsFS(tid, mine).catch(e => console.warn('[deixis] save failed:', e));
         } catch (e) {
           console.warn('[deixis] annotation loop failed:', e);
         }

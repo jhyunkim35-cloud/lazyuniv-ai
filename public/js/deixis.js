@@ -37,25 +37,40 @@ function _countOccurrences(haystack, needle) {
   return n;
 }
 
+// String-aware bracket matcher: find the JSON array of objects in model output,
+// tolerating prose before/after (bracketed headers like "[작업: ...]" are skipped
+// because they aren't followed by '{' or ']') and max_tokens truncation (salvages
+// every complete object and closes the array).
+function _extractJsonArray(raw) {
+  let start = -1;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] === '[' && /^\s*[{\]]/.test(raw.slice(i + 1, i + 8))) { start = i; break; }
+  }
+  if (start === -1) return null;
+  let depth = 0, inStr = false, esc = false, lastObjEnd = -1;
+  for (let i = start; i < raw.length; i++) {
+    const c = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '[' || c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 1) lastObjEnd = i; }
+    else if (c === ']') { depth--; if (depth === 0) return raw.substring(start, i + 1); }
+  }
+  // Never closed → truncated output: keep the complete objects.
+  return lastObjEnd !== -1 ? raw.substring(start, lastObjEnd + 1) + ']' : null;
+}
+
 function parseDeixisAnnotations(rawModelText, recText, pptText) {
   let arr;
   try {
-    const raw = (rawModelText || '');
-    const firstBracket = raw.indexOf('[');
-    if (firstBracket === -1) return [];
-    // Bounded backward scan: find each ']' position from the LAST, try JSON.parse on slices,
-    // stop at first success or after 20 attempts.
-    let attempts = 0;
-    for (let i = raw.length - 1; i > firstBracket && attempts < 20; i--) {
-      if (raw[i] === ']') {
-        attempts++;
-        try {
-          arr = JSON.parse(raw.substring(firstBracket, i + 1));
-          if (Array.isArray(arr)) break; // Found valid array.
-        } catch (_) { /* continue to next ']' */ }
-      }
-    }
-    if (!Array.isArray(arr)) return [];
+    const slice = _extractJsonArray(rawModelText || '');
+    if (!slice) return [];
+    arr = JSON.parse(slice);
   } catch (_) { return []; }
   if (!Array.isArray(arr)) return [];
   const slideNums = new Set(
@@ -67,9 +82,16 @@ function parseDeixisAnnotations(rawModelText, recText, pptText) {
     if (!a || typeof a !== 'object') continue;
     const q = typeof a.q === 'string' ? a.q.trim() : '';
     const ref = typeof a.ref === 'string' ? a.ref.trim() : '';
+    // A non-integer slide (e.g. "99") must be REJECTED, not laundered to null —
+    // null skips the slide-existence gate below, which would let hallucinated
+    // slides through as "context-only" resolutions.
+    if (a.slide !== null && a.slide !== undefined && !Number.isInteger(a.slide)) continue;
     const slide = Number.isInteger(a.slide) ? a.slide : null;
     if (a.conf !== 'high') continue;                       // threshold policy: high only
     if (q.length < 4 || q.length > 60) continue;
+    // Multi-line quotes and quotes swallowing a speaker-label prefix break the
+    // preview's line-start label pass (label styling + U15 name substitution).
+    if (/\n/.test(q) || /(발화자|참석자)\s*\d+\s*:/.test(q)) continue;
     if (ref.length < 2 || ref.length > 120) continue;
     if (_countOccurrences(recText || '', q) !== 1) continue; // must anchor uniquely
     if (slide !== null && !slideNums.has(slide)) continue;   // hallucinated slide → drop

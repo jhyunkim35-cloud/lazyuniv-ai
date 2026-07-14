@@ -140,6 +140,18 @@ async function applyDiarizationLabelsFS(id, { text, charCount }) {
     diarizationJobId: null,
     updatedAt: new Date().toISOString(),
   };
+  // U17: the label upgrade rewrites the whole text — re-validate any saved deixis
+  // annotations against the new form and drop the ones whose quote no longer
+  // anchors exactly once (otherwise the preview keeps dead entries forever).
+  try {
+    const doc = await ref.doc(id).get();
+    const existing = doc.exists ? doc.data().deixisAnnotations : null;
+    if (Array.isArray(existing) && existing.length > 0 && typeof assignAnnotationsToRecordText === 'function') {
+      patch.deixisAnnotations = assignAnnotationsToRecordText(existing, text || '');
+    }
+  } catch (e) {
+    console.warn('[applyDiarizationLabelsFS] deixis re-validation skipped:', e);
+  }
   await ref.doc(id).update(patch);
   return patch;
 }

@@ -37,7 +37,7 @@ assert_contains public/js/pipeline.js "let cachePrefix = buildAgent1CachePrefix(
 # ── 4) 해석 호출: agent1 프리픽스 재사용 + MINIMAL_SYSTEM + claude-sonnet-4-6 (캐시 공유 계약) ─
 assert_contains public/js/pipeline.js "const prefix = buildAgent1CachePrefix(storedPptText, storedFilteredText);" "U17-4a: 해석 단계가 agent1과 동일 인자로 프리픽스 생성 (바이트 동일 → 캐시 히트)"
 assert_contains public/js/pipeline.js "const raw = await callClaudeOnce(apiKey, buildDeixisUserPrompt(), MINIMAL_SYSTEM," "U17-4b: 해석 호출이 MINIMAL_SYSTEM 사용 (agent1과 시스템 프롬프트 동일 → 캐시 매칭)"
-assert_contains public/js/pipeline.js "2000, 'claude-sonnet-4-6', prefix, { isFirstCall: false, feature: 'noteAnalysis' });" "U17-4c: 해석 호출이 claude-sonnet-4-6 + 공유 프리픽스로 전송"
+assert_contains public/js/pipeline.js "8192, 'claude-sonnet-4-6', prefix, { isFirstCall: false, feature: 'noteAnalysis' });" "U17-4c: 해석 호출이 claude-sonnet-4-6 + 공유 프리픽스 + max_tokens 8192(40개 주석 잘림 방지)로 전송"
 
 # ── 5) 임계치 정책: high 신뢰도만 채택 ──────────────────────
 assert_contains public/js/deixis.js "if (a.conf !== 'high') continue;" "U17-5: parseDeixisAnnotations가 고신뢰(high)만 채택 (medium/low 드롭)"
@@ -65,7 +65,17 @@ if [ -n "$_u17_d_line" ] && [ -n "$_u17_p_line" ] && [ "$_u17_d_line" -lt "$_u17
 else
   _fail "U17-7a: index.html이 deixis.js를 pipeline.js보다 먼저 로드  (deixis@${_u17_d_line:-없음}, pipeline@${_u17_p_line:-없음})"
 fi
-assert_contains public/index.html "?v=u17deixis" "U17-7b: 캐시버스트 마커 적용"
+assert_contains public/index.html "deixis.js?v=u17fix" "U17-7b: 캐시버스트 마커 적용 (u17fix 라운드)"
+
+# ── 9) u17fix 라운드 — 확정 결함 픽스 회귀 가드 ─────────────
+assert_contains public/js/deixis.js "function _extractJsonArray(" "U17-9a: 문자열 인지 브래킷 매칭 추출기 존재 (프리앰블/포스트앰블/잘림 내성)"
+assert_contains public/js/deixis.js "if (a.slide !== null && a.slide !== undefined && !Number.isInteger(a.slide)) continue;" "U17-9b: 문자열 slide 거부 (환각 게이트 우회 차단)"
+assert_contains public/js/deixis.js "if (/\n/.test(q) || /(발화자|참석자)" "U17-9c: 개행·발화자 라벨 포함 인용문 거부 (미리보기 라벨 패스 보호)"
+assert_contains public/js/pipeline.js "storedDeixisRan = true;" "U17-9d: 스테이지 실행 플래그 — 파싱 성공 후에만 true (API 실패가 기존 주석 못 지움)"
+assert_contains public/js/note_creation.js "storedDeixisRan" "U17-9e: 저장 루프가 실행 플래그 게이트 (빈 결과도 덮어써 스테일 주석 제거)"
+assert_contains public/js/transcripts_view.js "file._rawText = raw;" "U17-9f: raw 텍스트 스레딩 (검증·저장·렌더 앵커 텍스트 통일)"
+assert_contains public/js/note_creation.js "_countOccurrences(t2, a.q) === 0" "U17-9g: 교차 녹취록 오귀속 가드 (다른 파일에 같은 인용문 있으면 배정 안 함)"
+assert_contains public/js/transcripts_store.js "patch.deixisAnnotations = assignAnnotationsToRecordText(existing, text || '');" "U17-9h: 화자분리 사후 text 교체 시 주석 재검증"
 
 # ── 8) node --check — 이번 기능이 건드린 JS 전부 문법 검증 ──
 for _u17_f in public/js/deixis.js public/js/pipeline.js public/js/transcripts_store.js public/js/transcripts_view.js public/js/note_creation.js scripts/test_deixis.js; do
