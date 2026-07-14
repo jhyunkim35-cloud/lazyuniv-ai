@@ -506,6 +506,10 @@
     #splitSlides .slide-label { text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; }
     /* Round 1: slide list items + clickable p.N references + flash highlight */
     #splitSlides .split-slide-item { display:block; border-radius:8px; transition:background 0.3s ease; }
+    .search-sect-header {
+      grid-column: 1 / -1; display: flex; align-items: center; gap: 6px;
+      color: var(--text-muted); font-size: 0.85rem; font-weight: 600; margin-top: 8px;
+    }
     mark.search-hit {
       background: var(--primary-dim); color: var(--primary-bright);
       border-radius: 3px; padding: 0 2px;
@@ -4971,7 +4975,7 @@
 <script defer src="/js/icons.js?v=u15polish"></script>
 <script defer src="/js/storage.js?v=u15polish"></script>
 <script defer src="/js/firestore_sync.js?v=u15polish"></script>
-<script defer src="/js/transcripts_store.js?v=u17fix"></script>
+<script defer src="/js/transcripts_store.js?v=u18tsearch"></script>
 <script defer src="/js/api.js?v=u15polish"></script>
 <script defer src="/js/pptx_parser.js?v=u15polish"></script>
 <script defer src="/js/quiz.js?v=u15polish"></script>
@@ -4990,7 +4994,7 @@
 <script defer src="/js/srs.js?v=u15polish"></script>
 <script defer src="/js/timetable.js?v=u15polish"></script>
 <script defer src="/js/srs_review.js?v=u15polish"></script>
-<script defer src="/js/home_view.js?v=u18snippet"></script>
+<script defer src="/js/home_view.js?v=u18tsearch"></script>
 <script defer src="/js/transcripts_view.js?v=u17fix"></script>
 <script defer src="/js/bulk.js?v=u15polish"></script>
 <script defer src="/js/firebase_auth.js?v=u15polish"></script>

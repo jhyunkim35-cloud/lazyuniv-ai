@@ -177,6 +177,16 @@ async function saveDeixisAnnotationsFS(id, deixisAnnotations) {
   return patch;
 }
 
+// U18: global-search hook — title/text contains match, newest first
+// (inherits getAllTranscriptsFS's createdAt desc order).
+async function searchTranscriptsFS(query) {
+  const q = (query || '').toLowerCase();
+  if (!q) return [];
+  const all = await getAllTranscriptsFS();
+  return all.filter(t =>
+    (t.title || '').toLowerCase().includes(q) || (t.text || '').toLowerCase().includes(q));
+}
+
 // Attach a transcript to a note (for "used in" tracking). Best-effort.
 async function markTranscriptUsedInNote(transcriptId, noteId) {
   const ref = userTranscriptsRef();
@@ -200,5 +210,6 @@ window.renameTranscriptFS       = renameTranscriptFS;
 window.applyDiarizationLabelsFS = applyDiarizationLabelsFS;
 window.saveSpeakerNamesFS       = saveSpeakerNamesFS;
 window.saveDeixisAnnotationsFS  = saveDeixisAnnotationsFS;
+window.searchTranscriptsFS      = searchTranscriptsFS;
 window.markTranscriptUsedInNote = markTranscriptUsedInNote;
 window.defaultTranscriptTitle   = defaultTranscriptTitle;

@@ -304,7 +304,14 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const folderCountMap = {};
   notes.forEach(n => { if (n.folderId) folderCountMap[n.folderId] = (folderCountMap[n.folderId] || 0) + 1; });
 
-  const hasContent = (isHomeView && !isSearch) ? (folders.length > 0 || displayNotes.length > 0) : displayNotes.length > 0;
+  // U18: global search also surfaces transcripts (내 녹취록) as a section
+  // below the note results — the top bar promises "검색", not "노트 검색".
+  const tMatches = (isSearch && typeof searchTranscriptsFS === 'function')
+    ? await searchTranscriptsFS(activeQuery).catch(() => []) : [];
+
+  const hasContent = (isHomeView && !isSearch)
+    ? (folders.length > 0 || displayNotes.length > 0)
+    : (displayNotes.length > 0 || tMatches.length > 0);
   if (!hasContent) {
     emptyMsg.style.display = '';
     const icon = document.getElementById('emptyHomeIcon');
@@ -352,6 +359,13 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
       }
       allGrid.appendChild(card);
     });
+    if (isSearch && tMatches.length) {
+      const hdr = document.createElement('div');
+      hdr.className = 'search-sect-header';
+      hdr.innerHTML = `<i data-lucide="mic" class="icon-sm"></i><span>녹취록 ${tMatches.length}건</span>`;
+      allGrid.appendChild(hdr);
+      tMatches.forEach(t => allGrid.appendChild(buildTranscriptResultCard(t, activeQuery)));
+    }
   }
 
   renderSidebarFolders(notes, folders);
@@ -377,6 +391,26 @@ function buildSearchSnippet(note, query) {
   const raw = (start > 0 ? '…' : '') + source.slice(start, idx + query.length + 80).trim() + '…';
   const escQ = escHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return escHtml(raw).replace(new RegExp(escQ, 'gi'), m => `<mark class="search-hit">${m}</mark>`);
+}
+
+// Transcript hit in global search — same card shell as notes, mic pill,
+// click opens the transcript preview modal.
+function buildTranscriptResultCard(t, query) {
+  const card = document.createElement('div');
+  card.className = 'note-card';
+  const snip = buildSearchSnippet({ notesText: t.text }, query) || escHtml((t.text || '').slice(0, 100));
+  card.innerHTML = `
+    <div class="note-card-content">
+      <div class="note-card-folder"><i data-lucide="mic" class="icon-xs"></i><span>녹취록</span></div>
+      <div class="note-card-title">${escHtml(t.title || '제목 없음')}</div>
+      <div class="note-card-preview">${snip}</div>
+      <div class="note-card-footer">
+        <span>${fmtDate(t.createdAt)}</span>
+        <span>${(t.charCount || (t.text || '').length).toLocaleString()}자</span>
+      </div>
+    </div>`;
+  card.addEventListener('click', () => window.openTranscriptPreview?.(t.id));
+  return card;
 }
 
 function buildNoteCard(note, folderMap, folderColorMap = {}) {
