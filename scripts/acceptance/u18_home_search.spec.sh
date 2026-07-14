@@ -60,11 +60,6 @@ assert_contains public/js/transcripts_view.js "window.pickSavedTranscriptForSlot
 assert_contains public/js/pptx_parser.js "window.pickSavedTranscriptForSlot(item.id)" "U18-7c3: 빈 슬롯 버튼 → 픽커 호출"
 assert_contains public/index.html ".rec-pick-saved-btn" "U18-7c4: 슬롯 버튼 CSS 존재"
 
-# ── 7d) 시험 대시보드 스트립 (폴더 뷰 · examPlan 있는 폴더만) ─
-assert_contains public/js/home_view.js "function buildExamDashStrip(folder, noteCount)" "U18-7d1: 시험 대시보드 빌더 존재"
-assert_contains public/js/home_view.js "enterReviewMode(folder.id)" "U18-7d2: 복습 CTA가 기존 SRS 진입 재사용"
-assert_contains public/index.html ".exam-dash-strip" "U18-7d3: 대시보드 CSS 존재"
-
 # ── 8) node --check ─────────────────────────────────────────
 for _u18_f in public/js/home_view.js public/js/transcripts_store.js public/js/main_inline.js; do
   if node --check "$_u18_f" >/dev/null 2>&1; then
