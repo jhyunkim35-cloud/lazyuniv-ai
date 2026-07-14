@@ -506,6 +506,10 @@
     #splitSlides .slide-label { text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:1rem; }
     /* Round 1: slide list items + clickable p.N references + flash highlight */
     #splitSlides .split-slide-item { display:block; border-radius:8px; transition:background 0.3s ease; }
+    mark.search-hit {
+      background: var(--primary-dim); color: var(--primary-bright);
+      border-radius: 3px; padding: 0 2px;
+    }
     .split-no-slides {
       height:100%; min-height:200px; display:flex; flex-direction:column; align-items:center;
       justify-content:center; gap:8px; color:var(--text-muted); text-align:center; padding:24px;
@@ -4986,7 +4990,7 @@
 <script defer src="/js/srs.js?v=u15polish"></script>
 <script defer src="/js/timetable.js?v=u15polish"></script>
 <script defer src="/js/srs_review.js?v=u15polish"></script>
-<script defer src="/js/home_view.js?v=u18search"></script>
+<script defer src="/js/home_view.js?v=u18snippet"></script>
 <script defer src="/js/transcripts_view.js?v=u17fix"></script>
 <script defer src="/js/bulk.js?v=u15polish"></script>
 <script defer src="/js/firebase_auth.js?v=u15polish"></script>
@@ -4997,7 +5001,7 @@
 <script defer src="/js/bug_report.js?v=u18vars"></script>
 <script defer src="/js/onboarding_tour.js?v=u15polish"></script>
 <script defer src="/js/main.js?v=u15polish"></script>
-<script defer src="/js/main_inline.js?v=u18noslides"></script>
+<script defer src="/js/main_inline.js?v=u18snippet"></script>
 <div id="bulkDeleteBar">
   <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-muted);">
     <input type="checkbox" id="bulkSelectAllChk" onchange="toggleBulkSelectAll(this.checked)" style="accent-color:var(--primary);width:15px;height:15px;">

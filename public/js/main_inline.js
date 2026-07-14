@@ -1061,6 +1061,14 @@ document.getElementById('globalSearchInput').addEventListener('input', function(
     renderHomeView(results, query);
   }, 300);
 });
+document.getElementById('globalSearchInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && this.value) {
+    e.stopPropagation(); // don't let the global Esc handler close viewers too
+    this.value = '';
+    this.dispatchEvent(new Event('input'));
+    this.blur();
+  }
+});
 
 // IndexedDB layer moved to /js/storage.js
 

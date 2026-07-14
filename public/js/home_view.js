@@ -342,7 +342,16 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     }
     const sorted = isSearch ? displayNotes
       : [...displayNotes].sort((a, b) => (a.sortOrder ?? Infinity) - (b.sortOrder ?? Infinity));
-    sorted.forEach(note => allGrid.appendChild(buildNoteCard(note, folderMap, folderColorMap)));
+    sorted.forEach(note => {
+      const card = buildNoteCard(note, folderMap, folderColorMap);
+      if (isSearch) {
+        // Show WHERE the query matched (highlighted snippet) instead of the
+        // generic head preview; title-only matches keep the normal preview.
+        const snip = buildSearchSnippet(note, activeQuery);
+        if (snip) card.querySelector('.note-card-preview').innerHTML = snip;
+      }
+      allGrid.appendChild(card);
+    });
   }
 
   renderSidebarFolders(notes, folders);
@@ -353,6 +362,21 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
     const el = document.getElementById(id);
     if (el) el.textContent = `${mb} MB`;
   });
+}
+
+// Search-hit snippet: ~40 chars of context before the first body match,
+// ~80 after, every occurrence wrapped in <mark class="search-hit">.
+// Returns null when the query only matched the title.
+function buildSearchSnippet(note, query) {
+  if (!query) return null;
+  const source = (note.type === 'notion' ? (note.markdownContent || '') : (note.notesText || ''))
+    .replace(/^#+\s+.*/gm, '').replace(/\*\*/g, '').replace(/\n+/g, ' ');
+  const idx = source.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return null;
+  const start = Math.max(0, idx - 40);
+  const raw = (start > 0 ? '…' : '') + source.slice(start, idx + query.length + 80).trim() + '…';
+  const escQ = escHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return escHtml(raw).replace(new RegExp(escQ, 'gi'), m => `<mark class="search-hit">${m}</mark>`);
 }
 
 function buildNoteCard(note, folderMap, folderColorMap = {}) {
