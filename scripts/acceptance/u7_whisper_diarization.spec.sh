@@ -38,7 +38,7 @@ assert_contains public/js/recorder.js "audioBitsPerSecond: 32000" "U7-5: 32kbps 
 
 assert_contains vercel.json "api/whisper-stt.js" "U7-6: maxDuration 등록"
 assert_contains public/js/transcripts_view.js "발화자|참석자" "U7-7: 프리뷰 발화자 라벨 강조 렌더"
-assert_matches public/index.html "transcripts_view\.js\?v=u18link" "U7-7: transcripts_view 캐시버스트 갱신 (현재값 정확 핀 — 얼터네이션 금지, 구값 허용은 회귀 감지력 상실)"
+assert_matches public/index.html "transcripts_view\.js\?v=u18pick" "U7-7: transcripts_view 캐시버스트 갱신 (현재값 정확 핀 — 얼터네이션 금지, 구값 허용은 회귀 감지력 상실)"
 
 assert_live /api/whisper-stt "unauthorized" "U7-8: 라이브 함수 응답 (미인증 401 바디)"
 

@@ -244,7 +244,22 @@ function renderRecSlots() {
     removeBtn.title       = '제거';
     removeBtn.textContent = '×';
 
-    div.append(handle, orderSpan, fileArea, removeBtn);
+    // U18: empty slots also offer picking a SAVED transcript (내 녹취록) in
+    // place — previously the only path was leaving for the 내 녹취록 page.
+    if (!fileName && typeof window.pickSavedTranscriptForSlot === 'function' && _currentView === 'new') {
+      const pickBtn = document.createElement('button');
+      pickBtn.type        = 'button';
+      pickBtn.className   = 'rec-pick-saved-btn';
+      pickBtn.title       = '저장된 녹취록에서 선택';
+      pickBtn.textContent = '🎙 내 녹취록';
+      pickBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        window.pickSavedTranscriptForSlot(item.id);
+      });
+      div.append(handle, orderSpan, fileArea, pickBtn, removeBtn);
+    } else {
+      div.append(handle, orderSpan, fileArea, removeBtn);
+    }
 
     // ── File input change ──
     fileInput.addEventListener('change', e => {

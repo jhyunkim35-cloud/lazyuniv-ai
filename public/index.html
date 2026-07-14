@@ -3296,6 +3296,21 @@
       cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .usedin-chip:hover { border-color: var(--primary); color: var(--primary-bright); }
+    .rec-pick-saved-btn {
+      flex: 0 0 auto; font-size: 0.76rem; padding: 0.3rem 0.6rem; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      cursor: pointer; white-space: nowrap;
+    }
+    .rec-pick-saved-btn:hover { border-color: var(--primary); color: var(--primary-bright); }
+    .tr-pick-item {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+      width: 100%; text-align: left; padding: 0.55rem 0.7rem; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      cursor: pointer; margin-bottom: 6px;
+    }
+    .tr-pick-item:hover { border-color: var(--primary); }
+    .tr-pick-title { font-weight: 600; font-size: 0.88rem; }
+    .tr-pick-meta  { font-size: 0.74rem; color: var(--text-muted); }
     .transcript-preview-close {
       flex: 0 0 auto;
       width: 32px;
@@ -4987,7 +5002,7 @@
 <script defer src="/js/firestore_sync.js?v=u15polish"></script>
 <script defer src="/js/transcripts_store.js?v=u18tsearch"></script>
 <script defer src="/js/api.js?v=u15polish"></script>
-<script defer src="/js/pptx_parser.js?v=u15polish"></script>
+<script defer src="/js/pptx_parser.js?v=u18pick"></script>
 <script defer src="/js/quiz.js?v=u15polish"></script>
 <script defer src="/js/ui.js?v=u15polish"></script>
 <script defer src="/js/viewers.js?v=u15polish"></script>
@@ -5005,7 +5020,7 @@
 <script defer src="/js/timetable.js?v=u15polish"></script>
 <script defer src="/js/srs_review.js?v=u15polish"></script>
 <script defer src="/js/home_view.js?v=u18tsearch"></script>
-<script defer src="/js/transcripts_view.js?v=u18link"></script>
+<script defer src="/js/transcripts_view.js?v=u18pick"></script>
 <script defer src="/js/bulk.js?v=u15polish"></script>
 <script defer src="/js/firebase_auth.js?v=u15polish"></script>
 <script defer src="/js/payment.js?v=u15polish"></script>

@@ -54,6 +54,12 @@ assert_contains public/js/transcripts_view.js "transcriptPreviewUsedIn" "U18-7b2
 assert_contains public/js/transcripts_view.js "openSavedNote(btn.dataset.noteId)" "U18-7b3: 칩 클릭 → 노트 열기"
 assert_contains public/index.html ".usedin-chip" "U18-7b4: 칩 CSS 존재"
 
+# ── 7c) 새 노트 슬롯 '내 녹취록에서 선택' ───────────────────
+assert_contains public/js/transcripts_view.js "function buildTranscriptAnalysisFile(t)" "U18-7c1: 공용 분석 파일 빌더 (id/raw 스레딩 단일 출처)"
+assert_contains public/js/transcripts_view.js "window.pickSavedTranscriptForSlot = pickSavedTranscriptForSlot;" "U18-7c2: 슬롯 픽커 전역 노출"
+assert_contains public/js/pptx_parser.js "window.pickSavedTranscriptForSlot(item.id)" "U18-7c3: 빈 슬롯 버튼 → 픽커 호출"
+assert_contains public/index.html ".rec-pick-saved-btn" "U18-7c4: 슬롯 버튼 CSS 존재"
+
 # ── 8) node --check ─────────────────────────────────────────
 for _u18_f in public/js/home_view.js public/js/transcripts_store.js public/js/main_inline.js; do
   if node --check "$_u18_f" >/dev/null 2>&1; then

@@ -248,12 +248,11 @@
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
-  function useTranscriptForNewNote(t) {
+  // Shared builder: saved transcript record → analysis File with the id/raw-text
+  // threading the deixis save path needs. Used by the preview's "새 노트 만들기"
+  // and the new-note slot picker.
+  function buildTranscriptAnalysisFile(t) {
     const raw = t.text || '';
-    if (!raw) {
-      window.showToast?.('녹취록 내용이 없습니다.');
-      return;
-    }
     // U15: apply the display-only speaker-name mapping so the pipeline sees
     // "교수님:" instead of "발화자 1:" too — stored text itself stays untouched.
     const text = applySpeakerNames(raw, t.speakerNames);
@@ -262,6 +261,49 @@
     file._transcriptId = t.id; // U17: thread record id so post-analysis deixis save can target it
     file._rawText = raw;       // U17: annotations must anchor in the RAW stored text the preview renders,
                                // not the name-applied analysis text (they differ when speakers are renamed)
+    return file;
+  }
+
+  // U18: "내 녹취록에서 선택" picker for an empty new-note rec slot — fills the
+  // slot in place instead of forcing a detour through the 내 녹취록 page.
+  async function pickSavedTranscriptForSlot(slotId) {
+    const ts = await getAllTranscriptsFS();
+    if (!ts.length) { window.showToast?.('저장된 녹취록이 없습니다.'); return; }
+    const overlay = document.createElement('div');
+    overlay.className = 'db-modal-overlay';
+    overlay.innerHTML = `
+      <div class="db-modal">
+        <h3 style="display:flex;align-items:center;gap:0.4rem;"><i data-lucide="mic" class="icon-sm" style="color:var(--primary);"></i><span>내 녹취록에서 선택</span></h3>
+        <div class="db-modal-list">${ts.map(t => `
+          <button type="button" class="tr-pick-item" data-id="${escHtml(t.id)}">
+            <span class="tr-pick-title">${escHtml(t.title || '제목 없음')}</span>
+            <span class="tr-pick-meta">${escHtml(fmtDateTime(t.createdAt))} · ${(t.charCount || (t.text || '').length).toLocaleString()}자</span>
+          </button>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:0.6rem;">
+          <button type="button" class="sr-btn-secondary" id="trPickCancel" style="padding:0.4rem 1rem;border-radius:8px;cursor:pointer;">취소</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    overlay.querySelector('#trPickCancel').addEventListener('click', close);
+    overlay.querySelectorAll('.tr-pick-item').forEach(btn => btn.addEventListener('click', () => {
+      const t = ts.find(x => x.id === btn.dataset.id);
+      if (!t || !(t.text || '')) { window.showToast?.('녹취록 내용이 없습니다.'); return; }
+      if (typeof setRecSlotFile === 'function') setRecSlotFile(slotId, buildTranscriptAnalysisFile(t));
+      close();
+      window.showToast?.('📝 녹취록을 슬롯에 추가했습니다.');
+    }));
+    if (window.lucide?.createIcons) window.lucide.createIcons();
+  }
+
+  function useTranscriptForNewNote(t) {
+    if (!(t.text || '')) {
+      window.showToast?.('녹취록 내용이 없습니다.');
+      return;
+    }
+    const file = buildTranscriptAnalysisFile(t);
     hidePreviewModal();
     if (typeof switchView === 'function') switchView('new');
     // Slight delay so switchView finishes rendering before DOM manipulation
@@ -577,5 +619,6 @@
   window.renderTranscriptsView    = renderTranscriptsView;
   window.openTranscriptPreview    = openTranscriptPreview;
   window.updateMyTranscriptsCount = updateMyTranscriptsCount;
+  window.pickSavedTranscriptForSlot = pickSavedTranscriptForSlot;
 
 })();
