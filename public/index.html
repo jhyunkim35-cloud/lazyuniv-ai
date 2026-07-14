@@ -3309,6 +3309,26 @@
       cursor: pointer; margin-bottom: 6px;
     }
     .tr-pick-item:hover { border-color: var(--primary); }
+    .exam-dash-strip {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.8rem 1.1rem; margin-bottom: 1rem;
+    }
+    .exam-dash-strip.urgent { border-color: var(--danger, #ef4444); }
+    .exam-dash-dday {
+      font-size: 1.25rem; font-weight: 800; color: var(--primary-bright);
+      flex: 0 0 auto; min-width: 3.2rem; text-align: center;
+    }
+    .exam-dash-strip.urgent .exam-dash-dday { color: var(--danger, #ef4444); }
+    .exam-dash-info { flex: 1; min-width: 0; }
+    .exam-dash-date { font-weight: 600; font-size: 0.9rem; }
+    .exam-dash-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    .exam-dash-btn {
+      flex: 0 0 auto; padding: 0.45rem 0.9rem; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--primary); background: var(--primary-dim); color: var(--primary-bright);
+      font-size: 0.82rem; font-weight: 600;
+    }
+    .exam-dash-btn:hover { background: var(--primary); color: #fff; }
     .tr-pick-title { font-weight: 600; font-size: 0.88rem; }
     .tr-pick-meta  { font-size: 0.74rem; color: var(--text-muted); }
     .transcript-preview-close {
@@ -5019,7 +5039,7 @@
 <script defer src="/js/srs.js?v=u15polish"></script>
 <script defer src="/js/timetable.js?v=u15polish"></script>
 <script defer src="/js/srs_review.js?v=u15polish"></script>
-<script defer src="/js/home_view.js?v=u18tsearch"></script>
+<script defer src="/js/home_view.js?v=u18exam"></script>
 <script defer src="/js/transcripts_view.js?v=u18pick"></script>
 <script defer src="/js/bulk.js?v=u15polish"></script>
 <script defer src="/js/firebase_auth.js?v=u15polish"></script>

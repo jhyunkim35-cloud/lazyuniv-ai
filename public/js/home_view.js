@@ -278,6 +278,16 @@ async function renderHomeView(filteredNotes, activeQuery = '') {
   const emptyMsg  = document.getElementById('emptyHomeMsg');
   if (!recentGrid || !allGrid) return;
 
+  // U18: exam dashboard strip — folder view only, only when the folder has an
+  // exam plan. Pure composition of existing exam_plan/srs helpers (no new state).
+  document.getElementById('examDashStrip')?.remove();
+  if (isFolderView) {
+    const folder = folders.find(f => f.id === _activeFolderId);
+    if (folder?.examPlan?.examDate && typeof getDaysUntil === 'function') {
+      allGrid.parentNode.insertBefore(buildExamDashStrip(folder, displayNotes.length), allGrid);
+    }
+  }
+
   // Recent grid: 4 most recently updated notes across ALL folders (getAllNotesFS
   // sorts by updatedAt desc). Filed notes are otherwise hidden behind folder
   // cards on home, so this is the only one-click path back to yesterday's note —
@@ -391,6 +401,43 @@ function buildSearchSnippet(note, query) {
   const raw = (start > 0 ? '…' : '') + source.slice(start, idx + query.length + 80).trim() + '…';
   const escQ = escHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return escHtml(raw).replace(new RegExp(escQ, 'gi'), m => `<mark class="search-hit">${m}</mark>`);
+}
+
+// U18: exam dashboard strip — D-day, daily target, due-card count, review CTA.
+// All reads; review launch reuses srs_review's enterReviewMode.
+function buildExamDashStrip(folder, noteCount) {
+  const plan  = folder.examPlan;
+  const dLeft = getDaysUntil(plan.examDate);
+  const dLabel = dLeft === 0 ? 'D-DAY' : (dLeft > 0 ? `D-${dLeft}` : '시험 종료');
+  const target = (plan.dailyTargetMode === 'custom' && plan.dailyTargetCount)
+    ? plan.dailyTargetCount
+    : (typeof recommendedDailyTarget === 'function' && dLeft > 0
+        ? recommendedDailyTarget(noteCount, dLeft, plan.prepMode) : null);
+  const strip = document.createElement('div');
+  strip.id = 'examDashStrip';
+  strip.className = 'exam-dash-strip' + (dLeft !== null && dLeft >= 0 && dLeft <= 3 ? ' urgent' : '');
+  strip.innerHTML = `
+    <div class="exam-dash-dday">${escHtml(dLabel)}</div>
+    <div class="exam-dash-info">
+      <div class="exam-dash-date">${escHtml(plan.examDate)} 시험</div>
+      <div class="exam-dash-meta">노트 ${noteCount}개${target ? ` · 오늘 목표 ${target}개` : ''}<span id="examDashDue"></span></div>
+    </div>
+    <button type="button" id="examDashReviewBtn" class="exam-dash-btn" style="display:none;">오늘 복습 시작</button>`;
+  if (typeof getDueCards === 'function' && dLeft >= 0) {
+    const d = new Date();
+    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    getDueCards(folder.id, ymd).then(cards => {
+      if (!cards.length) return;
+      const dueEl = strip.querySelector('#examDashDue');
+      if (dueEl) dueEl.textContent = ` · 복습 대기 ${cards.length}개`;
+      const btn = strip.querySelector('#examDashReviewBtn');
+      if (btn && typeof enterReviewMode === 'function') {
+        btn.style.display = '';
+        btn.addEventListener('click', () => enterReviewMode(folder.id));
+      }
+    }).catch(() => {});
+  }
+  return strip;
 }
 
 // Transcript hit in global search — same card shell as notes, mic pill,
