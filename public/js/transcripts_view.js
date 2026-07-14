@@ -305,6 +305,7 @@
             <div id="transcriptPreviewTitle" class="transcript-preview-title">제목</div>
             <div id="transcriptPreviewMeta" class="transcript-preview-meta"></div>
             <button id="transcriptSpeakerRenameBtn" style="display:none;margin-top:0.4rem;font-size:0.78rem;padding:0.28rem 0.7rem;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;">🏷 발화자 이름 바꾸기</button>
+            <div id="transcriptPreviewUsedIn" class="transcript-preview-usedin"></div>
           </div>
           <button id="transcriptPreviewCloseBtn" class="transcript-preview-close" aria-label="닫기"><i data-lucide="x" class="icon-sm"></i></button>
         </header>
@@ -388,6 +389,27 @@
 
     const renameBtn = document.getElementById('transcriptSpeakerRenameBtn');
     if (renameBtn) renameBtn.style.display = hasSpeakerLabels(t.text || '') ? '' : 'none';
+
+    // U18: "이 녹취록으로 만든 노트" chips — usedInNoteIds is written by the
+    // single-note pipeline; deleted notes resolve to null and are dropped.
+    const usedEl = document.getElementById('transcriptPreviewUsedIn');
+    if (usedEl) {
+      usedEl.innerHTML = '';
+      const ids = Array.isArray(t.usedInNoteIds) ? t.usedInNoteIds.slice(-5).reverse() : [];
+      if (ids.length && typeof getNoteFS === 'function') {
+        Promise.all(ids.map(id => getNoteFS(id).catch(() => null))).then(notes => {
+          if (titleEl.dataset.transcriptId !== t.id) return; // preview moved on
+          const found = notes.filter(Boolean);
+          if (!found.length) return;
+          usedEl.innerHTML = '<span class="usedin-label">이 녹취록으로 만든 노트</span>' +
+            found.map(n => `<button class="usedin-chip" data-note-id="${escHtml(n.id)}">📄 ${escHtml(n.title || '제목없음')}</button>`).join('');
+          usedEl.querySelectorAll('.usedin-chip').forEach(btn => btn.addEventListener('click', () => {
+            hidePreviewModal();
+            if (typeof openSavedNote === 'function') openSavedNote(btn.dataset.noteId);
+          }));
+        });
+      }
+    }
 
     _previewEl.classList.remove('hidden');
 

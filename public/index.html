@@ -3286,6 +3286,16 @@
       font-size: 0.78rem;
       color: var(--text-muted);
     }
+    .transcript-preview-usedin {
+      margin-top: 0.45rem; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    }
+    .usedin-label { font-size: 0.72rem; color: var(--text-muted); }
+    .usedin-chip {
+      font-size: 0.76rem; padding: 0.22rem 0.6rem; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      cursor: pointer; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .usedin-chip:hover { border-color: var(--primary); color: var(--primary-bright); }
     .transcript-preview-close {
       flex: 0 0 auto;
       width: 32px;
@@ -4985,7 +4995,7 @@
 <script defer src="/js/deixis.js?v=u17fix"></script>
 <script defer src="/js/pipeline.js?v=u17fix"></script>
 <script defer src="/js/batch.js?v=u15polish"></script>
-<script defer src="/js/note_creation.js?v=u17fix"></script>
+<script defer src="/js/note_creation.js?v=u18link"></script>
 <script defer src="/js/notes_crud.js?v=u15polish"></script>
 <script defer src="/js/notion_viewer.js?v=u15polish"></script>
 <script defer src="/js/notion_clipboard.js?v=u15polish"></script>
@@ -4995,7 +5005,7 @@
 <script defer src="/js/timetable.js?v=u15polish"></script>
 <script defer src="/js/srs_review.js?v=u15polish"></script>
 <script defer src="/js/home_view.js?v=u18tsearch"></script>
-<script defer src="/js/transcripts_view.js?v=u17fix"></script>
+<script defer src="/js/transcripts_view.js?v=u18link"></script>
 <script defer src="/js/bulk.js?v=u15polish"></script>
 <script defer src="/js/firebase_auth.js?v=u15polish"></script>
 <script defer src="/js/payment.js?v=u15polish"></script>

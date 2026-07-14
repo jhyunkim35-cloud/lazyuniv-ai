@@ -184,6 +184,14 @@ async function runSingleNoteAnalysis() {
     // user's chosen title/folder (or keeps the auto title on cancel —
     // unchanged prior behavior).
     await draftSaveNote().catch(e => console.error('draftSaveNote:', e));
+    // U18: link source transcripts to this note (usedInNoteIds) — the tracking
+    // field has existed since the transcript store landed but nothing wrote it.
+    // Best-effort fire-and-forget; markTranscriptUsedInNote never rejects.
+    if (currentNoteId) {
+      for (const s of recFiles) {
+        if (s.file._transcriptId) markTranscriptUsedInNote(s.file._transcriptId, currentNoteId);
+      }
+    }
     autoSaveNote().catch(e => { console.error('autoSaveNote:', e); showToast(`❌ 자동 저장 실패: ${e.message}`); });
     // Usage is now incremented server-side by /api/claude on first call.
 

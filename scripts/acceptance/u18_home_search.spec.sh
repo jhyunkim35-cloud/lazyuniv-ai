@@ -48,6 +48,12 @@ assert_contains public/index.html ".split-no-slides" "U18-6b: 플레이스홀더
 # ── 7) Esc 검색 클리어 ──────────────────────────────────────
 assert_contains public/js/main_inline.js "if (e.key === 'Escape' && this.value) {" "U18-7: Esc로 검색 클리어"
 
+# ── 7b) 녹취록↔노트 링크 (usedInNoteIds 배선 + 미리보기 칩) ─
+assert_contains public/js/note_creation.js "markTranscriptUsedInNote(s.file._transcriptId, currentNoteId)" "U18-7b1: 노트 저장 시 소스 녹취록에 usedInNoteIds 기록"
+assert_contains public/js/transcripts_view.js "transcriptPreviewUsedIn" "U18-7b2: 미리보기에 '만든 노트' 칩 컨테이너"
+assert_contains public/js/transcripts_view.js "openSavedNote(btn.dataset.noteId)" "U18-7b3: 칩 클릭 → 노트 열기"
+assert_contains public/index.html ".usedin-chip" "U18-7b4: 칩 CSS 존재"
+
 # ── 8) node --check ─────────────────────────────────────────
 for _u18_f in public/js/home_view.js public/js/transcripts_store.js public/js/main_inline.js; do
   if node --check "$_u18_f" >/dev/null 2>&1; then
