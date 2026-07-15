@@ -323,7 +323,8 @@
   function showCreateSuccess(box, data, lectureName) {
     box.style.display = 'block';
     box.replaceChildren();
-    const url = `${location.origin}/?roomJoin=${encodeURIComponent(data.inviteToken)}`;
+    // Fragment (#roomJoin=) keeps the token out of server logs / Referer.
+    const url = `${location.origin}/#roomJoin=${encodeURIComponent(data.inviteToken)}`;
 
     box.appendChild($('div', { style: 'font-weight:600;font-size:14px;margin-bottom:8px' }, '✅ 룸 생성 완료'));
     box.appendChild($('div', { style: 'font-size:12px;color:var(--text-muted,#64748b);margin-bottom:8px' },
@@ -795,7 +796,9 @@
 
     // Invite link copy button (only when active)
     if (!isArchived && roomData.inviteToken) {
-      const inviteUrl = `${location.origin}/?roomJoin=${encodeURIComponent(roomData.inviteToken)}`;
+      // `let` — the regen button below swaps in a fresh token in place.
+      // Fragment (#roomJoin=) keeps the token out of server logs / Referer.
+      let inviteUrl = `${location.origin}/#roomJoin=${encodeURIComponent(roomData.inviteToken)}`;
       const inviteBtn = $('button', {
         class: 'sr-page-meta-invite',
         onclick: async () => {
@@ -807,6 +810,44 @@
         },
       }, '🔗 초대 링크 복사');
       sheet.appendChild(inviteBtn);
+
+      // Leak kill-switch (creator only): mint a new token server-side —
+      // any previously shared link dies instantly. Client-side inviteToken
+      // writes are rule-blocked, so this goes through /api/invite-regen.
+      if (isCreator) {
+        const regenBtn = $('button', {
+          class: 'sr-page-meta-invite sr-page-meta-regen',
+          onclick: async () => {
+            if (!await appConfirm('초대 링크를 재발급하시겠습니까?\n기존에 공유한 링크는 즉시 무효화됩니다.', { danger: true })) return;
+            regenBtn.disabled = true;
+            regenBtn.textContent = '재발급 중...';
+            try {
+              const idToken = await getIdToken();
+              if (!idToken) throw new Error('로그인이 필요합니다');
+              const res = await fetch('/api/invite-regen', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + idToken,
+                },
+                body: JSON.stringify({ type: 'room', id: roomData.id }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data.inviteToken) throw new Error(data.error || ('http_' + res.status));
+              roomData.inviteToken = data.inviteToken;
+              inviteUrl = `${location.origin}/#roomJoin=${encodeURIComponent(data.inviteToken)}`;
+              toast('새 초대 링크가 발급되었습니다 — 이전 링크는 무효화됨', 'success');
+            } catch (e) {
+              console.error('[study_rooms] invite regen failed', e);
+              toast('재발급 실패: ' + (e.message || 'unknown'));
+            } finally {
+              regenBtn.disabled = false;
+              regenBtn.textContent = '♻️ 링크 재발급';
+            }
+          },
+        }, '♻️ 링크 재발급');
+        sheet.appendChild(regenBtn);
+      }
     }
 
     sheet.appendChild($('h3', { class: 'sr-page-section-title' }, '멤버 · 학습 진도'));

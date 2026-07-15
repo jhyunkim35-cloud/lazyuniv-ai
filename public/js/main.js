@@ -144,13 +144,41 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
   }
 })();
 
-// Handle invite link (?join=<token>): wait for auth, then open join modal.
-// Runs AFTER the payment IIFE — by the time we get here payment has already
-// cleaned its own params from the URL, but `join` survives because payment's
-// replaceState was triggered only on `?payment=...`. We grab `join` fresh.
+// ── Invite param helpers (fragment-first, query fallback) ──────────────────
+// New invite links carry the token in the URL FRAGMENT (#join=<token>) so
+// the secret never leaves the browser: fragments are not sent to the server
+// (no server/CDN log exposure) and are stripped from Referer headers.
+// Old links used query params (?join=<token>) — we keep reading those for
+// backward compat so already-shared links don't break.
+function readInviteParam(name) {
+  try {
+    const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, '')).get(name);
+    if (fromHash) return fromHash;
+  } catch (_) { /* malformed hash: fall through to query */ }
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+// Strip the param from BOTH hash and query so a refresh doesn't re-trigger
+// the modal, preserving any other params/fragments (future deeplinks).
+function stripInviteParam(name) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(name);
+    const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+    hashParams.delete(name);
+    const q = url.searchParams.toString();
+    const h = hashParams.toString();
+    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + (h ? '#' + h : ''));
+  } catch (_) { /* old browsers without URL constructor: ignore */ }
+}
+
+// Handle invite link (#join=<token>, legacy ?join=): wait for auth, then
+// open join modal. Runs AFTER the payment IIFE — by the time we get here
+// payment has already cleaned its own params from the URL, but `join`
+// survives because payment's replaceState was triggered only on
+// `?payment=...` and preserves url.hash. We grab `join` fresh.
 (async function handleJoinCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('join');
+  const token = readInviteParam('join');
   if (!token) return;
 
   // Wait for auth — user may still need to click "Google 로그인"
@@ -159,14 +187,7 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
     else auth.onAuthStateChanged(u => { if (u) resolve(); });
   });
 
-  // Clean only the `join` param so a refresh doesn't re-trigger the modal,
-  // but preserve any other params (e.g. future deeplinks).
-  try {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('join');
-    const q = url.searchParams.toString();
-    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
-  } catch (_) { /* old browsers without URL constructor: ignore */ }
+  stripInviteParam('join');
 
   if (typeof openGroupJoinModal === 'function') {
     openGroupJoinModal({ token });
@@ -206,13 +227,13 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
   }
 })();
 
-// Handle study-room invite link (?roomJoin=<token>): wait for auth, then
-// open the study-room join modal. Separate param from ?join= because group
-// and room tokens have the same shape but live in different collections —
-// we don't want a stale group token to accidentally route to room-join.
+// Handle study-room invite link (#roomJoin=<token>, legacy ?roomJoin=):
+// wait for auth, then open the study-room join modal. Separate param from
+// join because group and room tokens have the same shape but live in
+// different collections — we don't want a stale group token to accidentally
+// route to room-join.
 (async function handleStudyRoomJoinCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('roomJoin');
+  const token = readInviteParam('roomJoin');
   if (!token) return;
 
   await new Promise(resolve => {
@@ -220,12 +241,7 @@ window.addEventListener('beforeunload', () => clearInterval(_debugPanelInterval)
     else auth.onAuthStateChanged(u => { if (u) resolve(); });
   });
 
-  try {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('roomJoin');
-    const q = url.searchParams.toString();
-    window.history.replaceState({}, '', url.pathname + (q ? '?' + q : '') + url.hash);
-  } catch (_) {}
+  stripInviteParam('roomJoin');
 
   if (typeof openStudyRoomJoinModal === 'function') {
     openStudyRoomJoinModal({ token });

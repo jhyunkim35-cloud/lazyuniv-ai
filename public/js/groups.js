@@ -256,7 +256,9 @@
     box.style.display = 'block';
     box.replaceChildren();
 
-    const url = `${location.origin}/?join=${encodeURIComponent(data.inviteToken)}`;
+    // Token rides in the URL FRAGMENT (#join=...) — fragments never reach the
+    // server, so the token stays out of server/CDN logs and Referer headers.
+    const url = `${location.origin}/#join=${encodeURIComponent(data.inviteToken)}`;
 
     box.appendChild($('div', { style: 'font-weight:600;font-size:14px;margin-bottom:8px' }, '✅ 그룹 생성 완료'));
     box.appendChild($('div', { style: 'font-size:12px;color:var(--text-muted,#64748b);margin-bottom:8px' }, '아래 링크를 친구한테 공유하세요'));
@@ -532,7 +534,9 @@
     meta.appendChild(metaItem('⏱', '예상', (groupData.expectedMinutes || 0) + '분'));
     meta.appendChild(metaItem('👥', '멤버', membersData.length + '명'));
     if (!isArchived && groupData.inviteToken) {
-      const inviteUrl = `${location.origin}/?join=${encodeURIComponent(groupData.inviteToken)}`;
+      // `let` — the regen button below swaps in a fresh token in place.
+      // Fragment (#join=) keeps the token out of server logs / Referer.
+      let inviteUrl = `${location.origin}/#join=${encodeURIComponent(groupData.inviteToken)}`;
       const inviteBtn = $('button', {
         class: 'groups-meta-invite',
         onclick: async () => {
@@ -546,6 +550,44 @@
         },
       }, '🔗 초대 링크 복사');
       meta.appendChild(inviteBtn);
+
+      // Leak kill-switch (creator only): mint a new token server-side —
+      // any previously shared link dies instantly. Rules whitelist blocks
+      // client-side inviteToken writes, so this goes through /api/invite-regen.
+      if (isCreator) {
+        const regenBtn = $('button', {
+          class: 'groups-meta-invite groups-meta-regen',
+          onclick: async () => {
+            if (!await appConfirm('초대 링크를 재발급하시겠습니까?\n기존에 공유한 링크는 즉시 무효화됩니다.', { danger: true })) return;
+            regenBtn.disabled = true;
+            regenBtn.textContent = '재발급 중...';
+            try {
+              const idToken = await getIdToken();
+              if (!idToken) throw new Error('로그인이 필요합니다');
+              const res = await fetch('/api/invite-regen', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + idToken,
+                },
+                body: JSON.stringify({ type: 'group', id: groupData.id }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data.inviteToken) throw new Error(data.error || ('http_' + res.status));
+              groupData.inviteToken = data.inviteToken;
+              inviteUrl = `${location.origin}/#join=${encodeURIComponent(data.inviteToken)}`;
+              toast('새 초대 링크가 발급되었습니다 — 이전 링크는 무효화됨', 'success');
+            } catch (e) {
+              console.error('[group-page] invite regen failed', e);
+              toast('재발급 실패: ' + (e.message || 'unknown'));
+            } finally {
+              regenBtn.disabled = false;
+              regenBtn.textContent = '♻️ 링크 재발급';
+            }
+          },
+        }, '♻️ 링크 재발급');
+        meta.appendChild(regenBtn);
+      }
     }
     sheet.appendChild(meta);
 
