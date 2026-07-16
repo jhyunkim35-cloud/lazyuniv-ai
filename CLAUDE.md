@@ -34,6 +34,7 @@ Vanilla JS + Vercel 서버리스 + Firebase. 라이브: notyx.co.kr
 - 캐시버스트: `index.html` 의 `?v=OLD` → `?v=NEW` 교체 필수 (안 하면 stale).
 - 프리커밋 훅: `.githooks/pre-commit`가 JS 문법오류·한글 모지바케 자동 차단. 새 클론 1회만 `git config core.hooksPath .githooks` (안 하면 훅 안 돎).
 - `/goal` 프롬프트: **4,000자 하드 제한** (초과 시 명령 자체가 거부됨). 킥오프 프롬프트 작성 시 반드시 글자수 세고 시작 — 상세 컨텍스트는 파일(예: `C:\temp\<작업>\brief.md`)로 빼고 /goal에는 "그 파일 먼저 읽어라" 한 줄 + 핵심 골만.
+- **구현 위임 = `implementer` 에이전트 필수** (`~/.claude/agents/implementer.md`, claude-sonnet-5 고정). Workflow/Agent 호출에 model 미지정 시 메인 모델(Fable) 상속되는 사고 이력(7/14~15 세션 전체 Fable 구현) — 코드 작성은 절대 메인 모델로 직접 하지 말고 implementer로 위임. 메인(Fable)은 플래닝·리뷰·감사만.
 
 ## 📚 스택
 - `public/index.html` + `public/js/` ~36개 (ES모듈 X, `<script src>`, **로드순서 중요**)
