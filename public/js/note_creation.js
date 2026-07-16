@@ -70,23 +70,38 @@ async function runSingleNoteAnalysis() {
   // Reset image state so a PDF re-run never shows stale PPTX gallery data
   renderImageGallery([]);
 
+  // R1: PDF page-image render kicked off here runs in the background, in
+  // parallel with the AI pipeline (which only consumes storedPptText) — joined
+  // right before setProgress(100) below, after the pipeline finishes.
+  let pdfImagesPromise = null;
+
   try {
-    if (pptFile) {
+    if (pptFile && pptFile.name.toLowerCase().endsWith('.pdf')) {
+      setProgress(5, '파일 읽는 중…');
+      const pdfjs = await getPdfjsLib();
+      const pdfDoc = await pdfjs.getDocument({ data: await pptFile.arrayBuffer() }).promise;
+      if (pdfDoc.numPages > MAX_PDF_PAGES) {   // early gate BEFORE any AI spend
+        const n = pdfDoc.numPages; pdfDoc.destroy();
+        throw Object.assign(new Error(`PDF가 ${n}페이지입니다. 최대 ${MAX_PDF_PAGES}페이지까지 처리할 수 있습니다.`), { name: 'PageLimitError' });
+      }
+      if (pdfDoc.numPages > WARN_PDF_PAGES) showToast(`📄 PDF가 ${pdfDoc.numPages}페이지입니다. 처리 시간이 길어질 수 있습니다.`);
+      storedPptText = await extractPdfTextFromDoc(pdfDoc);
+      // kick off page-image rendering in the background — the note pipeline is text-only
+      pdfImagesPromise = extractPdfPageImagesFromDoc(pdfDoc, {
+        onProgress: (done, total) => { if (done % 10 === 0 || done === total) agentLog(0, `슬라이드 이미지 렌더링 ${done}/${total}p (백그라운드)`); },
+      });
+      pdfImagesPromise.catch(() => {});   // silence unhandledrejection if the pipeline throws first
+    } else if (pptFile) {
       setProgress(5, '파일 읽는 중…');
       const pptText = await extractPresentationText(pptFile);
       storedPptText = pptText;
 
-      // Extract images from PPTX or PDF and render gallery
+      // Extract images from PPTX and render gallery
       if (pptFile.name.toLowerCase().endsWith('.pptx')) {
         setProgress(8, '슬라이드 이미지 추출 중…');
         const imgs = await extractPptxImages(pptFile);
         renderImageGallery(imgs);
         if (imgs.length) agentLog(0, `슬라이드 이미지 ${imgs.length}개 발견`);
-      } else if (pptFile.name.toLowerCase().endsWith('.pdf')) {
-        setProgress(8, 'PDF 페이지 이미지 렌더링 중…');
-        const imgs = await extractPdfPageImages(pptFile);
-        renderImageGallery(imgs);
-        if (imgs.length) agentLog(0, `PDF 페이지 이미지 ${imgs.length}개 렌더링`);
       }
       // .docx has no images to extract — falls through here with none, which is fine.
     } else if (imageFiles.length) {
@@ -157,6 +172,20 @@ async function runSingleNoteAnalysis() {
           console.warn('[deixis] annotation loop failed:', e);
         }
       }
+    }
+
+    // R1: join the background PDF page-image render (kicked off before the AI
+    // pipeline) — must land before draftSaveNote/autoSaveNote (upload extractedImages
+    // to Storage) and before the split-viewer auto-open below.
+    if (pdfImagesPromise) {
+      setProgress(97, '슬라이드 이미지 렌더링 마무리 중…');
+      const imgs = await pdfImagesPromise.catch(e => {
+        if (e?.name === 'AbortError') throw e;           // preserve cancel semantics
+        console.warn('PDF 페이지 이미지 렌더링 실패:', e);
+        return [];
+      });
+      renderImageGallery(imgs);
+      if (imgs.length) agentLog(0, `PDF 페이지 이미지 ${imgs.length}개 렌더링`);
     }
 
     setProgress(100, '완료!');

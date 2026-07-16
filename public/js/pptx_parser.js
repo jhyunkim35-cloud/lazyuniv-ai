@@ -803,21 +803,11 @@ async function extractPptxImages(file) {
 }
 
 /* ── PDF via PDF.js ───────────────────────────── */
-async function extractPdfText(file) {
-  const pdfjs = await getPdfjsLib();
-
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+// R1: text-pass loop, factored out of extractPdfText so note_creation.js can
+// run it against a doc it already opened itself (parallel with image render).
+// Takes an already-loaded pdf.js doc; does not load/destroy/page-limit-check.
+async function extractPdfTextFromDoc(pdf) {
   const numPages = pdf.numPages;
-
-  if (numPages > MAX_PDF_PAGES) {
-    pdf.destroy();
-    throw Object.assign(new Error(`PDF가 ${numPages}페이지입니다. 최대 ${MAX_PDF_PAGES}페이지까지 처리할 수 있습니다.`), { name: 'PageLimitError' });
-  }
-  if (numPages > WARN_PDF_PAGES) {
-    showToast(`📄 PDF가 ${numPages}페이지입니다. 처리 시간이 길어질 수 있습니다.`);
-  }
-
   const lines = [];
   for (let i = 1; i <= numPages; i++) {
     // Yield to the browser every 5 pages to keep the UI responsive
@@ -848,14 +838,96 @@ async function extractPdfText(file) {
     }
   }
 
-  const result = lines.join('\n').trim() || 'PDF에서 텍스트를 추출할 수 없습니다.';
+  return lines.join('\n').trim() || 'PDF에서 텍스트를 추출할 수 없습니다.';
+}
+
+async function extractPdfText(file) {
+  const pdfjs = await getPdfjsLib();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+  const numPages = pdf.numPages;
+
+  if (numPages > MAX_PDF_PAGES) {
+    pdf.destroy();
+    throw Object.assign(new Error(`PDF가 ${numPages}페이지입니다. 최대 ${MAX_PDF_PAGES}페이지까지 처리할 수 있습니다.`), { name: 'PageLimitError' });
+  }
+  if (numPages > WARN_PDF_PAGES) {
+    showToast(`📄 PDF가 ${numPages}페이지입니다. 처리 시간이 길어질 수 있습니다.`);
+  }
+
+  const result = await extractPdfTextFromDoc(pdf);
   pdf.destroy();
   return result;
 }
 
 /* ── PDF page image extraction ────────────────── */
+// ponytail: FileReader is the only way to turn a Blob into a base64 string in
+// the browser without pulling in a dependency — no Buffer here.
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// R1: image-render loop, factored out of extractPdfPageImages so note_creation.js
+// can run it in the background, in parallel with the AI text pipeline, against
+// a doc it already opened itself. 3-way concurrency pool + adaptive render scale
+// (drops to 1.25 past 40 pages) + async OffscreenCanvas encode where available —
+// all just to cut wall-clock on the previously-serial synchronous-canvas render.
+async function extractPdfPageImagesFromDoc(pdf, opts = {}) {
+  const { onProgress, ownsDoc = true } = opts;
+  const total = pdf.numPages;
+  const scale = total > 40 ? 1.25 : 1.5;
+  const images = new Array(total);
+  let nextPage  = 1;
+  let doneCount = 0;
+
+  async function worker() {
+    while (nextPage <= total) {
+      if (abortController?.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      const i = nextPage++;
+      if (i > total) return;
+
+      const page     = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale });
+
+      let imageBase64;
+      if (typeof OffscreenCanvas !== 'undefined') {
+        const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
+        imageBase64 = await blobToBase64(blob);
+      } else {
+        const canvas   = document.createElement('canvas');
+        canvas.width   = viewport.width;
+        canvas.height  = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        imageBase64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+      }
+
+      images[i - 1] = { slideNumber: i, imageBase64, mimeType: 'image/jpeg' };
+      doneCount++;
+      onProgress?.(doneCount, total);
+    }
+  }
+
+  try {
+    await Promise.all(Array.from({ length: Math.min(3, total) }, worker));
+  } catch (e) {
+    if (ownsDoc) pdf.destroy();
+    throw e;
+  }
+
+  if (ownsDoc) pdf.destroy();
+  return images;
+}
+
 async function extractPdfPageImages(file) {
-  const images = [];
+  let images = [];
   try {
     const pdfjs = await getPdfjsLib();
     const arrayBuffer = await file.arrayBuffer();
@@ -869,26 +941,7 @@ async function extractPdfPageImages(file) {
       showToast(`📄 PDF가 ${pdf.numPages}페이지입니다. 처리 시간이 길어질 수 있습니다.`);
     }
 
-    for (let i = 1; i <= pdf.numPages; i++) {
-      // Yield to the browser every 5 pages to keep the UI responsive
-      if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
-      if (abortController?.signal.aborted) { pdf.destroy(); throw new DOMException('Aborted', 'AbortError'); }
-
-      const page     = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas   = document.createElement('canvas');
-      canvas.width   = viewport.width;
-      canvas.height  = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const dataURL = canvas.toDataURL('image/jpeg', 0.85);
-      images.push({
-        slideNumber: i,
-        imageBase64: dataURL.split(',')[1],
-        mimeType:    'image/jpeg',
-      });
-    }
-
-    pdf.destroy();
+    images = await extractPdfPageImagesFromDoc(pdf);
   } catch (e) {
     if (e.name === 'AbortError' || e.name === 'PageLimitError') throw e;
     console.warn('PDF 페이지 이미지 추출 오류:', e);
